@@ -1,0 +1,348 @@
+use super::*;
+
+use std::process::{Output, Stdio};
+
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ModFlags {
+    checksum: Option<bool>,
+    size: Option<bool>,
+    mod_time: Option<bool>,
+    perms: Option<bool>,
+    owner: Option<bool>,
+    group: Option<bool>,
+    update_time: Option<bool>,
+    acl: Option<bool>,
+    ext_attr: Option<bool>,
+}
+
+impl ModFlags {
+    pub fn parse(s: &[u8]) -> Result<ModFlags, ParseError> {
+        fn parse_flag(b: u8, on: u8) -> Result<Option<bool>, ParseError> {
+            if b == on {
+                Ok(Some(true))
+            } else if b == b' ' || b == b'.' || b == b'+' {
+                Ok(Some(false))
+            } else if b == b'?' {
+                Ok(None)
+            } else {
+                Err(ParseError { line: line!() }) //FIXME (jc)
+            }
+        }
+
+        if s.len() != 9 {
+            Err(ParseError { line: line!() }) //FIXME (jc)
+        } else {
+            Ok(ModFlags {
+                checksum: parse_flag(s[0], b'c')?,
+                size: parse_flag(s[1], b's')?,
+                mod_time: parse_flag(s[2], b't')?,
+                perms: parse_flag(s[3], b'p')?,
+                owner: parse_flag(s[4], b'o')?,
+                group: parse_flag(s[5], b'g')?,
+                update_time: parse_flag(s[6], b'u')?,
+                acl: parse_flag(s[7], b'a')?,
+                ext_attr: parse_flag(s[8], b'x')?,
+            })
+        }
+    }
+
+    pub fn is_modified_content(&self) -> bool {
+        self.checksum == Some(true) || self.size == Some(true)
+    }
+
+    pub fn is_modified_chmod(&self) -> bool {
+        self.perms == Some(true)
+    }
+
+    pub fn is_modified_chown(&self) -> bool {
+        self.owner == Some(true) || self.group == Some(true)
+    }
+
+    pub fn checksum(&self) -> Option<bool> {
+        self.checksum
+    }
+
+    pub fn size(&self) -> Option<bool> {
+        self.size
+    }
+
+    pub fn mod_time(&self) -> Option<bool> {
+        self.mod_time
+    }
+
+    pub fn perms(&self) -> Option<bool> {
+        self.perms
+    }
+
+    pub fn owner(&self) -> Option<bool> {
+        self.owner
+    }
+
+    pub fn group(&self) -> Option<bool> {
+        self.group
+    }
+
+    pub fn update_time(&self) -> Option<bool> {
+        self.update_time
+    }
+
+    pub fn acl(&self) -> Option<bool> {
+        self.acl
+    }
+
+    pub fn ext_attr(&self) -> Option<bool> {
+        self.ext_attr
+    }
+}
+
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum State {
+    /// Item is identical in both source and destination locations
+    Identical,
+    /// Item is modified between source and destination locations
+    Modified(ModFlags),
+    /// Item exists in source location and it is missing from destination location
+    Missing,
+    /// Item exists in destination location and it is missing from source location
+    Extraneous,
+}
+
+impl State {
+    pub fn is_modified_content(&self) -> bool {
+        match *self {
+            State::Identical => false,
+            State::Modified(flags) => flags.is_modified_content(),
+            State::Missing => true,
+            State::Extraneous => true,
+        }
+    }
+
+    pub fn is_modified_chmod(&self) -> bool {
+        match *self {
+            State::Identical => false,
+            State::Modified(flags) => flags.is_modified_chmod(),
+            State::Missing => true,
+            State::Extraneous => true,
+        }
+    }
+
+    pub fn is_modified_chown(&self) -> bool {
+        match *self {
+            State::Identical => false,
+            State::Modified(flags) => flags.is_modified_chown(),
+            State::Missing => true,
+            State::Extraneous => true,
+        }
+    }
+
+    pub fn mod_flags(&self) -> Option<ModFlags> {
+        match *self {
+            State::Modified(flags) => Some(flags),
+            _ => None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum FileType {
+    File,
+    Dir,
+    Symlink,
+    Device,
+    Special,
+}
+
+impl FileType {
+    pub fn parse(t: u8) -> Result<FileType, ParseError> {
+        match t {
+            b'f' => Ok(FileType::File),
+            b'd' => Ok(FileType::Dir),
+            b'L' => Ok(FileType::Symlink),
+            b'D' => Ok(FileType::Device),
+            b'S' => Ok(FileType::Special),
+            _ => Err(ParseError { line: line!() }),
+        }
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiffInfo {
+    state: State,
+    file_type: Option<FileType>,
+    file_path: PathBuf,
+}
+
+impl DiffInfo {
+    pub fn parse(details: &[u8], file_path: &str) -> Result<DiffInfo, ParseError> {
+        let (file_type, state) = {
+            if details == b"*deleting  " {
+                (None, State::Extraneous)
+            } else {
+                let file_type = FileType::parse(details[1])?;
+                let mod_flags = &details[2..];
+                let state = if mod_flags == b"+++++++++" {
+                    State::Missing
+                } else {
+                    State::Modified(ModFlags::parse(mod_flags)?)
+                };
+                (Some(file_type), state)
+            }
+        };
+
+        Ok(DiffInfo {
+            file_path: file_path.into(),
+            file_type,
+            state,
+        })
+    }
+
+    pub fn file_path(&self) -> &Path {
+        &self.file_path
+    }
+
+    pub fn file_type(&self) -> Option<FileType> {
+        self.file_type
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+}
+
+
+pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<Vec<DiffInfo>> {
+    let mut rsync_cmd = params.to_cmd(config);
+
+    rsync_cmd
+        .arg("--verbose")
+        .arg("--recursive")
+        .arg("--dry-run") // perform a trial run with no changes made
+        .arg("--super") // assume super-user rights. Necessary for owner checking
+        .arg("--checksum") // skip based on checksum, not mod-time & size.
+        .arg("--archive") // equals -rlptgoD (no -H,-A,-X)
+        .arg("--delete") // delete extraneous files from dest dirs
+        .arg("-ii") // output unchanged files
+        .arg("--out-format=###%i %f")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = rsync_cmd.output()?;
+
+    let Output {
+        status,
+        stdout,
+        stderr
+    } = output;
+
+    match status.code() {
+        None => Err(RsyncError::RsyncProcessTerminated),
+        Some(0) => {
+            let output = String::from_utf8(stdout).unwrap(); // FIXME (jc)
+            parse_output(&output).map_err(|err| err.into())
+        }
+        Some(_c) => {
+            let output = String::from_utf8(stderr).unwrap(); // FIXME (jc)
+            eprintln!("{}", output);
+            Err(RsyncError::RsyncProcessTerminated) //FIXME (jc)
+        }
+    }
+}
+
+
+fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
+    let mut diffs = Vec::new();
+
+    let items = output.lines().filter_map(|line| {
+        if line.starts_with("###") && line.len() > 15 {
+            Some((line[3..14].as_bytes(), &line[15..]))
+        } else {
+            None
+        }
+    });
+
+    for (details, file_path) in items {
+        let diff = DiffInfo::parse(details, file_path)?;
+        diffs.push(diff);
+    }
+
+    Ok(diffs)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_rsync_output() {
+        let out = r#"
+sending incremental file list
+###*deleting   .op/20180706_231007_143/001_zeus/etc/hosts
+###*deleting   .op/20180706_231007_143/001_zeus/etc/
+###*deleting   .op/20180706_231007_143/001_zeus/output.log
+###*deleting   .op/20180706_231007_143/001_zeus/_job.yaml
+###*deleting   .op/20180706_231007_143/001_zeus/
+###*deleting   .op/20180706_231007_143/001_heffe/etc/hosts
+###*deleting   .op/20180706_231007_143/001_heffe/etc/
+###*deleting   .op/20180706_231007_143/001_heffe/output.log
+###*deleting   .op/20180706_231007_143/001_heffe/_job.yaml
+###*deleting   .op/20180706_231007_143/001_heffe/
+###*deleting   .op/20180706_231007_143/_work.yaml
+###*deleting   .op/20180706_231007_143/
+###*deleting   .op/
+###*deleting   proc/script.sh
+###.d..t...... ./
+###>fcst...... .operc
+###.d..t...... conf/
+###.d..t...... conf/hosts/
+###.f          conf/hosts/.operc
+###>fcst...... conf/hosts/_default.yaml
+###>f+++++++++ conf/hosts/abc.yaml
+###>fcst...... conf/hosts/heffe.yaml
+###.d..t...... conf/hosts/zeus/
+###>fcst...... conf/hosts/zeus/_.yaml
+###.f          conf/hosts/zeus/id_rsa
+###.d          conf/users/
+###.f          conf/users/.operc
+###.f          conf/users/_default.yaml
+###.f          conf/users/jc.yaml
+###.f          conf/users/tkrym.yaml
+###.f          conf/users/ws.toml
+###cd+++++++++ conf/users2/
+###>f+++++++++ conf/users2/_default.yaml
+###.d..t...... proc/
+###>fcst...... proc/.operc
+###>fcst...... proc/hosts.yaml
+###.d          proc/etc/
+###.f          proc/etc/hosts
+###.d          ui/
+###.f          ui/dashboards.json
+
+sent 955 bytes  received 629 bytes  3,168.00 bytes/sec
+total size is 2,099  speedup is 1.33 (DRY RUN)
+"#;
+        let diffs = parse_output(out).unwrap();
+        for d in diffs {
+            println!("{:?}", d);
+        }
+    }
+
+    #[test]
+    fn rsync_compare_() {
+        let config = RsyncConfig::default();
+        let mut p = RsyncParams::new( "./","../op-model/test-data/model2/", "../op-model/test-data/model1/");
+        p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.operon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
+
+        let diffs = rsync_compare(&config, &p).unwrap();
+        println!("{}", diffs.len());
+        for d in diffs {
+            println!("{:?}", d);
+        }
+    }
+}
+

@@ -1,0 +1,42 @@
+---
+scope:
+tasks:
+  "generate /etc/hosts":
+    kind: template
+    scope:
+      src_path: etc/hosts
+
+updates:
+  "update /etc/hosts":
+    watch:
+      $hosts.hostname: +-*
+      $hosts.**.(ip,ip4,ip6): +-*
+    run:
+      - tasks:
+        - ${$proc.tasks[0]}
+        - kind: file-copy
+          scope:
+            src_path: etc/hosts
+            dst_path: /etc/hosts
+            chown: root:root
+            chmod: u+rw,g+r,o+r
+
+checks:
+  "check /etc/hosts":
+    run:
+      - hosts: ${$hosts}
+        tasks:
+          - ${$proc.tasks[0]}
+          - kind: file-compare
+            scope:
+              src_path: etc/hosts
+              dst_path: /etc/hosts
+              chown: root:root
+              chmod: u+rw,g+r,o+r
+          - kind: script
+            scope:
+              src_path: "script.sh"
+          - kind: command
+            scope:
+              cmd: uname
+              args: ["-r"]

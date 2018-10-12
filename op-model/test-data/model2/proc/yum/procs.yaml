@@ -1,0 +1,82 @@
+---
+yum_install:
+  proc: exec
+  label: Install packages
+  scope:
+  run:
+  - hosts: ${$yum_hosts}
+    tasks:
+    - task: script
+      scope:
+        src_path: "yum-install.sh"
+        run_as: "root"
+        args: ${$yum_packages[$$host.hostname].join(' ')}
+
+yum_remove:
+  proc: exec
+  label: Remove packages
+  scope:
+  run:
+  - hosts: ${$yum_hosts}
+    tasks:
+    - task: script
+      scope:
+        src_path: "yum-remove.sh"
+        run_as: "root"
+        args: ${$yum_packages[$$host.hostname].join(' ')}
+
+# Updates
+yum_update_add:
+  proc: update
+  label: Added packages
+  watch:
+    $$hosts.packages[*]: "+"
+  run:
+  - hosts: ${$$hosts[$$changes.path ^= @.@path])}
+    tasks:
+    - task: exec
+      scope:
+        exec: ${$$procs[@key == 'yum_install']}
+        yum_hosts: ${$$host}
+        yum_packages: ${map($$host.hostname, array($$host.packages[@path == $$changes.path]))}
+
+yum_update_remove:
+  proc: update
+  label: Removed packages
+  watch:
+    $$hosts.packages[*]: "-"
+  run:
+  - hosts: ${$$hosts[$$changes.path ^= @.@path])}
+    tasks:
+    - task: exec
+      scope:
+        exec: ${$$procs[@key == 'yum_remove']}
+        yum_hosts: ${$$host}
+        yum_packages: ${map($$host.hostname, array($$old.**[@path == $$changes.path]))}
+
+# Checks
+yum_check:
+  proc: check
+  label: Check packages
+  run:
+  - hosts: ${$$hosts}
+    tasks:
+    - task: script
+      ro: true
+      scope:
+        src_path: "yum-check.sh"
+        run_as: "root"
+        args: ${$$host.packages.join(' ')}
+      output:
+        var: missing_packages
+        format: json
+    - task: switch
+      cases:
+      - when: ${$missing_packages.length() > 0}
+        run:
+        - tasks:
+          - task: exec
+            scope:
+              exec: ${$$procs[@.@key == 'yum_install']}
+              yum_packages: ${map($$host.hostname, $missing_packages)}
+              yum_hosts: ${$$host}

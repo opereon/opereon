@@ -1,0 +1,553 @@
+use super::*;
+
+use std::path::{Path, PathBuf};
+use std::cmp::Ord;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::io::Read;
+use std::any::TypeId;
+use std::collections::HashMap;
+
+use walkdir::WalkDir;
+use crypto::sha1::Sha1;
+use crypto::digest::Digest;
+use kg_io::OpType;
+
+
+fn hash_file(file_type: FileType, path_abs: &Path, path: &Path, buf: &mut String, sha1: &mut Sha1) -> IoResult<()> {
+    sha1.input(path.to_str().unwrap().as_bytes());
+    if file_type == FileType::File {
+        buf.clear();
+        kg_io::fs::read_to_string(path_abs, buf)?;
+        sha1.input(buf.as_bytes());
+    }
+    Ok(())
+}
+
+
+#[derive(Debug, Serialize)]
+pub struct Model {
+    #[serde(flatten)]
+    scoped: Scoped,
+    metadata: Metadata,
+    hosts: Vec<HostDef>,
+    users: Vec<UserDef>,
+    procs: Vec<ProcDef>,
+    #[serde(skip)]
+    lookup: ModelLookup,
+}
+
+impl Model {
+    fn empty() -> Model {
+        let root = NodeRef::object(Properties::new());
+        Model {
+            metadata: Metadata::default(),
+            scoped: Scoped::new(&root, &root, ScopeDef::new()),
+            hosts: Vec::new(),
+            users: Vec::new(),
+            procs: Vec::new(),
+            lookup: ModelLookup::new(),
+        }
+    }
+
+    /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
+    /// # Returns
+    /// Tuple containing path to manifest dir and manifest itself.
+    pub fn search_manifest(start_dir: &Path) -> IoResult<(PathBuf, Manifest)> {
+        let manifest_filename = PathBuf::from("op.toml");
+
+        let mut parent = Some(start_dir);
+
+        while parent.is_some() {
+            let curr_dir = parent.unwrap();
+            let manifest = curr_dir.join(&manifest_filename);
+
+            let mut content = String::new();
+
+            match kg_io::fs::read_to_string(&manifest, &mut content) {
+                Ok(_) => {
+                    let manifest: Manifest = toml::from_str(&content).unwrap();
+
+                    return Ok((curr_dir.to_owned(), manifest));
+                }
+                Err(err) => {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        return Err(err);
+                    } else {
+                        parent = curr_dir.parent();
+                    }
+                }
+            }
+        }
+
+        return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
+    }
+
+    fn read(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
+        let mut sha1 = Sha1::new();
+        let mut buf = String::new();
+
+        let path = path.canonicalize()?;
+        let (model_dir, manifest) = Model::search_manifest(&path)?;
+
+        assert!(model_dir.is_dir());
+
+        kg_tree::set_base_path(&model_dir);
+        metadata.set_path(model_dir);
+
+        let mut m = Model {
+            metadata,
+            ..Model::empty()
+        };
+
+        let cr = ConfigResolver::scan(m.metadata.path())?;
+
+        m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
+
+        let scope = ScopeMut::new();
+
+        for e in WalkDir::new(m.metadata.path())
+            .min_depth(1)
+            .sort_by(|a, b| a.path().cmp(b.path()))
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+            let path_abs = e.path();
+            let path = path_abs.strip_prefix(m.metadata.path()).unwrap();
+            let file_type: FileType = e.file_type().into();
+
+            if path.starts_with(".op/") {
+                continue;
+            }
+
+            if file_type == FileType::File {
+                let file_name = path.file_name().unwrap();
+                if file_name == DEFAULT_CONFIG_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
+                    hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
+                    continue;
+                }
+            }
+
+            hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
+
+            let config = cr.resolve(path_abs);
+
+            if let Some(inc) = config.find_include(path, file_type) {
+                let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
+
+                let n = NodeRef::null();
+                n.data_mut().set_file(Some(&file_info));
+
+                let item = inc.item().apply_one(m.root(), &n);
+                if item.data().file().is_none() {
+                    item.data_mut().set_file(Some(&file_info));
+                }
+
+                scope.set_var("item".into(), NodeSet::One(item));
+
+                inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
+            }
+        }
+
+        // defines
+        {
+            let defs = manifest.defines().to_node();
+            if manifest.defines().is_user_defined() {
+                defs.data_mut().set_file(Some(&FileInfo::new(&m.metadata.path().join(DEFAULT_MANIFEST_FILENAME), FileType::File, FileFormat::Toml)));
+            }
+
+            let scope_def = m.scoped.scope_def_mut();
+            scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
+            scope_def.set_var_def("$hosts".into(), ValueDef::Resolvable(manifest.defines().hosts().clone()));
+            scope_def.set_var_def("$users".into(), ValueDef::Resolvable(manifest.defines().users().clone()));
+            scope_def.set_var_def("$procs".into(), ValueDef::Resolvable(manifest.defines().procs().clone()));
+        }
+
+        // overrides
+        for (path, config) in cr.iter() {
+            if !config.overrides().is_empty() {
+                let path = if path.as_os_str().is_empty() {
+                    Opath::parse("@").unwrap()
+                } else {
+                    Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
+                };
+
+                let current = path.apply_one(m.root(), m.root());
+
+                for (p, e) in config.overrides().iter() {
+                    let res = p.apply(m.root(), &current);
+                    for n in res.into_iter() {
+                        e.apply(m.root(), &n);
+                    }
+                }
+            }
+        }
+
+        // interpolations
+        let mut resolver = TreeResolver::new();
+        resolver.resolve(m.root());
+
+        {
+            let scope = m.scoped.scope_mut();
+
+            // definitions (hosts, users, processors)
+            //FIXME (jc) error handling
+            let mut hosts = Vec::new();
+            for h in scope.get_var("$hosts").unwrap().iter() {
+                match HostDef::parse(&m, &m.scoped, h) {
+                    Ok(host) => hosts.push(host),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.hosts = hosts;
+
+            let mut users = Vec::new();
+            for u in scope.get_var("$users").unwrap().iter() {
+                match UserDef::parse(&m, &m.scoped, u) {
+                    Ok(user) => users.push(user),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.users = users;
+
+            let mut procs = Vec::new();
+            for p in scope.get_var("$procs").unwrap().iter() {
+                match ProcDef::parse(&m, &m.scoped, p) {
+                    Ok(p) => procs.push(p),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.procs = procs;
+        }
+
+        if m.metadata.id().is_nil() {
+            m.metadata.set_id(Sha1Hash::result(&mut sha1));
+        } else {
+            assert_eq!(m.metadata.id(), Sha1Hash::result(&mut sha1));
+        }
+        Ok(m)
+    }
+
+    pub fn copy(src_path: &Path, dst_path: &Path) -> IoResult<Sha1Hash> {
+        let mut sha1 = Sha1::new();
+        let mut buf = String::new();
+
+        let path = src_path.canonicalize()?;
+        let (model_dir, manifest)= Model::search_manifest(&path)?;
+
+        assert!(model_dir.is_dir());
+
+        for e in WalkDir::new(&model_dir)
+            .min_depth(1)
+            .sort_by(|a, b| a.path().cmp(b.path()))
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+            let path_abs = e.path();
+            let path = path_abs.strip_prefix(&model_dir).unwrap();
+            let file_type: FileType = e.file_type().into();
+
+            if path.starts_with(".op/") {
+                continue;
+            }
+
+            hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
+
+            let dst_path = dst_path.join(path);
+            if !path.as_os_str().is_empty() {
+                if file_type == FileType::Dir {
+                    std::fs::create_dir(dst_path)?;
+                } else {
+                    std::fs::copy(path, dst_path)?;
+                }
+            }
+        }
+
+        Ok(Sha1Hash::result(&mut sha1))
+    }
+
+    pub fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut Metadata {
+        &mut self.metadata
+    }
+
+    pub fn set_metadata(&mut self, metadata: Metadata) {
+        self.metadata = metadata;
+    }
+
+    pub fn hosts(&self) -> &[HostDef] {
+        &self.hosts
+    }
+
+    pub fn users(&self) -> &[UserDef] {
+        &self.users
+    }
+
+    pub fn procs(&self) -> &[ProcDef] {
+        &self.procs
+    }
+
+    pub fn get_host(&self, node: &NodeRef) -> Option<&HostDef> {
+        self.lookup.get(node)
+    }
+
+    pub fn get_host_path(&self, node_path: &Opath) -> Option<&HostDef> {
+        self.lookup.get_path(self.root(), node_path)
+    }
+
+    pub fn get_user(&self, node: &NodeRef) -> Option<&UserDef> {
+        self.lookup.get(node)
+    }
+
+    pub fn get_user_path(&self, node_path: &Opath) -> Option<&UserDef> {
+        self.lookup.get_path(self.root(), node_path)
+    }
+
+    pub fn get_proc(&self, node: &NodeRef) -> Option<&ProcDef> {
+        self.lookup.get(node)
+    }
+
+    pub fn get_proc_path(&self, node_path: &Opath) -> Option<&ProcDef> {
+        self.lookup.get_path(self.root(), node_path)
+    }
+
+    pub fn get_task(&self, node: &NodeRef) -> Option<&TaskDef> {
+        self.lookup.get(node)
+    }
+
+    pub fn get_task_path(&self, node_path: &Opath) -> Option<&TaskDef> {
+        self.lookup.get_path(self.root(), node_path)
+    }
+
+    unsafe fn init(&mut self) {
+        unsafe fn init_proc<T: AsScoped>(lookup: &mut ModelLookup, parent: &T, p: &ProcDef) {
+            lookup.put(p);
+            parent.as_scoped().add_child(p);
+            for s in p.run().steps() {
+                for t in s.tasks() {
+                    lookup.put(t);
+                    p.as_scoped().add_child(t);
+                    if let Some(switch) = t.switch() {
+                        for c in switch.cases() {
+                            init_proc(lookup, t, c.proc());
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut lookup = ModelLookup::new();
+        for h in self.hosts() {
+            lookup.put(h);
+        }
+        for u in self.users() {
+            lookup.put(u);
+        }
+        for p in self.procs() {
+            init_proc(&mut lookup, self, p);
+        }
+        self.lookup = lookup;
+    }
+
+    fn reset(&mut self) {
+        self.as_scoped().clear_scope();
+    }
+
+    fn deep_copy(&self) -> Self {
+        use std::collections::HashMap;
+
+        let mut node_path_map = HashMap::new();
+        self.root().visit_recursive(|_, _, n| {
+            node_path_map.insert(n.data_ptr(), n.path());
+            true
+        });
+
+        let root = self.root().deep_copy();
+        let mut path_node_map = HashMap::with_capacity(node_path_map.len());
+        root.visit_recursive(|_, _, n| {
+            path_node_map.insert(n.path(), n.clone());
+            true
+        });
+
+        let mut node_map = NodeMap::with_capacity(node_path_map.len());
+        for (n, p) in node_path_map {
+            let nn = path_node_map[&p].clone();
+            node_map.insert(n, nn);
+        }
+
+        std::mem::drop(path_node_map);
+
+        let mut m = Model {
+            scoped: Scoped::new(self.root(), self.root(), self.scoped.scope_def().clone()),
+            metadata: self.metadata.clone(),
+            hosts: self.hosts.clone(),
+            users: self.users.clone(),
+            procs: self.procs.clone(),
+            lookup: ModelLookup::new(),
+        };
+
+        m.remap(&node_map);
+
+        m
+    }
+}
+
+impl AsScoped for Model {
+    fn as_scoped(&self) -> &Scoped {
+        &self.scoped
+    }
+}
+
+impl Remappable for Model {
+    fn remap(&mut self, node_map: &NodeMap) {
+        self.scoped.remap(node_map);
+        self.hosts.iter_mut().for_each(|h| h.remap(node_map));
+        self.users.iter_mut().for_each(|u| u.remap(node_map));
+        self.procs.iter_mut().for_each(|p| p.remap(node_map));
+    }
+}
+
+impl ModelDef for Model {
+    fn root(&self) -> &NodeRef {
+        self.as_scoped().root()
+    }
+
+    fn node(&self) -> &NodeRef {
+        self.as_scoped().node()
+    }
+}
+
+impl ScopedModelDef for Model {
+    fn scope_def(&self) -> &ScopeDef {
+        self.as_scoped().scope_def()
+    }
+
+    fn scope(&self) -> &Scope {
+        self.as_scoped().scope()
+    }
+
+    fn scope_mut(&self) -> &ScopeMut {
+        self.as_scoped().scope_mut()
+    }
+}
+
+
+struct ModelLookup {
+    node_map: HashMap<*const Node, &'static ModelDef>,
+    path_map: HashMap<Opath, &'static ModelDef>,
+}
+
+impl ModelLookup {
+    fn new() -> ModelLookup {
+        ModelLookup {
+            node_map: HashMap::new(),
+            path_map: HashMap::new(),
+        }
+    }
+
+    fn get<T: ModelDef>(&self, node: &NodeRef) -> Option<&T> {
+        if let Some(&p) = self.node_map.get(&node.data_ptr()) {
+            p.downcast_ref::<T>()
+        } else {
+            None
+        }
+    }
+
+    fn get_path<T: ModelDef>(&self, root: &NodeRef, node_path: &Opath) -> Option<&T> {
+        if let Some(&p) = self.path_map.get(node_path) {
+            p.downcast_ref::<T>()
+        } else {
+            None
+        }
+    }
+
+    fn put(&mut self, def: &ModelDef) {
+        self.node_map.insert(def.node().data_ptr(), unsafe { std::mem::transmute::<&ModelDef, &'static ModelDef>(def) });
+        self.path_map.insert(def.node().path(), unsafe { std::mem::transmute::<&ModelDef, &'static ModelDef>(def) });
+    }
+}
+
+impl std::fmt::Debug for ModelLookup {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use std::raw::TraitObject;
+
+        struct ModelDefDebug(&'static ModelDef);
+
+        impl std::fmt::Debug for ModelDefDebug {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                let type_id = self.0.type_id();
+                let ptr = unsafe { std::mem::transmute::<&ModelDef, TraitObject>(self.0).data };
+                if type_id == TypeId::of::<Model>() {
+                    write!(f, "Model<{:p}>", ptr)
+                } else if type_id == TypeId::of::<HostDef>() {
+                    write!(f, "HostDef<{:p}>", ptr)
+                } else if type_id == TypeId::of::<UserDef>() {
+                    write!(f, "UserDef<{:p}>", ptr)
+                } else if type_id == TypeId::of::<ProcDef>() {
+                    write!(f, "ProcedureDef<{:p}>", ptr)
+                } else if type_id == TypeId::of::<TaskDef>() {
+                    write!(f, "TaskDef<{:p}>", ptr)
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+
+        let mut s = f.debug_map();
+        for (k, v) in self.path_map.iter() {
+            s.entry(&k.to_string(), &ModelDefDebug(*v));
+        }
+        s.finish()
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct ModelRef(Arc<Mutex<Model>>);
+
+impl ModelRef {
+    fn new(model: Model) -> ModelRef {
+        let m = ModelRef(Arc::new(Mutex::new(model)));
+        unsafe { m.lock().init() };
+        m
+    }
+
+    pub fn read<P: AsRef<Path>>(metadata: Metadata, path: P) -> IoResult<ModelRef> {
+        Ok(Self::new(Model::read(metadata, path.as_ref())?))
+    }
+
+    pub fn lock(&self) -> MutexGuard<Model> {
+        self.0.lock().unwrap()
+    }
+
+    pub fn deep_copy(&self) -> ModelRef {
+        let m = self.lock();
+        Self::new(m.deep_copy())
+    }
+
+    pub fn reset(&self) {
+        self.lock().reset();
+    }
+
+    pub fn ref_count(&self) -> usize {
+        Arc::strong_count(&self.0)
+    }
+}
+
+impl Default for ModelRef {
+    fn default() -> Self {
+        ModelRef(Arc::new(Mutex::new(Model::empty())))
+    }
+}
+
+impl PartialEq for ModelRef {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ModelRef {}
+
+unsafe impl Send for ModelRef {}
+
+unsafe impl Sync for ModelRef {}

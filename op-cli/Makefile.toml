@@ -1,0 +1,15 @@
+[tasks.post-build]
+script = [
+"cp ../target/debug/op docker/", # copy operon executable to docker context dir
+"cd docker", # cd to docker context dir
+"docker build -t operon .", # build operon host image
+"docker-compose build" # build network infrastructure defined in docker-compose.yml
+]
+
+# skip rust-fmt
+[tasks.format-flow]
+disabled = true
+
+# skip tests
+[tasks.test-flow]
+disabled = true

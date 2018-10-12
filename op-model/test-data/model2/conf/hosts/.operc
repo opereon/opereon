@@ -1,0 +1,5 @@
+[overrides]
+"@.*" = "@.extend(readFile('conf/hosts/_default.yaml'), 0)"
+
+[[exclude]]
+path = "_default.*"

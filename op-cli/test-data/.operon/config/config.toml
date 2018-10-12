@@ -1,0 +1,21 @@
+run_dir = "${env:HOME}/.operon/run"
+data_dir = "${env:HOME}/.operon/data"
+
+[daemon]
+socket_path = "${run_dir}/op.sock"
+pid_file_path = "${run_dir}/op.pid"
+
+[log]
+log_path = "${env:HOME}/.operon/op.log"
+
+[queue]
+persist_dir = "${data_dir}/queue"
+
+[model]
+data_dir = "${data_dir}/models"
+cache_limit = 10
+
+[exec]
+
+[exec.command.ssh]
+socket_dir = "${run_dir}/ssh"

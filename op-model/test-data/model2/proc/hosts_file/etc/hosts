@@ -1,0 +1,8 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+127.0.0.1   <% $host.fqdn %> <% $host.hostname %>
+
+#for $h in $hosts[@ != $host]
+<% array($h.**{0}.ip4)[0] %> <% $h.fqdn %> <% $h.hostname %>
+#end

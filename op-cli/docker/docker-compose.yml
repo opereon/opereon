@@ -1,0 +1,41 @@
+version: "2"
+services:
+  host1:
+    build: ./
+#    networks:
+#      net1:
+#        ipv4_address: 172.18.1.2
+  host2:
+    build: ./
+#    networks:
+#      net1:
+#        ipv4_address: 172.18.1.3
+
+  host3:
+    build: ./
+#    networks:
+#      net1:
+#        ipv4_address: 172.18.1.4
+#  host4:
+#    build: ./
+#  host5:
+#    build: ./
+#  host6:
+#    build: ./
+#  host7:
+#    build: ./
+networks:
+  net1:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.1.0/24
+          gateway: 172.18.1.1
+#  net2:
+#    driver: bridge
+#    ipam:
+#      driver: default
+#      config:
+#      - subnet: 173.18.1.0/24
+#        gateway: 173.18.1.1
