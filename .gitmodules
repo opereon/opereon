@@ -6,10 +6,6 @@
 	path = kg-diag
 	url = git@github.com:Kodegenix/kg-diag.git
 	branch = master
-[submodule "kg-display"]
-	path = kg-display
-	url = git@github.com:Kodegenix/kg-display.git
-	branch = master
 [submodule "kg-io"]
 	path = kg-io
 	url = git@github.com:Kodegenix/kg-io.git
@@ -17,6 +13,10 @@
 [submodule "kg-tree"]
 	path = kg-tree
 	url = git@github.com:Kodegenix/kg-tree.git
+	branch = master
+[submodule "kg-display"]
+	path = kg-display
+	url = git@github.com:Kodegenix/kg-display.git
 	branch = master
 [submodule "kg-utils"]
 	path = kg-utils
