@@ -1,45 +1,40 @@
 [package]
-name = "operon"
+name = "op-cli"
 version = "0.1.0"
-authors = ["Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
 workspace = ".."
 
 [dependencies]
+kg-diag = "0.1"
+kg-tree = "0.1"
+kg-utils = "0.2"
 op-exec = { path = "../op-exec" }
-kg-diag = { path = "../kg-diag" }
-op-net= { path = "../op-net" }
-kg-tree= { path = "../kg-tree" }
-
-structopt = "*"
-daemonize = "*"
-bytes = "*"
-futures = "*"
-tokio = "*"
-tokio-signal = "0.2.1"
-tokio-codec = "0.1.0"
+op-net = { path = "../op-net" }
+structopt = "0.2"
+daemonize = "0.3"
+bytes = "0.4"
+futures = "0.1"
+tokio = "0.1"
+tokio-signal = "0.2"
+tokio-codec = "0.1"
 tokio-uds = "0.2"
-
-serde = "*"
-serde_derive = "*"
-serde_json = "*"
-serde_yaml = "*"
-toml = "*"
-rmp-serde = "*"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+serde_yaml = "0.8"
+toml = "0.4"
+rmp-serde = "0.13"
 uuid = { version = "*", features = ["serde"] }
 chrono = { version = "*", features = ["serde"] }
-
-linked-hash-map = { git = "https://github.com/jchlapinski/linked-hash-map.git", features = ["serde_impl", "heapsize_impl"] }
-
-
 actix = "*"
 actix_derive = "*"
+env_logger = "0.5"
+slog = "2.3"
+slog-term = "2.4"
+slog-async = "2.3"
+slog-stdlog = "3.0"
+slog-scope = "4.0"
 
-env_logger = "0.5.13"
-slog = "2.3.3"
-slog-term = "2.4.0"
-slog-async = "2.3.0"
-slog-stdlog = "3.0.2"
-slog-scope = "4.0.1"
 [dev-dependencies]
 
 [[bin]]

@@ -8,7 +8,7 @@ use op_exec::{DiffMethod, ModelPath};
 #[structopt(
     name = "op",
     author = "",
-    about = "OPERON - System configuration automation.\nCopyright (c) Kodegenix Sp z o.o. (http://www.kodegenix.pl).",
+    about = "OPEREON - System configuration automation.\nCopyright (c) Kodegenix Sp z o.o. (http://www.kodegenix.pl).",
     raw(setting = "AppSettings::InferSubcommands"),
 )]
 pub struct Opts {
@@ -17,7 +17,7 @@ pub struct Opts {
         short = "c",
         long = "config",
         name = "PATH",
-        default_value = "/etc/operon/config.toml; $HOME/.operon/config/config.toml"
+        default_value = "/etc/opereon/config.toml; $HOME/.opereon/config/config.toml"
     )]
     pub config_file_path: String,
 
@@ -40,20 +40,20 @@ pub struct Opts {
 #[derive(Debug, StructOpt)]
 pub enum Command {
     //////////////////////////////// Daemon options ////////////////////////////////
-    /// Start Operon service
+    /// Start Opereon service
     #[structopt(name = "start", author = "")]
     Start {
-        /// Run operon service in foreground instead of as a daemon.
+        /// Run opereon service in foreground instead of as a daemon.
         /// This is useful for running operon in docker container.
         #[structopt(short = "f", long = "foreground")]
         foreground: bool,
     },
 
-    /// Stop Operon service running
+    /// Stop Opereon service running
     #[structopt(name = "stop", author = "")]
     Stop,
 
-    /// List reachable Operon instances.
+    /// List reachable Opereon instances.
     #[structopt(name = "nodes", author = "")]
     Nodes,
 

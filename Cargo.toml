@@ -1,0 +1,15 @@
+[workspace]
+members = ["op-*"]
+
+[patch.crates-io]
+kg-diag = { path = "kg-diag/kg-diag" }
+kg-diag-derive = { path = "kg-diag/kg-diag-derive" }
+kg-display = { path = "kg-display/kg-display" }
+kg-display-derive = { path = "kg-display/kg-display-derive" }
+kg-utils = { path = "kg-utils" }
+kg-io = { path = "kg-io" }
+kg-symbol = { path = "kg-symbol" }
+kg-tree = { path = "kg-tree" }
+kg-template = { path = "kg-template" }
+
+

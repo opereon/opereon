@@ -118,12 +118,12 @@ impl<'de> de::Deserialize<'de> for Sha1Hash {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
-    uid: u32,
+    uid: usize,
     username: String,
 }
 
 impl User {
-    pub fn new(uid: u32, username: Cow<str>) -> Self {
+    pub fn new(uid: usize, username: Cow<str>) -> Self {
         User {
             uid,
             username: username.into(),
@@ -131,10 +131,12 @@ impl User {
     }
 
     pub fn current() -> Self {
-        User::new(users::get_current_uid(), users::get_current_username().unwrap_or_default().into())
+        let uid = users::get_current_uid() as usize;
+        let username = users::get_current_username().map_or(String::new(), |u| u.into_string().unwrap());
+        User::new(uid, username.into())
     }
 
-    pub fn uid(&self) -> u32 {
+    pub fn uid(&self) -> usize {
         self.uid
     }
 

@@ -4,15 +4,10 @@
 #[macro_use]
 extern crate indoc;
 
-//#[macro_use]
-//extern crate log;
-
 extern crate walkdir;
 extern crate globset;
 extern crate uuid;
 extern crate heapsize;
-extern crate linked_hash_map;
-extern crate lru_cache;
 extern crate chrono;
 extern crate users;
 extern crate crypto;
@@ -34,8 +29,8 @@ extern crate kg_utils;
 use std::path::{Path, PathBuf};
 
 use chrono::prelude::*;
-use linked_hash_map::LinkedHashMap;
 
+use kg_utils::collections::LinkedHashMap;
 use kg_io::*;
 use kg_tree::*;
 use kg_tree::opath::*;

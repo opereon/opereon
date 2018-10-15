@@ -22,6 +22,7 @@ extern crate toml;
 
 extern crate actix;
 
+extern crate kg_utils;
 extern crate kg_tree;
 extern crate kg_diag;
 extern crate op_exec;
@@ -31,7 +32,6 @@ extern crate env_logger;
 
 #[macro_use]
 extern crate slog;
-extern crate linked_hash_map;
 extern crate slog_async;
 extern crate slog_term;
 extern crate core;
@@ -41,6 +41,7 @@ use slog::FnValue;
 
 use structopt::StructOpt;
 
+use kg_utils::collections::LinkedHashMap;
 use op_exec::OutcomeFuture;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
 

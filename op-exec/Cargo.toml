@@ -1,22 +1,20 @@
 [package]
 name = "op-exec"
 version = "0.1.0"
-authors = ["jchlapinski <jakub.chlapinski@kodegenix.pl>"]
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 workspace = ".."
 
 [dependencies]
-kg-diag = { path = "../kg-diag" }
-kg-diag-derive = { path = "../kg-diag-derive" }
-kg-display-derive = { path = "../kg-display-derive" }
-kg-utils = { path = "../kg-utils" }
-kg-io = { path = "../kg-io" }
-kg-tree = { path = "../kg-tree" }
-kg-template = { path = "../kg-template" }
-kg-symbol= { path="../kg-symbol" }
+kg-diag = "0.1"
+kg-diag-derive = "0.1"
+kg-display-derive = "0.1"
+kg-utils = "0.2"
+kg-io = "0.1"
+kg-tree = "0.1"
+kg-template = "0.1"
+kg-symbol= "0.1"
 op-model = { path = "../op-model" }
 op-net = { path = "../op-net" }
-lru-cache = { git = "https://github.com/jchlapinski/lru-cache.git" }
-linked-hash-map = { git = "https://github.com/jchlapinski/linked-hash-map.git", features = ["serde_impl", "heapsize_impl"] }
 tokio = "*"
 tokio-process = "*"
 os_pipe = "*"

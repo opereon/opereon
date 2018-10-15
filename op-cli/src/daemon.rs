@@ -1,7 +1,7 @@
 use actix::actors::signal;
 use actix::prelude::*;
 
-use super::check;
+use super::*;
 
 use op_net;
 use op_net::MessageReceived;
@@ -28,7 +28,6 @@ use uuid::Uuid;
 use cli_server::CliMessageRcvd;
 use commons::CliMessage;
 use core::fmt;
-use linked_hash_map::LinkedHashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json;

@@ -26,9 +26,9 @@ extern crate serde_yaml;
 extern crate toml;
 extern crate rmp_serde;
 
-extern crate linked_hash_map;
-extern crate lru_cache;
 extern crate crypto;
+#[macro_use]
+extern crate slog;
 
 #[macro_use]
 extern crate kg_diag;
@@ -45,20 +45,15 @@ extern crate kg_symbol;
 extern crate op_model;
 extern crate op_net;
 
-#[macro_use]
-extern crate slog;
-
 
 use std::io::{BufReader};
 use std::path::{Path, PathBuf};
-
-use linked_hash_map::LinkedHashMap;
-use lru_cache::LruCache;
 
 use os_pipe::pipe;
 use chrono::prelude::*;
 use uuid::Uuid;
 
+use kg_utils::collections::{LinkedHashMap, LruCache};
 use kg_io::*;
 use kg_diag::*;
 use kg_symbol::Symbol;

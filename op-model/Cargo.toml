@@ -1,18 +1,16 @@
 [package]
 name = "op-model"
 version = "0.1.0"
-authors = ["jchlapinski <jakub.chlapinski@kodegenix.pl>"]
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 workspace = ".."
 
 [dependencies]
-kg-utils = { path = "../kg-utils" }
-kg-io = { path = "../kg-io" }
-kg-tree = { path = "../kg-tree" }
-kg-symbol = { path = "../kg-symbol" }
+kg-utils = "0.2"
+kg-io = "0.1"
+kg-tree = "0.1"
+kg-symbol = "0.1"
 log = "*"
 libc = "*"
-linked-hash-map = { git = "https://github.com/jchlapinski/linked-hash-map.git", features = ["serde_impl", "heapsize_impl"] }
-lru-cache = { git = "https://github.com/jchlapinski/lru-cache.git" }
 notify = "*"
 walkdir = "*"
 globset = "*"
@@ -24,7 +22,7 @@ toml = "*"
 uuid = { version = "*", features = ["serde", "v1", "v3", "v4", "v5"] }
 heapsize = "*"
 chrono = { version = "*", features = ["serde"] }
-users = "*"
+users = "0.8"
 rust-crypto = "*"
 
 [dev-dependencies]

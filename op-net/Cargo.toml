@@ -1,0 +1,32 @@
+[package]
+name = "op-net"
+version = "0.1.0"
+authors = ["Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
+
+[dependencies]
+actix = "0.7.4"
+tokio = "0.1.7"
+tokio-signal = "0.2.1"
+tokio-codec = "0.1.0"
+serde = "*"
+serde_json = "*"
+actix_derive = "0.3.0"
+serde_derive = "1.0.71"
+uuid = { version = "*", features = ["serde"] }
+chrono = { version = "0.4.5", features = ["serde"] }
+bytes = { version = "0.4", features = ["serde"] }
+futures = "0.1.23"
+rmp-serde = "0.13.7"
+tokio-core = "0.1.17"
+tokio-udp = "0.1.1"
+interfaces = "0.0.4"
+log = "0.4"
+hostname = "*"
+toml = "0.4.6"
+kg-io= { path = "../kg-io" }
+
+
+
+[dev-dependencies]
+slog-term = "2.2.0"
+slog-async = "2.1.0"

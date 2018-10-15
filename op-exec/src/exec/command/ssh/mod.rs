@@ -14,7 +14,6 @@ use std::fs::File;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
-use lru_cache::LruCache;
 use os_pipe::pipe;
 
 

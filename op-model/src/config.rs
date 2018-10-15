@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::cell::{RefCell, Ref};
 
 use toml;
-use linked_hash_map::LinkedHashMap;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder, Candidate};
 
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
