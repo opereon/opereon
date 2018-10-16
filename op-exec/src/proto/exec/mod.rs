@@ -1,5 +1,7 @@
 use super::*;
 
+thread_local!(static EXEC_PATH: RefCell<PathBuf> = RefCell::new(PathBuf::new()));
+
 mod args;
 mod proc;
 mod run;
