@@ -55,6 +55,7 @@ use uuid::Uuid;
 
 use kg_utils::collections::{LinkedHashMap, LruCache};
 use kg_io::*;
+use kg_io::fs;
 use kg_diag::*;
 use kg_symbol::Symbol;
 use kg_tree::*;

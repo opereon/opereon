@@ -1,5 +1,7 @@
 use super::*;
 
+use std::cell::RefCell;
+
 thread_local!(static EXEC_PATH: RefCell<PathBuf> = RefCell::new(PathBuf::new()));
 
 mod args;

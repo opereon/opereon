@@ -6,12 +6,20 @@ struct AsPath {
     path: String
 }
 
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunExec {
     #[serde(serialize_with = "RunExec::store_steps", deserialize_with = "RunExec::load_steps")]
     steps: Vec<StepExec>,
 }
 
 impl RunExec {
+    pub fn new() -> RunExec {
+        RunExec {
+            steps: Vec::new(),
+        }
+    }
+
     fn store_steps<S>(steps: &Vec<StepExec>, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         serializer.collect_seq(steps.iter().map(|e| {
             let dir = e.path().file_name().unwrap();
@@ -27,20 +35,28 @@ impl RunExec {
 
         let paths: Vec<AsPath> = Vec::deserialize(deserializer)?;
 
-        let jobs = WORK_PATH.with(|work_path| {
-            let work_path = work_path.borrow();
+        let steps = EXEC_PATH.with(|exec_path| {
+            let exec_path = exec_path.borrow();
 
-            let mut jobs = Vec::with_capacity(paths.len());
+            let mut steps = Vec::with_capacity(paths.len());
             for path in paths {
-                let path = work_path.join(&path.path);
-                let s = String::from_utf8(std::fs::read(&path).unwrap()).unwrap();
-                let mut job: Job = serde_yaml::from_str(&s).unwrap();
-                job.set_path(path.parent().unwrap().into());
-                jobs.push(job);
+                let path = exec_path.join(&path.path);
+                let s = fs::read_string(&path).unwrap();
+                let mut step: StepExec = serde_yaml::from_str(&s).unwrap();
+                step.set_path(path.parent().unwrap().into());
+                steps.push(step);
             }
-            jobs
+            steps
         });
 
-        Ok(jobs)
+        Ok(steps)
+    }
+
+    pub fn steps(&self) -> &[StepExec] {
+        &self.steps
+    }
+
+    pub fn add_step(&mut self, step: StepExec) {
+        self.steps.push(step);
     }
 }

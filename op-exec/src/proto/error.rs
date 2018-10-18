@@ -13,6 +13,13 @@ impl From<std::io::Error> for ProtoError {
     }
 }
 
+impl From<kg_io::error::IoError> for ProtoError {
+    fn from(err: kg_io::error::IoError) -> Self {
+        eprintln!("{}", err);
+        unimplemented!()
+    }
+}
+
 impl From<kg_tree::serial::Error> for ProtoError {
     fn from(err: kg_tree::serial::Error) -> Self {
         eprintln!("{}", err);

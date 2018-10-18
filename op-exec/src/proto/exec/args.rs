@@ -42,6 +42,10 @@ impl Arguments {
             scope.set_var(k.clone(), n);
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 pub struct ArgumentsBuilder {
