@@ -130,7 +130,7 @@ mod tests {
             {
               "users": "$.conf.users.*",
               "hosts": "$.conf.hosts.*",
-              "procs": "$.proc.**[@.proc != null]",
+              "procs": "$.proc.**[(@.proc != null)]",
               "cust1": "$.cust1",
               "cust2": "$.cust2"
             }

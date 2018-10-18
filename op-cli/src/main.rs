@@ -395,7 +395,7 @@ fn main() {
         Command::Exec { mut path } => {
             make_path_absolute(&mut path);
 
-            ExecContext::ExecWork { bin_id: Uuid::nil(), work_path: path }.into()
+            ExecContext::ProcExec { bin_id: Uuid::nil(), exec_path: path }.into()
         }
         Command::Check { mut model, filter, dry_run } => {
             make_model_path_absolute(&mut model);
