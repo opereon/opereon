@@ -47,7 +47,7 @@ pub trait FileExecutor {
                     dst_path: &Path,
                     chown: Option<&str>,
                     chmod: Option<&str>,
-                    log: &OutputLog) -> Result<ActionResult, FileError>;
+                    log: &OutputLog) -> Result<TaskResult, FileError>;
 
     fn file_copy(&mut self,
                     engine: &EngineRef,
@@ -56,7 +56,7 @@ pub trait FileExecutor {
                     dst_path: &Path,
                     chown: Option<&str>,
                     chmod: Option<&str>,
-                    log: &OutputLog) -> Result<ActionResult, FileError>;
+                    log: &OutputLog) -> Result<TaskResult, FileError>;
 }
 
 

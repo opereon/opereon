@@ -7,7 +7,7 @@ pub use self::config::TemplateConfig;
 
 
 pub trait TemplateExecutor {
-    fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<ActionResult, RuntimeError>;
+    fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<TaskResult, RuntimeError>;
 }
 
 

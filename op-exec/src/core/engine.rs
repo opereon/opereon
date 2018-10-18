@@ -11,7 +11,7 @@ use op_net::NodeInfo;
 pub struct Engine {
     config: ConfigRef,
     model_manager: ModelManager,
-    work_manager: WorkManager,
+    exec_manager: ExecManager,
     resource_manager: ResourceManager,
     ssh_session_cache: SshSessionCache,
     operation_queue1: VecDeque<OperationTask>,
@@ -25,14 +25,14 @@ pub struct Engine {
 impl Engine {
     pub fn new(config: ConfigRef, logger: slog::Logger) -> Engine {
         let model_manager = ModelManager::new(config.clone(), logger.clone());
-        let work_manager = WorkManager::new(config.clone());
+        let exec_manager = ExecManager::new(config.clone());
         let resource_manager = ResourceManager::new();
         let ssh_session_cache = SshSessionCache::new(config.clone());
 
         Engine {
             config,
             model_manager,
-            work_manager,
+            exec_manager,
             resource_manager,
             ssh_session_cache,
             operation_queue1: VecDeque::new(),
@@ -56,12 +56,12 @@ impl Engine {
         &mut self.model_manager
     }
 
-    pub fn work_manager(&self) -> &WorkManager {
-        &self.work_manager
+    pub fn exec_manager(&self) -> &ExecManager {
+        &self.exec_manager
     }
 
-    pub fn work_manager_mut(&mut self) -> &mut WorkManager {
-        &mut self.work_manager
+    pub fn exec_manager_mut(&mut self) -> &mut ExecManager {
+        &mut self.exec_manager
     }
 
     pub fn resource_manager(&self) -> &ResourceManager {

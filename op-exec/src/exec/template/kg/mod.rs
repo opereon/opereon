@@ -17,7 +17,7 @@ impl TemplateResolver {
 }
 
 impl TemplateExecutor for TemplateResolver {
-    fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<ActionResult, RuntimeError> {
+    fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<TaskResult, RuntimeError> {
         let template = {
             let mut f = FileBuffer::open(src_path)?;
             let mut r = f.char_reader();
@@ -39,7 +39,7 @@ impl TemplateExecutor for TemplateResolver {
         }
         std::fs::write(&dst_path, res)?;
 
-        Ok(ActionResult::new(Outcome::Empty, Some(0), None))
+        Ok(TaskResult::new(Outcome::Empty, Some(0), None))
     }
 }
 

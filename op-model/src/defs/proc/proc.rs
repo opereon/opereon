@@ -3,7 +3,7 @@ use super::*;
 use std::str::FromStr;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all="kebab-case")]
 pub enum ProcKind {
     Exec,
@@ -21,6 +21,12 @@ impl FromStr for ProcKind {
             "check" => Ok(ProcKind::Check),
             _ => perr!("unknown proc kind"), //FIXME (jc)
         }
+    }
+}
+
+impl Default for ProcKind {
+    fn default() -> Self {
+        ProcKind::Exec
     }
 }
 

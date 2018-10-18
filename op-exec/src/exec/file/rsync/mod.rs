@@ -191,7 +191,7 @@ impl FileExecutor for RsyncExecutor {
                     dst_path: &Path,
                     chown: Option<&str>,
                     chmod: Option<&str>,
-                    log: &OutputLog) -> Result<ActionResult, FileError> {
+                    log: &OutputLog) -> Result<TaskResult, FileError> {
         let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
@@ -221,7 +221,7 @@ impl FileExecutor for RsyncExecutor {
             }
         }
 
-        Ok(ActionResult::new(Outcome::Empty, Some(result), None))
+        Ok(TaskResult::new(Outcome::Empty, Some(result), None))
     }
 
     fn file_copy(&mut self,
@@ -231,7 +231,7 @@ impl FileExecutor for RsyncExecutor {
                  dst_path: &Path,
                  chown: Option<&str>,
                  chmod: Option<&str>,
-                 log: &OutputLog) -> Result<ActionResult, FileError> {
+                 log: &OutputLog) -> Result<TaskResult, FileError> {
         let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params

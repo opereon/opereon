@@ -8,6 +8,8 @@ use std::cell::RefCell;
 pub struct ProcExec {
     created: DateTime<Utc>,
     name: String,
+    label: String,
+    kind: ProcKind,
     curr_model: ModelPath,
     #[serde(skip_serializing_if = "Option::is_none")]
     prev_model: Option<ModelPath>,
@@ -24,6 +26,8 @@ impl ProcExec {
         ProcExec {
             created,
             name: String::new(),
+            label: String::new(),
+            kind: ProcKind::default(),
             curr_model: ModelPath::Current,
             prev_model: None,
             proc_path: Opath::null(),
@@ -37,6 +41,8 @@ impl ProcExec {
         ProcExec {
             created,
             name: String::new(),
+            label: String::new(),
+            kind: ProcKind::default(),
             curr_model: ModelPath::Current,
             prev_model: None,
             proc_path: Opath::null(),
@@ -47,7 +53,7 @@ impl ProcExec {
     }
 
     fn get_proc_exec_dir_name(&self) -> String {
-        let mut dir_name = self.created.format("%Y%m%d_%H%M%S%.3f").to_string();
+        let mut dir_name = format!("{}_{}", self.created.format("%Y%m%d_%H%M%S%.3f"), self.name);
         unsafe { dir_name.as_mut_vec()[15] = b'_'; }
         dir_name
     }
@@ -61,13 +67,9 @@ impl ProcExec {
     }
 
     pub fn prepare(&mut self, model: &Model, proc: &ProcDef, proc_exec_dir: &Path) -> Result<(), ProtoError> {
-        if proc_exec_dir.is_absolute() {
-            self.create_proc_exec_dir(proc_exec_dir)?;
-        } else {
-            self.create_proc_exec_dir(&model.metadata().path().join(proc_exec_dir))?;
-        }
-
-        self.name = proc.label().to_string();
+        self.name = proc.id().to_string();
+        self.label = proc.label().to_string();
+        self.kind = proc.kind();
 
         self.curr_model = if model.metadata().is_stored() {
             ModelPath::Id(model.metadata().id())
@@ -78,6 +80,12 @@ impl ProcExec {
         self.proc_path = proc.node().path();
 
         self.args.resolve(proc.root(), proc.node(), proc.scope_mut());
+
+        if proc_exec_dir.is_absolute() {
+            self.create_proc_exec_dir(proc_exec_dir)?;
+        } else {
+            self.create_proc_exec_dir(&model.metadata().path().join(proc_exec_dir))?;
+        }
 
         for s in proc.run().steps().iter() {
             let hosts = s.resolve_hosts(model, proc)?;
@@ -123,6 +131,14 @@ impl ProcExec {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn kind(&self) -> ProcKind {
+        self.kind
     }
 
     pub fn curr_model(&self) -> &ModelPath {

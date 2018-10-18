@@ -30,20 +30,20 @@ pub enum Context {
         filter: Option<String>,
         dry_run: bool,
     },
-    ExecWork {
+    ProcExec {
         bin_id: Uuid,
-        work_path: PathBuf,
+        exec_path: PathBuf,
     },
-    ExecJob {
+    StepExec {
         bin_id: Uuid,
-        work_path: PathBuf,
-        job_index: usize,
+        exec_path: PathBuf,
+        step_index: usize,
     },
-    ExecAction {
+    TaskExec {
         bin_id: Uuid,
-        work_path: PathBuf,
-        job_index: usize,
-        action_index: usize,
+        exec_path: PathBuf,
+        step_index: usize,
+        task_index: usize,
     },
     Sequence(Vec<OperationRef>),
     Parallel(Vec<OperationRef>),
@@ -60,9 +60,9 @@ impl Context {
             Context::ModelDiff {..} => "model-diff",
             Context::ModelUpdate {..} => "model-update",
             Context::ModelCheck {..} => "model-check",
-            Context::ExecWork {..} => "exec-work",
-            Context::ExecJob {..} => "exec-job",
-            Context::ExecAction {..} => "exec-action",
+            Context::ProcExec {..} => "proc-exec",
+            Context::StepExec {..} => "step-exec",
+            Context::TaskExec {..} => "task-exec",
             Context::Sequence(..) => "sequence",
             Context::Parallel(..) => "parallel",
         }

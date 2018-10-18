@@ -260,7 +260,7 @@ impl CommandExecutor for SshSession {
         args: &[String],
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<ActionResult, CommandError> {
+    ) -> Result<TaskResult, CommandError> {
         let child = self.run_command(cmd, args, Stdio::piped(), Stdio::piped(), log)?;
         execute(child, out_format, None, log)
     }
@@ -275,7 +275,7 @@ impl CommandExecutor for SshSession {
         run_as: Option<&str>,
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<ActionResult, CommandError> {
+    ) -> Result<TaskResult, CommandError> {
         let child = self.run_script(script, args, env, cwd, run_as, Stdio::piped(), Stdio::piped(), log)?;
         execute(child, out_format, None, log)
     }
@@ -309,7 +309,7 @@ impl CommandExecutor for SshSessionRef {
         args: &[String],
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<ActionResult, CommandError> {
+    ) -> Result<TaskResult, CommandError> {
         self.read().exec_command(engine, cmd, args, out_format, log)
     }
 
@@ -323,7 +323,7 @@ impl CommandExecutor for SshSessionRef {
         run_as: Option<&str>,
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<ActionResult, CommandError> {
+    ) -> Result<TaskResult, CommandError> {
         self.read().exec_script(engine, script, args, env, cwd, run_as, out_format, log)
     }
 }

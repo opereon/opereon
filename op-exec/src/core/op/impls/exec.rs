@@ -7,31 +7,31 @@ fn cleanup_resources(engine: &EngineRef, resource_id: Uuid) {
 
 
 #[derive(Debug)]
-pub struct ExecWorkOperation {
+pub struct ProcExecOperation {
     operation: OperationRef,
     engine: EngineRef,
     op: OperationExec,
 }
 
-unsafe impl Sync for ExecWorkOperation {}
+unsafe impl Sync for ProcExecOperation {}
 
-unsafe impl Send for ExecWorkOperation {}
+unsafe impl Send for ProcExecOperation {}
 
 
-impl ExecWorkOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, work_path: &Path) -> Result<ExecWorkOperation, RuntimeError> {
-        let work = engine.write().work_manager_mut().get(work_path)?;
+impl ProcExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path) -> Result<ProcExecOperation, RuntimeError> {
+        let exec = engine.write().exec_manager_mut().get(exec_path)?;
         let steps = {
-            let work = work.lock();
+            let exec = exec.lock();
 
-            println!("{}: executing work in {}", work.name(), work_path.display());
+            println!("{}: executing in {}", exec.name(), exec_path.display());
 
-            let mut steps = Vec::with_capacity(work.jobs().len());
-            for i in 0..work.jobs().len() {
-                let op: OperationRef = Context::ExecJob {
+            let mut steps = Vec::with_capacity(exec.run().steps().len());
+            for i in 0..exec.run().steps().len() {
+                let op: OperationRef = Context::StepExec {
                     bin_id,
-                    work_path: work_path.to_path_buf(),
-                    job_index: i,
+                    exec_path: exec_path.to_path_buf(),
+                    step_index: i,
                 }.into();
                 steps.push(op);
             }
@@ -41,7 +41,7 @@ impl ExecWorkOperation {
         let op: OperationRef = Context::Parallel(steps).into();
         let op = engine.enqueue_operation(op, false)?.into_exec();
 
-        Ok(ExecWorkOperation {
+        Ok(ProcExecOperation {
             operation,
             engine,
             op,
@@ -49,7 +49,7 @@ impl ExecWorkOperation {
     }
 }
 
-impl Future for ExecWorkOperation {
+impl Future for ProcExecOperation {
     type Item = Outcome;
     type Error = RuntimeError;
 
@@ -66,7 +66,7 @@ impl Future for ExecWorkOperation {
     }
 }
 
-impl OperationImpl for ExecWorkOperation {
+impl OperationImpl for ProcExecOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
@@ -74,49 +74,49 @@ impl OperationImpl for ExecWorkOperation {
 
 
 #[derive(Debug)]
-pub struct ExecJobOperation {
+pub struct StepExecOperation {
     operation: OperationRef,
     engine: EngineRef,
     model: ModelRef,
     op: OperationExec,
 }
 
-impl ExecJobOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, work_path: &Path, job_index: usize) -> Result<ExecJobOperation, RuntimeError> {
+impl StepExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
         let bin_id = if bin_id.is_nil() {
             operation.read().id()
         } else {
             bin_id
         };
 
-        let work = engine.write().work_manager_mut().get(work_path)?;
-        let model = engine.write().model_manager_mut().resolve_bin(work.lock().model_path(), bin_id)?;
+        let exec = engine.write().exec_manager_mut().get(exec_path)?;
+        let model = engine.write().model_manager_mut().resolve_bin(exec.lock().curr_model(), bin_id)?;
 
-        let steps = {
-            let w = work.lock();
+        let tasks = {
+            let exec = exec.lock();
 
-            let ref job = w.jobs()[job_index];
-            println!("{}: executing job in {}", job.host(), job.path().display());
+            let ref step = exec.run().steps()[step_index];
+            println!("{}: executing step in {}", step.host(), step.path().display());
 
-            let mut steps = Vec::with_capacity(job.actions().len());
+            let mut tasks = Vec::with_capacity(step.tasks().len());
 
-            for i in 0..job.actions().len() {
-                let op: OperationRef = Context::ExecAction {
+            for i in 0..step.tasks().len() {
+                let op: OperationRef = Context::TaskExec {
                     bin_id,
-                    work_path: work_path.to_owned(),
-                    job_index,
-                    action_index: i,
+                    exec_path: exec_path.to_owned(),
+                    step_index,
+                    task_index: i,
                 }.into();
-                steps.push(op);
+                tasks.push(op);
             }
 
-            steps
+            tasks
         };
 
-        let op: OperationRef = Context::Sequence(steps).into();
+        let op: OperationRef = Context::Sequence(tasks).into();
         let op = engine.enqueue_operation(op, false)?.into_exec();
 
-        Ok(ExecJobOperation {
+        Ok(StepExecOperation {
             operation,
             engine,
             model,
@@ -125,7 +125,7 @@ impl ExecJobOperation {
     }
 }
 
-impl Future for ExecJobOperation {
+impl Future for StepExecOperation {
     type Item = Outcome;
     type Error = RuntimeError;
 
@@ -142,48 +142,44 @@ impl Future for ExecJobOperation {
     }
 }
 
-impl OperationImpl for ExecJobOperation {
+impl OperationImpl for StepExecOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
 }
 
-unsafe impl Sync for ExecJobOperation {}
-
-unsafe impl Send for ExecJobOperation {}
-
 
 #[derive(Debug)]
-pub struct ExecActionOperation {
+pub struct TaskExecOperation {
     operation: OperationRef,
     engine: EngineRef,
     bin_id: Uuid,
-    work_path: PathBuf,
-    job_index: usize,
-    action_index: usize,
-    work_op: Option<OperationExec>,
+    exec_path: PathBuf,
+    step_index: usize,
+    task_index: usize,
+    proc_op: Option<OperationExec>,
 }
 
-impl ExecActionOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, work_path: &Path, job_index: usize, action_index: usize) -> Result<ExecActionOperation, RuntimeError> {
-        Ok(ExecActionOperation {
+impl TaskExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize, task_index: usize) -> Result<TaskExecOperation, RuntimeError> {
+        Ok(TaskExecOperation {
             operation,
             engine,
             bin_id,
-            work_path: work_path.to_path_buf(),
-            job_index,
-            action_index,
-            work_op: None,
+            exec_path: exec_path.to_path_buf(),
+            step_index,
+            task_index,
+            proc_op: None,
         })
     }
 }
 
-impl Future for ExecActionOperation {
+impl Future for TaskExecOperation {
     type Item = Outcome;
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Some(ref mut op) = self.work_op {
+        if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
                 self.operation.write().update_progress_value(p.value());
             }
@@ -196,15 +192,18 @@ impl Future for ExecActionOperation {
             let result = {
                 use std::fs::OpenOptions;
 
-                let work = self.engine.write().work_manager_mut().get(&self.work_path)?;
-                let model = self.engine.write().model_manager_mut().resolve_bin(work.lock().model_path(), self.bin_id)?;
-                let work = work.lock();
-                let model = model.lock();
-                let ref job = work.jobs()[self.job_index];
-                let ref action = job.actions()[self.action_index];
-                let proc = model.get_proc_path(work.proc_path()).unwrap();
-                let host = model.get_host_path(job.host_path()).unwrap();
-                let task = model.get_task_path(action.task_path()).unwrap();
+                let proc_exec = self.engine.write().exec_manager_mut().get(&self.exec_path)?;
+                let proc_exec = proc_exec.lock();
+
+                let curr_model = self.engine.write().model_manager_mut().resolve_bin(proc_exec.curr_model(), self.bin_id)?;
+                let curr_model = curr_model.lock();
+
+                let ref step_exec = proc_exec.run().steps()[self.step_index];
+                let ref task_exec = step_exec.tasks()[self.task_index];
+
+                let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
+                let host = curr_model.get_host_path(step_exec.host_path()).unwrap();
+                let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
                 {
                     let s = proc.scope_mut();
@@ -220,9 +219,9 @@ impl Future for ExecActionOperation {
                     .write(true)
                     .create(true)
                     .append(true)
-                    .open(job.path().join("output.log"))?);
+                    .open(step_exec.path().join("output.log"))?);
 
-                println!("{}: {}: executing...", job.host(), action);
+                println!("{}: {}: executing...", step_exec.host(), task_exec);
 
                 let scope = task.scope();
                 let base_path = proc.dir();
@@ -231,9 +230,9 @@ impl Future for ExecActionOperation {
                     TaskKind::Exec => {
                         let exec = scope.get_var("exec").unwrap();
                         let exec = exec.iter().next().unwrap();
-                        let p = model.get_proc(exec).unwrap();
+                        let p = curr_model.get_proc(exec).unwrap();
 
-                        let mut args = ArgumentsBuilder::new(model.root());
+                        let mut args = ArgumentsBuilder::new(curr_model.root());
                         for k in scope.var_names() {
                             if k != "exec" && !k.starts_with('$') {
                                 let var = scope.get_var(&k).unwrap();
@@ -241,13 +240,13 @@ impl Future for ExecActionOperation {
                             }
                         }
 
-                        let work_dir = Path::new(".op");
-                        let mut w = Work::with_args(Utc::now(), args.build());
-                        w.prepare(&model, p, work_dir)?;
-                        w.store()?;
+                        let exec_dir = Path::new(".op");
+                        let mut e = ProcExec::with_args(Utc::now(), args.build());
+                        e.prepare(&curr_model, p, exec_dir)?;
+                        e.store()?;
 
-                        let op: OperationRef = Context::ExecWork { bin_id: self.bin_id, work_path: w.path().to_path_buf() }.into();
-                        self.work_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                        let op: OperationRef = Context::ProcExec { bin_id: self.bin_id, exec_path: e.path().to_path_buf() }.into();
+                        self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                         return self.poll();
                     }
                     TaskKind::Switch => {
@@ -262,7 +261,7 @@ impl Future for ExecActionOperation {
                             }
                         }
                         if let Some(p) = p {
-                            let mut args = ArgumentsBuilder::new(model.root());
+                            let mut args = ArgumentsBuilder::new(curr_model.root());
                             for k in proc.scope().var_names() {
                                 if !k.starts_with('$') {
                                     let var = scope.get_var(&k).unwrap();
@@ -276,25 +275,25 @@ impl Future for ExecActionOperation {
                                 }
                             }
 
-                            let work_dir = Path::new(".op");
-                            let mut w = Work::with_args(Utc::now(), args.build());
+                            let exec_dir = Path::new(".op");
+                            let mut e = ProcExec::with_args(Utc::now(), args.build());
 
-                            w.prepare(&model, p, work_dir)?;
-                            w.store()?;
+                            e.prepare(&curr_model, p, exec_dir)?;
+                            e.store()?;
 
-                            let op: OperationRef = Context::ExecWork { bin_id: self.bin_id, work_path: w.path().to_path_buf() }.into();
-                            self.work_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                            let op: OperationRef = Context::ProcExec { bin_id: self.bin_id, exec_path: e.path().to_path_buf() }.into();
+                            self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                             return self.poll();
                         } else {
-                            ActionResult::new(Outcome::Empty, Some(0), None)
+                            TaskResult::new(Outcome::Empty, Some(0), None)
                         }
                     }
                     TaskKind::Template => {
                         let src_path: PathBuf = scope.get_var_value("src_path")?;
                         let src_path = base_path.join(src_path);
                         let dst_path: PathBuf = scope.get_var_value_or_default("dst_path", &src_path);
-                        let dst_path = job.path().join(dst_path);
-                        let mut executor = create_template_executor(job.host(), &self.engine)?;
+                        let dst_path = step_exec.path().join(dst_path);
+                        let mut executor = create_template_executor(step_exec.host(), &self.engine)?;
                         executor.process_template(&self.engine,
                                                   task,
                                                   &src_path,
@@ -305,7 +304,7 @@ impl Future for ExecActionOperation {
                         let cmd: String = scope.get_var_value("cmd")?;
                         let args: Vec<String> = scope.get_var("args").map_or(Vec::new(), |args| args.iter().map(|a| a.as_string()).collect());
                         let out_format = task.output().map(|o| o.format());
-                        let mut executor = create_command_executor(job.host(), &self.engine)?;
+                        let mut executor = create_command_executor(step_exec.host(), &self.engine)?;
                         executor.exec_command(&self.engine,
                                               &cmd,
                                               &args,
@@ -322,7 +321,7 @@ impl Future for ExecActionOperation {
                                                                                             task.root(),
                                                                                             task.node()));
                         let out_format = task.output().map(|o| o.format());
-                        let mut executor = create_command_executor(job.host(), &self.engine)?;
+                        let mut executor = create_command_executor(step_exec.host(), &self.engine)?;
                         executor.exec_script(&self.engine,
                                              SourceRef::Path(&src_path),
                                              &args,
@@ -338,7 +337,7 @@ impl Future for ExecActionOperation {
                         let dst_path: PathBuf = scope.get_var_value_or_default("dst_path", &src_path);
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
-                        let mut executor = create_file_executor(job.host(), &self.engine)?;
+                        let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
                         executor.file_compare(&self.engine,
                                               base_path,
                                               &src_path,
@@ -353,7 +352,7 @@ impl Future for ExecActionOperation {
                         let dst_path: PathBuf = scope.get_var_value_or_default("dst_path", &src_path);
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
-                        let mut executor = create_file_executor(job.host(), &self.engine)?;
+                        let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
                         executor.file_copy(&self.engine,
                                            base_path,
                                            &src_path,
@@ -364,7 +363,7 @@ impl Future for ExecActionOperation {
                     }
                 };
 
-                print!("{}: {}: result: {}", job.host(), action, result);
+                print!("{}: {}: result: {}", step_exec.host(), task_exec, result);
                 if let Some(out) = task.output() {
                     if let Outcome::NodeSet(ref ns) = *result.outcome() {
                         proc.scope_mut().set_var(out.var().into(), ns.lock().clone());
@@ -382,12 +381,8 @@ impl Future for ExecActionOperation {
     }
 }
 
-impl OperationImpl for ExecActionOperation {
+impl OperationImpl for TaskExecOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
 }
-
-unsafe impl Sync for ExecActionOperation {}
-
-unsafe impl Send for ExecActionOperation {}

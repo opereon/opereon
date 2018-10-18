@@ -5,6 +5,7 @@ use super::*;
 #[display(fmt = "{name}")]
 pub struct TaskExec {
     name: String,
+    kind: TaskKind,
     task_path: Opath,
 }
 
@@ -12,12 +13,17 @@ impl TaskExec {
     pub fn create(_model: &Model, _proc: &ProcDef, task: &TaskDef, _host: &HostDef, _proc_exec: &ProcExec, _step_exec: &StepExec) -> Result<TaskExec, ProtoError> {
         Ok(TaskExec {
             name: task.label().to_string(),
+            kind: task.kind(),
             task_path: Opath::from(task.node()),
         })
     }
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn kind(&self) -> TaskKind {
+        self.kind
     }
 
     pub fn task_path(&self) -> &Opath {

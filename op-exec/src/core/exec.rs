@@ -3,15 +3,15 @@ use super::*;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct WorkManager {
+pub struct ExecManager {
     config: ConfigRef,
-    cache: LruCache<PathBuf, WorkRef>,
+    cache: LruCache<PathBuf, ProcExecRef>,
 }
 
-impl WorkManager {
-    pub fn new(config: ConfigRef) -> WorkManager {
+impl ExecManager {
+    pub fn new(config: ConfigRef) -> ExecManager {
         let cache = LruCache::new(10); //FIXME (jc) add config param
-        WorkManager {
+        ExecManager {
             config,
             cache,
         }
@@ -81,14 +81,14 @@ impl WorkManager {
         Ok(model)
     }*/
 
-    pub fn get(&mut self, path: &Path) -> Result<WorkRef, ProtoError> {
+    pub fn get(&mut self, path: &Path) -> Result<ProcExecRef, ProtoError> {
         if let Some(w) = self.cache.get_mut(path) {
             return Ok(w.clone());
         }
-        let w = Work::load(path)?;
-        let w = WorkRef::new(w);
-        self.cache.insert(path.to_owned(), w.clone());
-        Ok(w)
+        let e = ProcExec::load(path)?;
+        let e = ProcExecRef::new(e);
+        self.cache.insert(path.to_owned(), e.clone());
+        Ok(e)
     }
 
     /*pub fn list(&self) -> std::io::Result<Vec<Metadata>> {

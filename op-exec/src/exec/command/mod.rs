@@ -100,7 +100,7 @@ pub trait CommandExecutor {
                     cmd: &str,
                     args: &[String],
                     out_format: Option<FileFormat>,
-                    log: &OutputLog) -> Result<ActionResult, CommandError>;
+                    log: &OutputLog) -> Result<TaskResult, CommandError>;
 
     fn exec_script(&mut self,
                     engine: &EngineRef,
@@ -110,7 +110,7 @@ pub trait CommandExecutor {
                     cwd: Option<&Path>,
                     run_as: Option<&str>,
                     out_format: Option<FileFormat>,
-                    log: &OutputLog) -> Result<ActionResult, CommandError>;
+                    log: &OutputLog) -> Result<TaskResult, CommandError>;
 }
 
 
@@ -257,7 +257,7 @@ fn execute(
     out_format: Option<FileFormat>,
     err_format: Option<FileFormat>,
     log: &OutputLog,
-) -> Result<ActionResult, CommandError> {
+) -> Result<TaskResult, CommandError> {
     use std::io::BufRead;
 
     let mut stdout = child.stdout.take().unwrap();
@@ -352,7 +352,7 @@ fn execute(
         Outcome::Empty
     };
 
-    Ok(ActionResult::new(outcome, status.code(), None))
+    Ok(TaskResult::new(outcome, status.code(), None))
 }
 
 

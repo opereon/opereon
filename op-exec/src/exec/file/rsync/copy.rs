@@ -84,7 +84,7 @@ fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
 }
 
 
-pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<ActionResult, RsyncError> {
+pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResult, RsyncError> {
     let (stdout, stdout_writer) = pipe()?;
     let (stderr, stderr_writer) = pipe()?;
 
@@ -145,7 +145,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<ActionRe
     hout.join().expect("panic while reading stdout")?;
     herr.join().expect("panic while reading stderr")?;
 
-    Ok(ActionResult::new(Outcome::Empty, status.code(), None))
+    Ok(TaskResult::new(Outcome::Empty, status.code(), None))
 }
 
 

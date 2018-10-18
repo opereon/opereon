@@ -2,7 +2,7 @@ use super::*;
 
 mod config;
 mod model;
-mod work;
+mod exec;
 mod sequence;
 mod parallel;
 
@@ -10,7 +10,7 @@ pub use self::model::DiffMethod;
 
 use self::config::*;
 use self::model::*;
-use self::work::*;
+use self::exec::*;
 use self::sequence::*;
 use self::parallel::*;
 
@@ -37,9 +37,9 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::ModelDiff { ref prev_model, ref next_model, method } => Box::new(ModelDiffOperation::new(operation.clone(), engine.clone(), prev_model.clone(), next_model.clone(), method)),
         Context::ModelUpdate { ref prev_model, ref next_model, dry_run } => Box::new(ModelUpdateOperation::new(operation.clone(), engine.clone(), prev_model.clone(), next_model.clone(), dry_run)),
         Context::ModelCheck { ref model, ref filter, dry_run } => Box::new(ModelCheckOperation::new(operation.clone(), engine.clone(), model.clone(), filter.clone(), dry_run)),
-        Context::ExecWork { bin_id, ref work_path } => Box::new(ExecWorkOperation::new(operation.clone(), engine.clone(), bin_id, work_path)?),
-        Context::ExecJob { bin_id, ref work_path, job_index } => Box::new(ExecJobOperation::new(operation.clone(), engine.clone(), bin_id, work_path, job_index)?),
-        Context::ExecAction { bin_id, ref work_path, job_index, action_index } => Box::new(ExecActionOperation::new(operation.clone(), engine.clone(), bin_id, work_path, job_index, action_index)?),
+        Context::ProcExec { bin_id, ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path)?),
+        Context::StepExec { bin_id, ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index)?),
+        Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
     };

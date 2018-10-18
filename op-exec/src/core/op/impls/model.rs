@@ -236,7 +236,7 @@ pub struct ModelUpdateOperation {
     prev_model: ModelPath,
     next_model: ModelPath,
     dry_run: bool,
-    work_op: Option<OperationExec>,
+    proc_op: Option<OperationExec>,
 }
 
 impl ModelUpdateOperation {
@@ -247,7 +247,7 @@ impl ModelUpdateOperation {
             prev_model,
             next_model,
             dry_run,
-            work_op: None,
+            proc_op: None,
         }
     }
 }
@@ -257,7 +257,7 @@ impl Future for ModelUpdateOperation {
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Some(ref mut op) = self.work_op {
+        if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
                 self.operation.write().update_progress_value(p.value());
             }
@@ -267,7 +267,7 @@ impl Future for ModelUpdateOperation {
                 Ok(Async::NotReady)
             }
         } else {
-            let mut work_ops = Vec::new();
+            let mut proc_ops = Vec::new();
             {
                 let (m1, m2) = {
                     let mut e = self.engine.write();
@@ -279,7 +279,7 @@ impl Future for ModelUpdateOperation {
                 let model2 = m2.lock();
                 let mut update = ModelUpdate::new(&model1, &model2);
 
-                let work_dir = Path::new(".op");
+                let exec_dir = Path::new(".op");
                 for p in model2.procs().iter() {
                     if p.kind() == ProcKind::Update {
                         let id = p.id();
@@ -290,14 +290,14 @@ impl Future for ModelUpdateOperation {
                             args.set_arg("$changes".into(), &changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
                             args.set_arg("$old".into(), &model1.root().clone().into());
 
-                            let mut w = Work::with_args(Utc::now(), args.build());
-                            w.prepare(&model2, p, work_dir)?;
-                            w.store()?;
+                            let mut e = ProcExec::with_args(Utc::now(), args.build());
+                            e.prepare(&model2, p, exec_dir)?;
+                            e.store()?;
 
-                            let op: OperationRef = Context::ExecWork { bin_id: Uuid::nil(), work_path: w.path().to_path_buf() }.into();
-                            work_ops.push(op);
+                            let op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                            proc_ops.push(op);
 
-                            println!("Update \"{}\": prepared in {}", id, w.path().display());
+                            println!("Update \"{}\": prepared in {}", id, e.path().display());
                         } else {
                             println!("Update \"{}\": skipped", id);
                         }
@@ -305,8 +305,8 @@ impl Future for ModelUpdateOperation {
                 }
             }
 
-            let op = Context::Sequence(work_ops).into();
-            self.work_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+            let op = Context::Sequence(proc_ops).into();
+            self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
             self.poll()
         }
     }
@@ -326,7 +326,7 @@ pub struct ModelCheckOperation {
     model_path: ModelPath,
     filter: Option<String>,
     dry_run: bool,
-    work_op: Option<OperationExec>,
+    proc_op: Option<OperationExec>,
 }
 
 impl ModelCheckOperation {
@@ -337,7 +337,7 @@ impl ModelCheckOperation {
             model_path,
             dry_run,
             filter,
-            work_op: None,
+            proc_op: None,
         }
     }
 }
@@ -347,7 +347,7 @@ impl Future for ModelCheckOperation {
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Some(ref mut op) = self.work_op {
+        if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
                 self.operation.write().update_progress_value(p.value());
             }
@@ -369,7 +369,7 @@ impl Future for ModelCheckOperation {
                 None
             };
 
-            let mut work_ops = Vec::new();
+            let mut proc_ops = Vec::new();
             {
                 let m = {
                     let mut e = self.engine.write();
@@ -377,19 +377,19 @@ impl Future for ModelCheckOperation {
                 };
                 let model = m.lock();
 
-                let work_dir = Path::new(".op");
+                let exec_dir = Path::new(".op");
                 for p in model.procs().iter() {
                     if p.kind() == ProcKind::Check {
                         let id = p.id();
                         if filter_re.is_none() || filter_re.as_ref().unwrap().is_match(id) {
-                            let mut w = Work::new(Utc::now());
-                            w.prepare(&model, p, work_dir)?;
-                            w.store()?;
+                            let mut e = ProcExec::new(Utc::now());
+                            e.prepare(&model, p, exec_dir)?;
+                            e.store()?;
 
-                            let work_op: OperationRef = Context::ExecWork { bin_id: Uuid::nil(), work_path: w.path().to_path_buf() }.into();
-                            work_ops.push(work_op);
+                            let proc_op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                            proc_ops.push(proc_op);
 
-                            println!("Check \"{}\": prepared in {}", id, w.path().display());
+                            println!("Check \"{}\": prepared in {}", id, e.path().display());
                         } else {
                             println!("Check \"{}\": skipped", id);
                         }
@@ -397,11 +397,11 @@ impl Future for ModelCheckOperation {
                 }
             }
 
-            if self.dry_run || work_ops.is_empty() {
+            if self.dry_run || proc_ops.is_empty() {
                 Ok(Async::Ready(Outcome::Empty))
             } else {
-                let op = Context::Sequence(work_ops).into();
-                self.work_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                let op = Context::Sequence(proc_ops).into();
+                self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                 self.poll()
             }
         }
