@@ -1,0 +1,17 @@
+proc: probe
+label: Probe host
+scope:
+run:
+- hosts: ${$host}
+  tasks:
+  - task: script
+    scope:
+      src_path: "hostname.sh"
+      run_as: "root"
+    output:
+      var: host
+      format: json
+  - task: template
+    scope:
+      src_path: "host.yaml"
+      dst_path: ${"conf/hosts/" + $host.hostname + "/_.yaml"}

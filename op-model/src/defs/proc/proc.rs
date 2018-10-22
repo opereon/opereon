@@ -9,6 +9,7 @@ pub enum ProcKind {
     Exec,
     Check,
     Update,
+    Probe,
 }
 
 impl FromStr for ProcKind {
@@ -19,6 +20,7 @@ impl FromStr for ProcKind {
             "exec" => Ok(ProcKind::Exec),
             "update" => Ok(ProcKind::Update),
             "check" => Ok(ProcKind::Check),
+            "probe" => Ok(ProcKind::Probe),
             _ => perr!("unknown proc kind"), //FIXME (jc)
         }
     }

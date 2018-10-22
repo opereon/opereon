@@ -1,12 +1,12 @@
-run_dir = "${env:HOME}/.operon/run"
-data_dir = "${env:HOME}/.operon/data"
+run_dir = "${env:HOME}/.opereon/run"
+data_dir = "${env:HOME}/.opereon/data"
 
 [daemon]
 socket_path = "${run_dir}/op.sock"
 pid_file_path = "${run_dir}/op.pid"
 
 [log]
-log_path = "${env:HOME}/.operon/op.log"
+log_path = "${env:HOME}/.opereon/op.log"
 
 [queue]
 persist_dir = "${data_dir}/queue"
