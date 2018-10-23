@@ -1,8 +1,6 @@
 use super::*;
 
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::cell::RefCell;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcExec {

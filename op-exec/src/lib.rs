@@ -30,21 +30,17 @@ extern crate crypto;
 #[macro_use]
 extern crate slog;
 
-#[macro_use]
 extern crate kg_diag;
 #[macro_use]
 extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
-#[macro_use]
 extern crate kg_utils;
 extern crate kg_io;
 extern crate kg_tree;
 extern crate kg_template;
 extern crate kg_symbol;
 extern crate op_model;
-extern crate op_net;
-
 
 use std::io::{BufReader};
 use std::path::{Path, PathBuf};

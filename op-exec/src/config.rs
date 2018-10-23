@@ -4,8 +4,6 @@ use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
 use kg_tree::serial::{from_tree, to_tree};
 use regex::{Captures, Regex};
 
-use op_net::Config as NetConfig;
-
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -174,7 +172,6 @@ pub struct Config {
     queue: QueueConfig,
     model: ModelConfig,
     exec: ExecConfig,
-    net: NetConfig,
 }
 
 impl Config {
@@ -247,10 +244,6 @@ impl Config {
         &self.exec
     }
 
-    pub fn net(&self) -> &NetConfig {
-        &self.net
-    }
-
     pub fn log(&self) -> &LogConfig {
         &self.log
     }
@@ -266,7 +259,6 @@ impl Default for Config {
             queue: QueueConfig::default(),
             model: ModelConfig::default(),
             exec: ExecConfig::default(),
-            net: NetConfig::default(),
         }
     }
 }

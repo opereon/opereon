@@ -9,31 +9,19 @@ kg-diag = "0.1"
 kg-tree = "0.1"
 kg-utils = "0.2"
 op-exec = { path = "../op-exec" }
-op-net = { path = "../op-net" }
 structopt = "0.2"
-daemonize = "0.3"
-bytes = "0.4"
 futures = "0.1"
-tokio = "0.1"
-tokio-signal = "0.2"
-tokio-codec = "0.1"
-tokio-uds = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 toml = "0.4"
-rmp-serde = "0.13"
 uuid = { version = "*", features = ["serde"] }
-chrono = { version = "*", features = ["serde"] }
 actix = "*"
 actix_derive = "*"
-env_logger = "0.5"
 slog = "2.3"
 slog-term = "2.4"
 slog-async = "2.3"
-slog-stdlog = "3.0"
-slog-scope = "4.0"
 
 [dev-dependencies]
 
