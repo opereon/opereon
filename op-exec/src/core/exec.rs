@@ -1,7 +1,5 @@
 use super::*;
 
-use std::sync::Arc;
-
 #[derive(Debug)]
 pub struct ExecManager {
     config: ConfigRef,

@@ -1,4 +1,4 @@
-use cli_client::display::DisplayFormat;
+use display::DisplayFormat;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
 
@@ -9,7 +9,7 @@ use op_exec::{DiffMethod, ModelPath};
     name = "op",
     author = "",
     about = "OPEREON - System configuration automation.\nCopyright (c) Kodegenix Sp z o.o. (http://www.kodegenix.pl).",
-    raw(setting = "AppSettings::InferSubcommands"),
+    raw(setting = "AppSettings::InferSubcommands")
 )]
 pub struct Opts {
     /// Path(s) to the config file
@@ -25,38 +25,12 @@ pub struct Opts {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     pub verbose: u8,
 
-    /// Execute command locally, without connecting to Operon daemon.
-    #[structopt(short = "L", long = "local")]
-    pub local: bool,
-
-    /// Execute command on running Operon daemon.
-    #[structopt(short = "R", long = "remote")]
-    pub remote: bool,
-
     #[structopt(subcommand)]
     pub command: Command,
 }
 
 #[derive(Debug, StructOpt)]
 pub enum Command {
-    //////////////////////////////// Daemon options ////////////////////////////////
-    /// Start Opereon service
-    #[structopt(name = "start", author = "")]
-    Start {
-        /// Run opereon service in foreground instead of as a daemon.
-        /// This is useful for running operon in docker container.
-        #[structopt(short = "f", long = "foreground")]
-        foreground: bool,
-    },
-
-    /// Stop Opereon service running
-    #[structopt(name = "stop", author = "")]
-    Stop,
-
-    /// List reachable Opereon instances.
-    #[structopt(name = "nodes", author = "")]
-    Nodes,
-
     /// Prints config to the output
     #[structopt(name = "config", author = "")]
     Config {
@@ -151,10 +125,7 @@ pub enum Command {
         #[structopt(
             short = "m",
             long = "method",
-            raw(
-                possible_values = r#"&["minimal","full"]"#,
-                case_insensitive = "true"
-            ),
+            raw(possible_values = r#"&["minimal","full"]"#, case_insensitive = "true"),
             default_value = "minimal"
         )]
         method: DiffMethod,

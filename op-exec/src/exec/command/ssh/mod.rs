@@ -7,12 +7,10 @@ pub use self::config::SshConfig;
 pub use self::dest::{SshDest, SshAuth};
 
 
-use std::process::{Command, Child, Stdio, ExitStatus};
+use std::process::{Child, Stdio};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::fs::File;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread::JoinHandle;
 
 use os_pipe::pipe;
 

@@ -4,8 +4,6 @@ mod config;
 
 pub use self::config::LocalConfig;
 
-use std::process::{ExitStatus};
-
 #[derive(Debug)]
 pub struct LocalExecutor {
     config: ConfigRef,

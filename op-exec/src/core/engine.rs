@@ -5,8 +5,6 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use uuid::Uuid;
 
-use op_net::NodeInfo;
-
 #[derive(Debug)]
 pub struct Engine {
     config: ConfigRef,

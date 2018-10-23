@@ -9,7 +9,7 @@ COPY ./.operon /root/.operon
 ENV RUST_BACKTRACE=1
 
 # enable logging for op-net
-ENV RUST_LOG="op_net=debug"
+#ENV RUST_LOG="op_net=debug"
 
 # add operon executable to path
 ENV PATH="${PATH}:/opt/operon/"
