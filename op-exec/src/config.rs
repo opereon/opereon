@@ -57,8 +57,8 @@ impl DaemonConfig {
 impl Default for DaemonConfig {
     fn default() -> Self {
         DaemonConfig {
-            socket_path: PathBuf::from("/var/run/operon/op.sock"),
-            pid_file_path: PathBuf::from("/var/run/operon/op.pid"),
+            socket_path: PathBuf::from("/var/run/opereon/op.sock"),
+            pid_file_path: PathBuf::from("/var/run/opereon/op.pid"),
         }
     }
 }
@@ -79,7 +79,7 @@ impl QueueConfig {
 impl Default for QueueConfig {
     fn default() -> Self {
         QueueConfig {
-            persist_dir: PathBuf::from("/var/run/operon/queue"),
+            persist_dir: PathBuf::from("/var/run/opereon/queue"),
         }
     }
 }
@@ -105,7 +105,7 @@ impl ModelConfig {
 impl Default for ModelConfig {
     fn default() -> Self {
         ModelConfig {
-            data_dir: PathBuf::from("/var/run/operon/data"),
+            data_dir: PathBuf::from("/var/run/opereon/data"),
             cache_limit: 10,
         }
     }
@@ -156,7 +156,7 @@ impl Default for LogConfig {
     fn default() -> Self {
         LogConfig {
             level: LogLevel::Info,
-            log_path: PathBuf::from("/var/log/operon/operon.log"),
+            log_path: PathBuf::from("/var/log/opereon/opereon.log"),
         }
     }
 }
@@ -252,8 +252,8 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            run_dir: PathBuf::from("/var/run/operon"),
-            data_dir: PathBuf::from("/var/lib/operon"),
+            run_dir: PathBuf::from("/var/run/opereon"),
+            data_dir: PathBuf::from("/var/lib/opereon"),
             daemon: DaemonConfig::default(),
             log: LogConfig::default(),
             queue: QueueConfig::default(),
@@ -305,10 +305,10 @@ mod tests {
     #[test]
     fn parse_path_list_should_resolve_env_vars() {
         std::env::set_var("VAR1_", "var1_value");
-        let paths = parse_path_list("$VAR1_/.operon/config.toml");
+        let paths = parse_path_list("$VAR1_/.opereon/config.toml");
         std::env::remove_var("VAR1_");
 
         assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0], Path::new("var1_value/.operon/config.toml"));
+        assert_eq!(paths[0], Path::new("var1_value/.opereon/config.toml"));
     }
 }

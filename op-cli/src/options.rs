@@ -4,6 +4,15 @@ use structopt::clap::AppSettings;
 
 use op_exec::{DiffMethod, ModelPath};
 
+
+fn parse_key_value(s: &str) -> Result<(String, String), String> {
+    match s.find('=') {
+        Some(pos) => Ok((s[..pos].into(), s[pos + 1..].into())),
+        None => Err("argument must be in form -Akey=value".into()),
+    }
+}
+
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "op",
@@ -172,6 +181,19 @@ pub enum Command {
         /// When set this flags prevents from actually executing any actions in hosts
         #[structopt(short = "d", long = "dry-run")]
         dry_run: bool,
+    },
+    /// Run probe from a model
+    #[structopt(name = "probe", author = "")]
+    Probe {
+        /// Model path, defaults to current model
+        #[structopt(name = "MODEL", default_value = "@")]
+        model: ModelPath,
+        /// Probe name
+        #[structopt(short = "n", long = "name")]
+        name: String,
+        /// Arguments for the probe
+        #[structopt(short = "A", parse(try_from_str = "parse_key_value"))]
+        args: Vec<(String, String)>,
     },
     /// Execute prepared work package
     #[structopt(name = "exec", author = "")]

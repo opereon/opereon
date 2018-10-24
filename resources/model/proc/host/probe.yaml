@@ -14,4 +14,4 @@ run:
   - task: template
     scope:
       src_path: "host.yaml"
-      dst_path: ${"conf/hosts/" + $host.hostname + "/_.yaml"}
+      dst_path: ${$host.hostname + "/_.yaml"}

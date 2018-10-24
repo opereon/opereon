@@ -30,6 +30,11 @@ pub enum Context {
         filter: Option<String>,
         dry_run: bool,
     },
+    ModelProbe {
+        model: ModelPath,
+        name: String,
+        args: Vec<(String, String)>,
+    },
     ProcExec {
         bin_id: Uuid,
         exec_path: PathBuf,
@@ -60,6 +65,7 @@ impl Context {
             Context::ModelDiff {..} => "model-diff",
             Context::ModelUpdate {..} => "model-update",
             Context::ModelCheck {..} => "model-check",
+            Context::ModelProbe {..} => "model-probe",
             Context::ProcExec {..} => "proc-exec",
             Context::StepExec {..} => "step-exec",
             Context::TaskExec {..} => "task-exec",

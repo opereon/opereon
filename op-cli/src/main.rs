@@ -243,6 +243,19 @@ fn main() {
                 dry_run,
             }
         }
+        Command::Probe {
+            mut model,
+            name,
+            args,
+        } => {
+            make_model_path_absolute(&mut model);
+
+            ExecContext::ModelProbe {
+                model,
+                name,
+                args,
+            }
+        }
     };
 
     actix::System::run(move || {
