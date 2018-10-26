@@ -1,15 +1,15 @@
 proc: probe
-label: Probe host
+label: Probe hostname
 scope:
 run:
-- hosts: ${$host}
+- hosts: ${$$host}
   tasks:
   - task: script
     scope:
       src_path: "hostname.sh"
       run_as: "root"
     output:
-      var: host
+      expr: ${$$host.extend($$output)}
       format: json
   - task: template
     scope:

@@ -61,7 +61,7 @@ impl ser::Serialize for ValueDef {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
         match *self {
             ValueDef::Static(ref n) => n.serialize(serializer),
-            ValueDef::Resolvable(ref e) => serializer.serialize_str(&format!("${{{}}}", e)),
+            ValueDef::Resolvable(ref e) => e.serialize(serializer),
         }
     }
 }
