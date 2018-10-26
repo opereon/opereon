@@ -175,9 +175,18 @@ impl FromStr for TaskKind {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OutputMode {
+    Var(String),
+    Expr(Opath),
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TaskOutput {
-    var: String,
+    #[serde(flatten)]
+    mode: OutputMode,
     format: FileFormat,
 }
 
@@ -199,19 +208,30 @@ impl TaskOutput {
         }
     }
 
-    pub fn var(&self) -> &str {
-        &self.var
+    pub fn mode(&self) -> &OutputMode {
+        &self.mode
     }
 
     pub fn format(&self) -> FileFormat {
         self.format
+    }
+
+    pub fn apply(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut, output: NodeSet) {
+        match self.mode {
+            OutputMode::Var(ref name) => scope.set_var(name.into(), output),
+            OutputMode::Expr(ref expr) => {
+                let scope = ScopeMut::child(scope.clone().into());
+                scope.set_var("$output".into(), output);
+                expr.apply_ext(root, current, &scope);
+            },
+        }
     }
 }
 
 impl Default for TaskOutput {
     fn default() -> Self {
         TaskOutput {
-            var: "output".into(),
+            mode: OutputMode::Var("output".into()),
             format: FileFormat::Yaml,
         }
     }

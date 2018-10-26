@@ -366,8 +366,8 @@ impl Future for TaskExecOperation {
                 print!("{}: {}: result: {}", step_exec.host(), task_exec, result);
                 if let Some(out) = task.output() {
                     if let Outcome::NodeSet(ref ns) = *result.outcome() {
-                        proc.scope_mut().set_var(out.var().into(), ns.lock().clone());
-                        print!(" => ${}", out.var());
+                        out.apply(task.root(), task.node(), proc.scope_mut(), ns.lock().clone());
+                        //print!(" => ${}", out.var());
                     }
                 }
                 println!();
