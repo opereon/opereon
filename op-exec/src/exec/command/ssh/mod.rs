@@ -409,7 +409,7 @@ mod tests {
 
         let log = OutputLog::new(Cursor::new(Vec::new()));
         let child = session.run_script(
-            SourceRef::Path(Path::new("./test-data/example-script.sh")),
+            SourceRef::Path(Path::new("../resources/files/example-script.sh")),
             &vec![
                 "param1".into(),
                 "param 2".into(),

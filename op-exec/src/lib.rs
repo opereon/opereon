@@ -35,6 +35,7 @@ extern crate kg_diag;
 extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
+#[macro_use]
 extern crate kg_utils;
 extern crate kg_io;
 extern crate kg_tree;

@@ -360,6 +360,7 @@ fn execute(
 pub struct CommandBuilder {
     cmd: String,
     args: Vec<String>,
+    env: LinkedHashMap<String, String>,
 }
 
 impl CommandBuilder {
@@ -367,6 +368,7 @@ impl CommandBuilder {
         CommandBuilder {
             cmd: cmd.into(),
             args: Vec::new(),
+            env: LinkedHashMap::new(),
         }
     }
 
@@ -382,10 +384,18 @@ impl CommandBuilder {
         self
     }
 
+    pub fn env<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut CommandBuilder {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
     pub fn build(&self) -> Command {
         let mut c = Command::new(&self.cmd);
         for a in self.args.iter() {
             c.arg(a);
+        }
+        for (k, v) in self.env.iter() {
+            c.env(k, v);
         }
         c
     }
