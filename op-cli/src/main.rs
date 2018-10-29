@@ -245,14 +245,14 @@ fn main() {
         }
         Command::Probe {
             mut model,
-            name,
+            filter,
             args,
         } => {
             make_model_path_absolute(&mut model);
 
             ExecContext::ModelProbe {
                 model,
-                name,
+                filter,
                 args,
             }
         }

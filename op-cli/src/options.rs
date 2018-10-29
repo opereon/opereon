@@ -175,7 +175,7 @@ pub enum Command {
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
         model: ModelPath,
-        /// Name filter expression
+        /// Check name filter expression
         #[structopt(short = "n", long = "name")]
         filter: Option<String>,
         /// When set this flags prevents from actually executing any actions in hosts
@@ -188,9 +188,9 @@ pub enum Command {
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
         model: ModelPath,
-        /// Probe name
+        /// Probe name filter expression
         #[structopt(short = "n", long = "name")]
-        name: String,
+        filter: Option<String>,
         /// Arguments for the probe
         #[structopt(short = "A", parse(try_from_str = "parse_key_value"))]
         args: Vec<(String, String)>,

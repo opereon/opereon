@@ -32,7 +32,7 @@ pub enum Context {
     },
     ModelProbe {
         model: ModelPath,
-        name: String,
+        filter: Option<String>,
         args: Vec<(String, String)>,
     },
     ProcExec {

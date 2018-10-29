@@ -413,3 +413,97 @@ impl OperationImpl for ModelCheckOperation {
         Ok(())
     }
 }
+
+
+#[derive(Debug)]
+pub struct ModelProbeOperation {
+    operation: OperationRef,
+    engine: EngineRef,
+    model_path: ModelPath,
+    filter: Option<String>,
+    proc_op: Option<OperationExec>,
+}
+
+impl ModelProbeOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath, filter: Option<String>, args: &[(String, String)]) -> ModelProbeOperation {
+        ModelProbeOperation {
+            operation,
+            engine,
+            model_path,
+            filter,
+            proc_op: None,
+        }
+    }
+}
+
+impl Future for ModelProbeOperation {
+    type Item = Outcome;
+    type Error = RuntimeError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Some(ref mut op) = self.proc_op {
+            if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
+                self.operation.write().update_progress_value(p.value());
+            }
+            if let Async::Ready(outcome) = op.outcome_mut().poll()? {
+                Ok(Async::Ready(outcome))
+            } else {
+                Ok(Async::NotReady)
+            }
+        } else {
+            let filter_re = if let Some(ref filter) = self.filter {
+                match Regex::new(filter) {
+                    Ok(re) => Some(re),
+                    Err(err) => {
+                        eprintln!("Error while parsing regular expression {:?}: {}", filter, err);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            let mut proc_ops = Vec::new();
+            {
+                let m = {
+                    let mut e = self.engine.write();
+                    e.model_manager_mut().resolve(&self.model_path)?
+                };
+                let model = m.lock();
+
+                let exec_dir = Path::new(".op");
+                for p in model.procs().iter() {
+                    if p.kind() == ProcKind::Probe {
+                        let id = p.id();
+                        if filter_re.is_none() || filter_re.as_ref().unwrap().is_match(id) {
+                            let mut e = ProcExec::new(Utc::now());
+                            e.prepare(&model, p, exec_dir)?;
+                            e.store()?;
+
+                            let proc_op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                            proc_ops.push(proc_op);
+
+                            println!("Probe \"{}\": prepared in {}", id, e.path().display());
+                        } else {
+                            println!("Probe \"{}\": skipped", id);
+                        }
+                    }
+                }
+            }
+
+            if proc_ops.is_empty() {
+                Ok(Async::Ready(Outcome::Empty))
+            } else {
+                let op = Context::Sequence(proc_ops).into();
+                self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                self.poll()
+            }
+        }
+    }
+}
+
+impl OperationImpl for ModelProbeOperation {
+    fn init(&mut self) -> Result<(), RuntimeError> {
+        Ok(())
+    }
+}
