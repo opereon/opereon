@@ -18,8 +18,10 @@ impl SshAuth {
             SshAuth::PublicKey { ref key_path } => {
                 cmd.arg("-i").arg(key_path.to_str().unwrap());
             }
-            SshAuth::Password { .. } => {
-                unimplemented!();
+            SshAuth::Password { ref password } => {
+                cmd.env("DISPLAY", "");
+                cmd.env("SSH_ASKPASS", "/home/outsider/workspace/opereon/resources/op-sshpass.sh");
+                cmd.env("OP_SSH_PASS", password.as_ref());
             }
         }
     }

@@ -120,7 +120,7 @@ impl SshSession {
     }
 
     fn open(&mut self) -> SshResult<()> {
-        if !self.check()? {
+        //if !self.check()? {
             let mut cmd = self.ssh_cmd()
                 .arg("-n")
                 .arg("-M") //Master mode
@@ -131,8 +131,8 @@ impl SshSession {
                 .build();
 
             cmd
-                .stdout(Stdio::null())
-                .stderr(Stdio::piped());
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit());
 
             let output = cmd.output()?;
 
@@ -141,9 +141,9 @@ impl SshSession {
             } else {
                 Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
             }
-        } else {
-            Ok(())
-        }
+        //} else {
+        //    Ok(())
+        //}
     }
 
     fn check(&self) -> SshResult<bool> {
@@ -153,8 +153,8 @@ impl SshSession {
             .build();
 
         cmd
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
 
         let s = cmd.status()?;
         Ok(s.success())
@@ -429,5 +429,40 @@ mod tests {
 
         println!("output:\n{}", log);
         println!("result: {:?}", result);
+    }
+
+    #[test]
+    fn password_auth() {
+        let config = ConfigRef::from_json(r#"{
+            "exec": {
+                "command": {
+                    "ssh": {
+                        "socket_dir": "/tmp"
+                    }
+                }
+            }
+        }"#).unwrap();
+
+        let username = "root";
+        let auth = SshAuth::Password { password: "k0d3g3n1x".into() };
+        let dest = SshDest::new("192.168.5.30", 22, username, auth);
+
+        let mut session = SshSession::new(dest, config);
+        session.open().unwrap();
+
+        let log = OutputLog::new(Cursor::new(Vec::new()));
+        let child = session.run_command(
+            "echo",
+            &vec!["\\\"${USER}\\\"".into()],
+            Stdio::inherit(),
+            Stdio::inherit(),
+            &log).unwrap();
+
+        let result = execute(child, Some(FileFormat::Json), None, &log).unwrap();
+        session.close().unwrap();
+
+        println!("output:\n{}", log);
+        println!("result: {:?}", result);
+        session.close().unwrap();
     }
 }
