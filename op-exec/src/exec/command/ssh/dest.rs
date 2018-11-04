@@ -19,9 +19,11 @@ impl SshAuth {
                 cmd.arg("-i").arg(key_path.to_str().unwrap());
             }
             SshAuth::Password { ref password } => {
-                cmd.env("DISPLAY", "");
-                cmd.env("SSH_ASKPASS", "/home/outsider/workspace/opereon/resources/op-sshpass.sh");
-                cmd.env("OP_SSH_PASS", password.as_ref());
+                cmd.arg("-o").arg("NumberOfPasswordPrompts=1");
+                cmd.env("DISPLAY", ":0");
+                cmd.env("SSH_ASKPASS", "/home/outsider/workspace/opereon/target/debug/op-ask");
+                cmd.env("OPEREON_PASSWD", password.as_ref());
+                cmd.setsid(true);
             }
         }
     }

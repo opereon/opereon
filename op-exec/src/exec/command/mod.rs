@@ -360,7 +360,8 @@ fn execute(
 pub struct CommandBuilder {
     cmd: String,
     args: Vec<String>,
-    env: LinkedHashMap<String, String>,
+    envs: LinkedHashMap<String, String>,
+    setsid: bool,
 }
 
 impl CommandBuilder {
@@ -368,7 +369,8 @@ impl CommandBuilder {
         CommandBuilder {
             cmd: cmd.into(),
             args: Vec::new(),
-            env: LinkedHashMap::new(),
+            envs: LinkedHashMap::new(),
+            setsid: false,
         }
     }
 
@@ -385,8 +387,37 @@ impl CommandBuilder {
     }
 
     pub fn env<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut CommandBuilder {
-        self.env.insert(key.into(), value.into());
+        self.envs.insert(key.into(), value.into());
         self
+    }
+
+    pub fn setsid(&mut self, enable: bool) -> &mut CommandBuilder {
+        self.setsid = enable;
+        self
+    }
+
+    #[cfg(unix)]
+    fn handle_setsid(&self, c: &mut Command) {
+        use std::os::unix::process::CommandExt;
+
+        if self.setsid {
+            c.before_exec(|| {
+                unsafe {
+                    if libc::setsid() == -1 {
+                        Err(std::io::Error::last_os_error())
+                    } else {
+                        Ok(())
+                    }
+                }
+            });
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn handle_setsid(&self, c: &mut Command) {
+        if self.setsid {
+            unsupported!()
+        }
     }
 
     pub fn build(&self) -> Command {
@@ -394,9 +425,10 @@ impl CommandBuilder {
         for a in self.args.iter() {
             c.arg(a);
         }
-        for (k, v) in self.env.iter() {
+        for (k, v) in self.envs.iter() {
             c.env(k, v);
         }
+        self.handle_setsid(&mut c);
         c
     }
 }

@@ -120,30 +120,26 @@ impl SshSession {
     }
 
     fn open(&mut self) -> SshResult<()> {
-        //if !self.check()? {
-            let mut cmd = self.ssh_cmd()
-                .arg("-n")
-                .arg("-M") //Master mode
-                .arg("-N") //Do not execute a remote command
-                .arg("-o").arg("ControlMaster=auto")
-                .arg("-o").arg("ControlPersist=yes")
-                .arg("-o").arg("ConnectTimeout=2")
-                .build();
+        let mut cmd = self.ssh_cmd()
+            .arg("-n")
+            .arg("-M") //Master mode
+            .arg("-N") //Do not execute a remote command
+            .arg("-o").arg("ControlMaster=auto")
+            .arg("-o").arg("ControlPersist=yes")
+            .arg("-o").arg("ConnectTimeout=2")
+            .build();
 
-            cmd
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit());
+        cmd
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
 
-            let output = cmd.output()?;
-
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
-            }
-        //} else {
-        //    Ok(())
-        //}
+        let output = cmd.output()?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
+        }
     }
 
     fn check(&self) -> SshResult<bool> {
@@ -153,8 +149,8 @@ impl SshSession {
             .build();
 
         cmd
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
 
         let s = cmd.status()?;
         Ok(s.success())
@@ -400,7 +396,6 @@ mod tests {
 
         let mut session = ssh_session();
 
-
         let mut envs = LinkedHashMap::new();
         envs.insert("ENV_VAR1".into(), "some value".into());
         envs.insert("ENV_VAR2".into(), "some other val - ${USER}".into());
@@ -429,40 +424,5 @@ mod tests {
 
         println!("output:\n{}", log);
         println!("result: {:?}", result);
-    }
-
-    #[test]
-    fn password_auth() {
-        let config = ConfigRef::from_json(r#"{
-            "exec": {
-                "command": {
-                    "ssh": {
-                        "socket_dir": "/tmp"
-                    }
-                }
-            }
-        }"#).unwrap();
-
-        let username = "root";
-        let auth = SshAuth::Password { password: "k0d3g3n1x".into() };
-        let dest = SshDest::new("192.168.5.30", 22, username, auth);
-
-        let mut session = SshSession::new(dest, config);
-        session.open().unwrap();
-
-        let log = OutputLog::new(Cursor::new(Vec::new()));
-        let child = session.run_command(
-            "echo",
-            &vec!["\\\"${USER}\\\"".into()],
-            Stdio::inherit(),
-            Stdio::inherit(),
-            &log).unwrap();
-
-        let result = execute(child, Some(FileFormat::Json), None, &log).unwrap();
-        session.close().unwrap();
-
-        println!("output:\n{}", log);
-        println!("result: {:?}", result);
-        session.close().unwrap();
     }
 }

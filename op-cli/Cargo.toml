@@ -1,8 +1,11 @@
+cargo-features = ["default-run"]
+
 [package]
 name = "op-cli"
 version = "0.1.0"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
 workspace = ".."
+default-run = "op"
 
 [dependencies]
 kg-diag = "0.1"
@@ -28,3 +31,7 @@ slog-async = "2.3"
 [[bin]]
 name = "op"
 path = "src/main.rs"
+
+[[bin]]
+name = "op-ask"
+path = "src/bin/op-ask.rs"
