@@ -30,6 +30,7 @@ use structopt::StructOpt;
 
 use op_exec::OutcomeFuture;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
+use op_exec::{SshDest, SshAuth};
 
 use std::fs;
 use std::fs::OpenOptions;
@@ -245,12 +246,24 @@ fn main() {
         }
         Command::Probe {
             mut model,
+            url,
+            password,
+            identity_file,
             filter,
             args,
         } => {
             make_model_path_absolute(&mut model);
 
+            let ssh_auth = if let Some(password) = password {
+                SshAuth::Password { password }
+            } else {
+                SshAuth::PublicKey { key_path: identity_file.unwrap() }
+            };
+
+            let ssh_dest = SshDest::from_url(url, ssh_auth);
+
             ExecContext::ModelProbe {
+                ssh_dest,
                 model,
                 filter,
                 args,

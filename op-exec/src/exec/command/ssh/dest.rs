@@ -50,7 +50,40 @@ impl SshDest {
         }
     }
 
-    pub fn to_uri(&self) -> String {
+    pub fn from_url<S>(url: S, auth: SshAuth) -> SshDest
+        where S: AsRef<str>
+    {
+        use std::str::FromStr;
+
+        lazy_static! {
+            static ref URL_REGEX: Regex = Regex::new("^(?:ssh://)?(?:([^@]+?)@)?([a-zA-Z0-9\\-]+(?:\\.[a-zA-Z0-9\\-]+)*)(?::(\\d+))?$").unwrap();
+        };
+
+        let url = url.as_ref();
+        if let Some(caps) = URL_REGEX.captures(url) {
+            let username = match caps.get(1) {
+                Some(m) => m.as_str().to_string(),
+                None => users::get_current_username().unwrap().to_str().unwrap().to_string(),
+            };
+            let hostname = caps.get(2).unwrap().as_str().to_string();
+            let port = match caps.get(3).map(|m| m.as_str()) {
+                Some(p) => u16::from_str(p).unwrap(),
+                None => 22,
+            };
+
+            SshDest {
+                hostname: hostname,
+                port,
+                username: username,
+                auth,
+            }
+        } else {
+            unreachable!();
+        }
+
+    }
+
+    pub fn to_url(&self) -> String {
         if self.port == 22 {
             format!("ssh://{username}@{hostname}",
                     username = self.username,
@@ -91,6 +124,14 @@ impl SshDest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_url() {
+        let a = SshAuth::PublicKey { key_path: PathBuf::from("~/.ssh/id_rsa") };
+        let url = "example.org";
+
+        println!("{:?}", SshDest::from_url(url, a));
+    }
 
     mod auth {
         use super::*;

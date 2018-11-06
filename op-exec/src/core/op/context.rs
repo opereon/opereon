@@ -31,6 +31,7 @@ pub enum Context {
         dry_run: bool,
     },
     ModelProbe {
+        ssh_dest: SshDest,
         model: ModelPath,
         filter: Option<String>,
         args: Vec<(String, String)>,

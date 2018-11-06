@@ -211,11 +211,11 @@ fn prepare_script<W: Write>(
     write!(out, "#!/usr/bin/env bash\n")?;
 
     if let Some(cwd) = cwd {
-        write!(out, "cd \"{}\"\n", cwd.display());
+        write!(out, "cd \"{}\"\n", cwd.display())?;
     }
     if let Some(env) = env {
         for (k, v) in env {
-            write!(out, "export {}='{}'\n", k, v);
+            write!(out, "export {}='{}'\n", k, v)?;
         }
     }
 
@@ -322,17 +322,17 @@ fn execute(
         })
     } else {
         std::thread::spawn(move || {
-                let mut r = BufReader::new(&mut stdout);
-                let mut line = String::new();
-                loop {
-                    line.clear();
-                    let len = r.read_line(&mut line)?;
-                    if len == 0 {
-                        break;
-                    } else {
-                        log_out.log_stdout(line.as_bytes())?;
-                    }
-                };
+            let mut r = BufReader::new(&mut stdout);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                let len = r.read_line(&mut line)?;
+                if len == 0 {
+                    break;
+                } else {
+                    log_out.log_stdout(line.as_bytes())?;
+                }
+            };
             Ok(Cursor::new(Vec::new()))
         })
     };

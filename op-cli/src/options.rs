@@ -185,15 +185,24 @@ pub enum Command {
     /// Run probe from a model
     #[structopt(name = "probe", author = "")]
     Probe {
-        /// Model path, defaults to current model
-        #[structopt(name = "MODEL", default_value = "@")]
-        model: ModelPath,
+        /// SSH connection url to remote host being probed, for example ssh://root@example.org:22
+        #[structopt(name = "URL")]
+        url: String,
+        /// Password for SSH authentication
+        #[structopt(short = "P", long = "password", group = "ssh_auth")]
+        password: Option<String>,
+        /// Path to an identity file for SSH authentication
+        #[structopt(short = "i", group = "ssh_auth")]
+        identity_file: Option<PathBuf>,
         /// Probe name filter expression
         #[structopt(short = "n", long = "name")]
         filter: Option<String>,
         /// Arguments for the probe
         #[structopt(short = "A", parse(try_from_str = "parse_key_value"))]
         args: Vec<(String, String)>,
+        /// Model path, defaults to current model
+        #[structopt(name = "MODEL", default_value = "@")]
+        model: ModelPath,
     },
     /// Execute prepared work package
     #[structopt(name = "exec", author = "")]
