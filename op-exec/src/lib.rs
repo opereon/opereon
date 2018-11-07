@@ -29,6 +29,7 @@ extern crate rmp_serde;
 extern crate crypto;
 #[macro_use]
 extern crate slog;
+extern crate url;
 
 extern crate kg_diag;
 #[macro_use]

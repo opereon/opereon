@@ -1,3 +1,5 @@
+use super::*;
+
 use display::DisplayFormat;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
@@ -10,6 +12,10 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
         Some(pos) => Ok((s[..pos].into(), s[pos + 1..].into())),
         None => Err("argument must be in form -Akey=value".into()),
     }
+}
+
+fn parse_ssh_url(s: &str) -> Result<Url, String> {
+    Url::parse("ssh:/").unwrap().join(s).map_err(|e| e.to_string())
 }
 
 
@@ -186,8 +192,8 @@ pub enum Command {
     #[structopt(name = "probe", author = "")]
     Probe {
         /// SSH connection url to remote host being probed, for example ssh://root@example.org:22
-        #[structopt(name = "URL")]
-        url: String,
+        #[structopt(name = "URL", parse(try_from_str = "parse_ssh_url"))]
+        url: Url,
         /// Password for SSH authentication
         #[structopt(short = "P", long = "password", group = "ssh_auth")]
         password: Option<String>,

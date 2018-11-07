@@ -1,11 +1,14 @@
 use super::*;
 
+use url::Url;
+
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "method")]
 pub enum SshAuth {
+    Default,
     PublicKey {
-        key_path: PathBuf,
+        identity_file: PathBuf,
     },
     Password {
         password: String,
@@ -15,8 +18,9 @@ pub enum SshAuth {
 impl SshAuth {
     pub (crate) fn set_auth(&self, cmd: &mut CommandBuilder) {
         match *self {
-            SshAuth::PublicKey { ref key_path } => {
-                cmd.arg("-i").arg(key_path.to_str().unwrap());
+            SshAuth::Default => { }
+            SshAuth::PublicKey { ref identity_file } => {
+                cmd.arg("-i").arg(identity_file.to_str().unwrap());
             }
             SshAuth::Password { ref password } => {
                 cmd.arg("-o").arg("NumberOfPasswordPrompts=1");
@@ -50,37 +54,21 @@ impl SshDest {
         }
     }
 
-    pub fn from_url<S>(url: S, auth: SshAuth) -> SshDest
-        where S: AsRef<str>
-    {
-        use std::str::FromStr;
-
-        lazy_static! {
-            static ref URL_REGEX: Regex = Regex::new("^(?:ssh://)?(?:([^@]+?)@)?([a-zA-Z0-9\\-]+(?:\\.[a-zA-Z0-9\\-]+)*)(?::(\\d+))?$").unwrap();
+    pub fn from_url(url: &Url, auth: SshAuth) -> SshDest {
+        println!("{:?}", url);
+        let hostname = url.host().unwrap().to_string();
+        let username = match url.username() {
+            "" => users::get_current_username().unwrap().to_str().unwrap().to_string(),
+            u @ _ => u.to_string(),
         };
+        let port = url.port().unwrap_or(22);
 
-        let url = url.as_ref();
-        if let Some(caps) = URL_REGEX.captures(url) {
-            let username = match caps.get(1) {
-                Some(m) => m.as_str().to_string(),
-                None => users::get_current_username().unwrap().to_str().unwrap().to_string(),
-            };
-            let hostname = caps.get(2).unwrap().as_str().to_string();
-            let port = match caps.get(3).map(|m| m.as_str()) {
-                Some(p) => u16::from_str(p).unwrap(),
-                None => 22,
-            };
-
-            SshDest {
-                hostname: hostname,
-                port,
-                username: username,
-                auth,
-            }
-        } else {
-            unreachable!();
+        SshDest {
+            hostname,
+            port,
+            username,
+            auth,
         }
-
     }
 
     pub fn to_url(&self) -> String {

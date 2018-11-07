@@ -11,6 +11,7 @@ extern crate serde_yaml;
 extern crate toml;
 
 extern crate actix;
+extern crate url;
 
 extern crate kg_diag;
 extern crate kg_tree;
@@ -27,6 +28,7 @@ use slog::Drain;
 use slog::FnValue;
 
 use structopt::StructOpt;
+use url::Url;
 
 use op_exec::OutcomeFuture;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
@@ -256,11 +258,13 @@ fn main() {
 
             let ssh_auth = if let Some(password) = password {
                 SshAuth::Password { password }
+            } else if let Some(identity_file) = identity_file {
+                SshAuth::PublicKey { identity_file }
             } else {
-                SshAuth::PublicKey { key_path: identity_file.unwrap() }
+                SshAuth::Default
             };
 
-            let ssh_dest = SshDest::from_url(url, ssh_auth);
+            let ssh_dest = SshDest::from_url(&url, ssh_auth);
 
             ExecContext::ModelProbe {
                 ssh_dest,

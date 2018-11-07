@@ -5,25 +5,25 @@ authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 workspace = ".."
 
 [dependencies]
-kg-utils = "0.2"
-kg-io = "0.1"
-kg-tree = "0.1"
-kg-symbol = "0.1"
-log = "*"
-libc = "*"
-notify = "*"
-walkdir = "*"
-globset = "*"
-serde = "*"
-serde_derive = "*"
-serde_json = "*"
-serde_yaml = "*"
-toml = "*"
-uuid = { version = "*", features = ["serde", "v1", "v3", "v4", "v5"] }
-heapsize = "*"
-chrono = { version = "*", features = ["serde"] }
-users = "0.8"
-rust-crypto = "*"
+kg-utils = "0.2.3"
+kg-io = "0.1.0"
+kg-tree = "0.1.1"
+kg-symbol = "0.1.8"
+log = "0.4.6"
+libc = "0.2.43"
+notify = "4.0.6"
+walkdir = "2.2.6"
+globset = "0.4.2"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.32"
+serde_yaml = "0.8.7"
+toml = "0.4.8"
+uuid = { version = "0.7.1", features = ["serde", "v1", "v3", "v4", "v5"] }
+heapsize = "0.4.2"
+chrono = { version = "0.4.6", features = ["serde"] }
+users = "0.8.0"
+rust-crypto = "0.2.36"
 
 [dev-dependencies]
-indoc = "*"
+indoc = "0.2.8"

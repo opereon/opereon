@@ -8,23 +8,24 @@ workspace = ".."
 default-run = "op"
 
 [dependencies]
-kg-diag = "0.1"
-kg-tree = "0.1"
-kg-utils = "0.2"
+kg-diag = "0.1.0"
+kg-tree = "0.1.1"
+kg-utils = "0.2.3"
 op-exec = { path = "../op-exec" }
-structopt = "0.2"
-futures = "0.1"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-serde_yaml = "0.8"
-toml = "0.4"
-uuid = { version = "*", features = ["serde"] }
-actix = "*"
-actix_derive = "*"
-slog = "2.3"
-slog-term = "2.4"
-slog-async = "2.3"
+structopt = "0.2.13"
+futures = "0.1.25"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.32"
+serde_yaml = "0.8.7"
+toml = "0.4.8"
+uuid = { version = "0.7.1", features = ["serde"] }
+actix = "0.7.5"
+actix_derive = "0.3.2"
+slog = "2.4.1"
+slog-term = "2.4.0"
+slog-async = "2.3.0"
+url = "1.7.2"
 
 [dev-dependencies]
 
