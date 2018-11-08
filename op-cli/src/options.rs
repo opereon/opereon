@@ -15,7 +15,11 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
 }
 
 fn parse_ssh_url(s: &str) -> Result<Url, String> {
-    Url::parse("ssh:/").unwrap().join(s).map_err(|e| e.to_string())
+    if s.starts_with("ssh://") {
+        Url::parse(s).map_err(|e| e.to_string())
+    } else {
+        Url::parse(&format!("ssh://{}", s)).map_err(|e| e.to_string())
+    }
 }
 
 

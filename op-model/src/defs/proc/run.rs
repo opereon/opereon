@@ -1,5 +1,7 @@
 use super::*;
 
+use std::borrow::Cow;
+
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Run {
@@ -63,10 +65,18 @@ pub struct Step {
 }
 
 impl Step {
-    pub fn resolve_hosts<'a>(&self, model: &'a Model, proc: &ProcDef) -> Result<Vec<&'a HostDef>, DefsParseError> {
-        self.hosts.as_ref().map_or(Ok(model.hosts().iter().collect()), |hosts_expr| {
+    pub fn resolve_hosts<'a>(&self, model: &'a Model, proc: &ProcDef) -> Result<Vec<Cow<'a, HostDef>>, DefsParseError> {
+        self.hosts.as_ref().map_or(Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()), |hosts_expr| {
             let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope());
-            Ok(hs.iter().filter_map(|h| model.get_host(h)).collect())
+            let mut res = Vec::with_capacity(hs.len());
+            for h in hs.iter() {
+                let host: Cow<HostDef> = match model.get_host(h) {
+                    Some(host) => Cow::Borrowed(host),
+                    None => Cow::Owned(HostDef::parse(model, model.as_scoped(), h)?),
+                };
+                res.push(host);
+            }
+            Ok(res)
         })
     }
 

@@ -4,7 +4,8 @@ use super::*;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StepExec {
     step: usize,
-    host_path: Opath,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    host_path: Option<Opath>,
     host: Host,
     tasks: Vec<TaskExec>,
     #[serde(skip)]
@@ -15,7 +16,8 @@ impl StepExec {
     pub fn create(model: &Model, proc: &ProcDef, step: &Step, host: &HostDef, proc_exec: &ProcExec) -> Result<StepExec, ProtoError> {
         let mut step_exec = StepExec {
             step: step.index(),
-            host_path: host.node().path(),
+            // only set host_path if host is defined inside the model
+            host_path: model.get_host(host.node()).map(|h| h.node().path()),
             host: Host::from_def(host)?,
             tasks: Vec::new(),
             path: PathBuf::new(),
@@ -79,8 +81,8 @@ impl StepExec {
         &self.host
     }
 
-    pub fn host_path(&self) -> &Opath {
-        &self.host_path
+    pub fn host_path(&self) -> Option<&Opath> {
+        self.host_path.as_ref()
     }
 }
 

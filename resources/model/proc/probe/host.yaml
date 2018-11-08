@@ -1,2 +1,2 @@
 ---
-domain: ${$host.domain}
+domain: <% $$host.domain %>

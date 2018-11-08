@@ -89,7 +89,7 @@ impl ProcExec {
             let hosts = s.resolve_hosts(model, proc)?;
 
             for host in hosts {
-                let step = StepExec::create(model, proc, s, host, self)?;
+                let step = StepExec::create(model, proc, s, &host, self)?;
                 self.add_step(step);
             }
         }

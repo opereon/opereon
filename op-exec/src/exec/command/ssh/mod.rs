@@ -348,7 +348,7 @@ mod tests {
         }"#).unwrap();
 
         let username = std::env::var("USER").unwrap();
-        let auth = SshAuth::PublicKey { key_path: "~/.ssh/id_rsa".into() };
+        let auth = SshAuth::PublicKey { identity_file: "~/.ssh/id_rsa".into() };
         let dest = SshDest::new("127.0.0.1", 22, username, auth);
 
         SshSession::new(dest, config)

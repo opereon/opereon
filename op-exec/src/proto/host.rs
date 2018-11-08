@@ -4,22 +4,25 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Host {
     hostname: String,
-    domain: String,
     ssh_dest: SshDest,
 }
 
 impl Host {
     pub fn from_def(host_def: &HostDef) -> Result<Host, ProtoError> {
-        let h = from_tree(host_def.node())?;
+        let mut h: Host = from_tree(host_def.node())?;
+        h.hostname = host_def.hostname().to_string();
         Ok(h)
+    }
+
+    pub fn from_dest(ssh_dest: SshDest) -> Host {
+        Host {
+            hostname: ssh_dest.hostname().to_string(),
+            ssh_dest,
+        }
     }
 
     pub fn hostname(&self) -> &str {
         &self.hostname
-    }
-
-    pub fn domain(&self) -> &str {
-        &self.domain
     }
 
     pub fn ssh_dest(&self) -> &SshDest {
@@ -29,11 +32,7 @@ impl Host {
 
 impl std::fmt::Display for Host {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.domain.is_empty() {
-            write!(f, "{}", self.hostname)
-        } else {
-            write!(f, "{}.{}", self.hostname, self.domain)
-        }
+        write!(f, "{}", self.hostname)
     }
 }
 
@@ -44,28 +43,26 @@ mod tests {
 
     fn as_host() -> Host {
         Host {
-            hostname: "h1".into(),
-            domain: "kodegenix.pl".into(),
+            hostname: "h1.kodegenix.pl".into(),
             ssh_dest: SshDest::new(
                 "h1.kodegenix.pl",
                 22,
                 "root",
-                SshAuth::PublicKey { key_path: PathBuf::from("~/.ssh/id_rsa") }
+                SshAuth::PublicKey { identity_file: PathBuf::from("~/.ssh/id_rsa") }
             ),
         }
     }
 
     fn as_json() -> &'static str {
         r#"{
-          "hostname": "h1",
-          "domain": "kodegenix.pl",
+          "hostname": "h1.kodegenix.pl",
           "ssh_dest": {
             "hostname": "h1.kodegenix.pl",
             "port": 22,
             "username": "root",
             "auth": {
               "method": "public-key",
-              "key_path": "~/.ssh/id_rsa"
+              "identity_file": "~/.ssh/id_rsa"
             }
           }
         }"#

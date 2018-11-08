@@ -8,7 +8,6 @@ pub struct HostDef {
     #[serde(skip)]
     node: NodeRef,
     hostname: String,
-    domain: String,
 }
 
 impl HostDef {
@@ -17,19 +16,13 @@ impl HostDef {
             root,
             node,
             hostname: String::new(),
-            domain: String::new(),
         };
-        h.hostname = get_expr(&h, "hostname");
-        h.domain = get_expr(&h, "domain");
+        h.hostname = get_expr(&h, "fqdn or hostname");
         h
     }
 
     pub fn hostname(&self) -> &str {
         &self.hostname
-    }
-
-    pub fn domain(&self) -> &str {
-        &self.domain
     }
 }
 
@@ -55,6 +48,7 @@ impl ParsedModelDef for HostDef {
         match *node.data().value() {
             Value::Object(ref props) => {
                 perr_assert!(props.contains_key("hostname"), "host definition must contain 'hostname' property")?;
+                perr_assert!(props.contains_key("ssh_dest"), "host definition must contain 'ssh_dest' property")?;
             }
             _ => {
                 perr!("host definition must be an object")?;

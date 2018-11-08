@@ -419,16 +419,18 @@ impl OperationImpl for ModelCheckOperation {
 pub struct ModelProbeOperation {
     operation: OperationRef,
     engine: EngineRef,
+    ssh_dest: SshDest,
     model_path: ModelPath,
     filter: Option<String>,
     proc_op: Option<OperationExec>,
 }
 
 impl ModelProbeOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath, filter: Option<String>, args: &[(String, String)]) -> ModelProbeOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, ssh_dest: SshDest, model_path: ModelPath, filter: Option<String>, args: &[(String, String)]) -> ModelProbeOperation {
         ModelProbeOperation {
             operation,
             engine,
+            ssh_dest,
             model_path,
             filter,
             proc_op: None,
@@ -476,7 +478,11 @@ impl Future for ModelProbeOperation {
                     if p.kind() == ProcKind::Probe {
                         let id = p.id();
                         if filter_re.is_none() || filter_re.as_ref().unwrap().is_match(id) {
-                            let mut e = ProcExec::new(Utc::now());
+                            let host = to_tree(&Host::from_dest(self.ssh_dest.clone())).unwrap();
+                            let mut args = Arguments::new();
+                            args.set_arg("$host".into(), ArgumentSet::new(&host.into(), model.root()));
+
+                            let mut e = ProcExec::with_args(Utc::now(), args);
                             e.prepare(&model, p, exec_dir)?;
                             e.store()?;
 

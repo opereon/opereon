@@ -17,6 +17,14 @@ pub enum SshAuth {
 
 impl SshAuth {
     pub (crate) fn set_auth(&self, cmd: &mut CommandBuilder) {
+        lazy_static! {
+            static ref OP_ASK_PATH: PathBuf = {
+                let mut path = std::env::current_exe().unwrap();
+                path.set_file_name("op-ask");
+                path
+            };
+        }
+
         match *self {
             SshAuth::Default => { }
             SshAuth::PublicKey { ref identity_file } => {
@@ -25,7 +33,7 @@ impl SshAuth {
             SshAuth::Password { ref password } => {
                 cmd.arg("-o").arg("NumberOfPasswordPrompts=1");
                 cmd.env("DISPLAY", ":0");
-                cmd.env("SSH_ASKPASS", "/home/outsider/workspace/opereon/target/debug/op-ask");
+                cmd.env("SSH_ASKPASS", OP_ASK_PATH.display().to_string());
                 cmd.env("OPEREON_PASSWD", password.as_ref());
                 cmd.setsid(true);
             }
@@ -55,7 +63,6 @@ impl SshDest {
     }
 
     pub fn from_url(url: &Url, auth: SshAuth) -> SshDest {
-        println!("{:?}", url);
         let hostname = url.host().unwrap().to_string();
         let username = match url.username() {
             "" => users::get_current_username().unwrap().to_str().unwrap().to_string(),
@@ -113,23 +120,15 @@ impl SshDest {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parse_url() {
-        let a = SshAuth::PublicKey { key_path: PathBuf::from("~/.ssh/id_rsa") };
-        let url = "example.org";
-
-        println!("{:?}", SshDest::from_url(url, a));
-    }
-
     mod auth {
         use super::*;
 
         #[test]
         fn can_serialize_public_key() {
-            let a = SshAuth::PublicKey { key_path: PathBuf::from("~/.ssh/id_rsa") };
+            let a = SshAuth::PublicKey { identity_file: PathBuf::from("~/.ssh/id_rsa") };
             let s = serde_json::to_string(&a).unwrap();
 
-            assert_eq!(r#"{"method":"public-key","key_path":"~/.ssh/id_rsa"}"#, &s);
+            assert_eq!(r#"{"method":"public-key","identity_file":"~/.ssh/id_rsa"}"#, &s);
         }
 
         #[test]

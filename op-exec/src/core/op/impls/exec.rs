@@ -77,7 +77,6 @@ impl OperationImpl for ProcExecOperation {
 pub struct StepExecOperation {
     operation: OperationRef,
     engine: EngineRef,
-    model: ModelRef,
     op: OperationExec,
 }
 
@@ -89,18 +88,31 @@ impl StepExecOperation {
             bin_id
         };
 
-        let exec = engine.write().exec_manager_mut().get(exec_path)?;
-        let model = engine.write().model_manager_mut().resolve_bin(exec.lock().curr_model(), bin_id)?;
+        let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
 
         let tasks = {
-            let exec = exec.lock();
+            let proc_exec = proc_exec.lock();
+            let model = engine.write().model_manager_mut().resolve_bin(proc_exec.curr_model(), bin_id)?;
 
-            let ref step = exec.run().steps()[step_index];
-            println!("{}: executing step in {}", step.host(), step.path().display());
+            let model = model.lock();
 
-            let mut tasks = Vec::with_capacity(step.tasks().len());
+            let ref step_exec = proc_exec.run().steps()[step_index];
+            println!("{}: executing step in {}", step_exec.host(), step_exec.path().display());
 
-            for i in 0..step.tasks().len() {
+            let proc = model.get_proc_path(proc_exec.proc_path()).unwrap();
+            {
+                let s = proc.scope_mut();
+                s.set_var("$proc".into(), proc.node().clone().into());
+                let host = match step_exec.host_path() {
+                    Some(p) => model.get_host_path(p).unwrap().node().clone(),
+                    None => to_tree(step_exec.host()).unwrap(),
+                };
+                s.set_var("$host".into(), host.into());
+            }
+
+            let mut tasks = Vec::with_capacity(step_exec.tasks().len());
+
+            for i in 0..step_exec.tasks().len() {
                 let op: OperationRef = Context::TaskExec {
                     bin_id,
                     exec_path: exec_path.to_owned(),
@@ -119,7 +131,6 @@ impl StepExecOperation {
         Ok(StepExecOperation {
             operation,
             engine,
-            model,
             op,
         })
     }
@@ -202,14 +213,8 @@ impl Future for TaskExecOperation {
                 let ref task_exec = step_exec.tasks()[self.task_index];
 
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
-                let host = curr_model.get_host_path(step_exec.host_path()).unwrap();
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
-                {
-                    let s = proc.scope_mut();
-                    s.set_var("$proc".into(), proc.node().clone().into());
-                    s.set_var("$host".into(), host.node().clone().into());
-                }
                 {
                     let s = task.scope_mut();
                     s.set_var("$task".into(), task.node().clone().into());
