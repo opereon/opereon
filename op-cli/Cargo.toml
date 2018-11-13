@@ -16,7 +16,7 @@ structopt = "0.2.13"
 futures = "0.1.25"
 serde = "1.0.80"
 serde_derive = "1.0.80"
-serde_json = "1.0.32"
+serde_json = "1.0.33"
 serde_yaml = "0.8.7"
 toml = "0.4.8"
 uuid = { version = "0.7.1", features = ["serde"] }
