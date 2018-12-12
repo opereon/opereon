@@ -24,7 +24,7 @@ impl Defines {
         Defines {
             users: Opath::parse("$.conf.users.*").unwrap(),
             hosts: Opath::parse("$.conf.hosts.*").unwrap(),
-            procs: Opath::parse("$.proc.**[@.proc != null]").unwrap(),
+            procs: Opath::parse("$.(proc, probe).**[@.proc != null]").unwrap(),
             custom: LinkedHashMap::new(),
             user_defined: false,
         }
@@ -128,11 +128,11 @@ mod tests {
 
             let json = r#"
             {
-              "users": "$.conf.users.*",
-              "hosts": "$.conf.hosts.*",
-              "procs": "$.proc.**[(@.proc != null)]",
-              "cust1": "$.cust1",
-              "cust2": "$.cust2"
+              "users": "${$.conf.users.*}",
+              "hosts": "${$.conf.hosts.*}",
+              "procs": "${$.(proc, probe).**[(@.proc != null)]}",
+              "cust1": "${$.cust1}",
+              "cust2": "${$.cust2}"
             }
             "#;
 

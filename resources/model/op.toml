@@ -1,9 +1,3 @@
 [info]
 authors = ["jc"]
 description = "Operon test model 2"
-
-[defines]
-users = "$.conf.users.*"
-hosts = "$.conf.hosts.*"
-ui = "$.ui.*"
-processors = "$.proc.*"

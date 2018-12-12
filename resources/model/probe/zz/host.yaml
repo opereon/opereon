@@ -1,0 +1,10 @@
+proc: probe
+label: Save host data
+scope:
+run:
+  - hosts: ${$$host}
+    tasks:
+      - task: template
+        scope:
+          src_path: "host.tpl"
+          dst_path: ${$$host.hostname + "/_.yaml"}
