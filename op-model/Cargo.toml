@@ -3,6 +3,7 @@ name = "op-model"
 version = "0.1.0"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 workspace = ".."
+edition = "2018"
 
 [dependencies]
 kg-utils = "0.2.3"
@@ -10,16 +11,16 @@ kg-io = "0.1.0"
 kg-tree = "0.1.1"
 kg-symbol = "0.1.8"
 log = "0.4.6"
-libc = "0.2.46"
-notify = "4.0.6"
+libc = "0.2.50"
+notify = "4.0.10"
 walkdir = "2.2.7"
 globset = "0.4.2"
-serde = "1.0.84"
-serde_derive = "1.0.84"
-serde_json = "1.0.34"
+serde = "1.0.89"
+serde_derive = "1.0.89"
+serde_json = "1.0.39"
 serde_yaml = "0.8.8"
 toml = "0.4.10"
-uuid = { version = "0.7.1", features = ["serde", "v1", "v3", "v4", "v5"] }
+uuid = { version = "0.7.2", features = ["serde", "v1", "v3", "v4", "v5"] }
 heapsize = "0.4.2"
 chrono = { version = "0.4.6", features = ["serde"] }
 users = "0.8.1"
