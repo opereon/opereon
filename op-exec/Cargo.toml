@@ -15,7 +15,7 @@ kg-tree = "0.1.1"
 kg-template = "0.1.0"
 kg-symbol= "0.1.8"
 op-model = { path = "../op-model" }
-tokio = "0.1.16"
+tokio = "0.1.17"
 tokio-process = "0.2.3"
 os_pipe = "0.8.1"
 time = "0.1.42"
