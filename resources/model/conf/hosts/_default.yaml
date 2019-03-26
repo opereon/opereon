@@ -7,4 +7,4 @@ ssh_dest:
   username: outsider
   auth:
     method: public-key
-    key_path: ~/.ssh/id_rsa
+    identity_file: ~/.ssh/id_rsa
