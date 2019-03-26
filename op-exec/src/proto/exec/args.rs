@@ -48,6 +48,12 @@ impl Arguments {
     }
 }
 
+impl Default for Arguments {
+    fn default() -> Self {
+        Arguments::new()
+    }
+}
+
 pub struct ArgumentsBuilder {
     root: NodeRef,
     args: Arguments,

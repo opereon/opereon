@@ -9,10 +9,10 @@ pub struct ProcExec {
     label: String,
     kind: ProcKind,
     curr_model: ModelPath,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     prev_model: Option<ModelPath>,
     proc_path: Opath,
-    #[serde(skip_serializing_if = "Arguments::is_empty")]
+    #[serde(skip_serializing_if = "Arguments::is_empty", default)]
     args: Arguments,
     run: RunExec,
     #[serde(skip)]
