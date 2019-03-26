@@ -53,7 +53,7 @@ impl Model {
     /// # Returns
     /// Tuple containing path to manifest dir and manifest itself.
     pub fn search_manifest(start_dir: &Path) -> IoResult<(PathBuf, Manifest)> {
-        let manifest_filename = PathBuf::from("op.toml");
+        let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
 
         let mut parent = Some(start_dir);
 
@@ -120,7 +120,7 @@ impl Model {
 
             if file_type == FileType::File {
                 let file_name = path.file_name().unwrap();
-                if file_name == DEFAULT_CONFIG_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
+                if file_name == DEFAULT_MANIFEST_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
                     hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
                     continue;
                 }
