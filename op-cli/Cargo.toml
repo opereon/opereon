@@ -7,6 +7,7 @@ authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <
 workspace = ".."
 edition = "2018"
 default-run = "op"
+build = "build.rs"
 
 [dependencies]
 kg-diag = "0.1.0"
@@ -27,6 +28,7 @@ slog = "2.4.1"
 slog-term = "2.4.0"
 slog-async = "2.3.0"
 url = "1.7.2"
+chrono = "0.4.6"
 
 [dev-dependencies]
 

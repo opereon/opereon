@@ -49,6 +49,13 @@ mod options;
 use display::DisplayFormat;
 use options::*;
 
+use chrono::{Utc, DateTime, FixedOffset};
+use chrono::offset::TimeZone;
+
+pub static SHORT_VERSION: &'static str = env!("OP_SHORT_VERSION");
+pub static LONG_VERSION: &'static str = env!("OP_LONG_VERSION");
+pub static TIMESTAMP: &'static str = env!("OP_TIMESTAMP");
+
 fn check<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
     match result {
         Ok(t) => t,
@@ -130,11 +137,18 @@ fn init_file_logger(config: &ConfigRef) -> slog::Logger {
 }
 
 fn main() {
+    let ts_local: DateTime<FixedOffset> = DateTime::parse_from_rfc3339(TIMESTAMP).unwrap();
+    let ts_utc = ts_local.with_timezone(&Utc);
+    let matches = Opts::clap()
+        .version(SHORT_VERSION)
+        .long_version(format!("{} ({})", LONG_VERSION, ts_utc.format("%F %T")).as_str())
+        .get_matches();
+
     let Opts {
         config_file_path,
         command,
         verbose,
-    } = Opts::from_args();
+    } = Opts::from_clap(&matches);
 
     let config = match ConfigRef::read(&config_file_path) {
         Err(err) => {
