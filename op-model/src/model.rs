@@ -354,8 +354,6 @@ impl Model {
     }
 
     fn deep_copy(&self) -> Self {
-        use std::collections::HashMap;
-
         let mut node_path_map = HashMap::new();
         self.root().visit_recursive(|_, _, n| {
             node_path_map.insert(n.data_ptr(), n.path());
