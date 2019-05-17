@@ -287,6 +287,9 @@ fn main() {
                 args,
             }
         }
+        Command::Init => {
+            ExecContext::ModelInit
+        }
     };
 
     actix::System::run(move || {

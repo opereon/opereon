@@ -3,6 +3,8 @@ use super::*;
 use regex::Regex;
 
 use kg_tree::diff::Diff;
+use std::sync::Mutex;
+use git2::Repository;
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -21,6 +23,39 @@ impl std::str::FromStr for DiffMethod {
             "full" => Ok(DiffMethod::Full),
             _ => Err("unknown diff method".to_string())
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ModelInitOperation {
+    operation: OperationRef,
+    engine: EngineRef,
+}
+
+impl ModelInitOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef) -> ModelInitOperation {
+        ModelInitOperation {
+            operation,
+            engine,
+        }
+    }
+}
+
+impl Future for ModelInitOperation {
+    type Item = Outcome;
+    type Error = RuntimeError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let mut e = self.engine.write();
+        // TODO handle result
+        e.model_manager_mut().init_model().unwrap();
+        Ok(Async::Ready(Outcome::Empty))
+    }
+}
+
+impl OperationImpl for ModelInitOperation {
+    fn init(&mut self) -> Result<(), RuntimeError> {
+        Ok(())
     }
 }
 

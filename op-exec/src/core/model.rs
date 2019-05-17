@@ -3,6 +3,9 @@ use super::*;
 use std::collections::HashMap;
 
 use crypto::sha1::Sha1;
+use git2::{Repository, RepositoryInitOptions};
+use std::sync::{Mutex, Arc, RwLock};
+use std::fmt::Formatter;
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -90,13 +93,14 @@ impl From<ModelRef> for Bins {
     }
 }
 
+type RepositoryRef = Arc<Mutex<Repository>>;
 
-#[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Sha1Hash, Bins>,
     path_map: HashMap<PathBuf, Sha1Hash>,
     current: Sha1Hash,
+    repository: Option<RepositoryRef>,
     logger: slog::Logger,
 }
 
@@ -108,6 +112,7 @@ impl ModelManager {
             model_cache,
             path_map: HashMap::new(),
             current: Sha1Hash::nil(),
+            repository: None,
             logger
         }
     }
@@ -119,6 +124,19 @@ impl ModelManager {
     pub fn init(&mut self) -> IoResult<()> {
         debug!(self.logger, "Initializing model manager");
         use std::str::FromStr;
+//
+//        let current_dir = fs::current_dir()?;
+//
+//        self.repository = match Repository::discover(&current_dir) {
+//            Ok(repository) => {
+//                debug!(self.logger, "Git repository found in path {}", repository.path().display());
+//                Some(Arc::new(Mutex::new(repository)))
+//            },
+//            Err(err) => {
+//                warn!(self.logger, "Git repository not found! {:?}", err);
+//                None
+//            }
+//        };
 
         kg_io::fs::create_dir_all(self.config().data_dir())?;
 
@@ -137,6 +155,20 @@ impl ModelManager {
             let m = ModelRef::default();
             self.cache_model(Bin::new(Uuid::nil(), m));
         }
+
+        Ok(())
+    }
+
+    pub fn init_model(&mut self) -> IoResult<()>{
+
+        let mut opts = RepositoryInitOptions::new();
+        opts.no_reinit(true);
+
+        // TODO error handling
+        let repo = Repository::init_opts(fs::current_dir()?, &opts).expect("Cannot create git repository!");
+//        repo.add_ignore_rule(".op").unwrap();
+
+        self.repository = Some(Arc::new(Mutex::new(repo)));
 
         Ok(())
     }
@@ -256,5 +288,34 @@ impl ModelManager {
         for (&id, b) in self.model_cache.iter() {
             self.path_map.insert(b.any().lock().metadata().path().to_owned(), id);
         }
+    }
+}
+
+impl std::fmt::Debug for ModelManager {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::build::CheckoutBuilder;
+    use git2::ObjectType;
+
+    #[test]
+    fn git_diff_test()-> Result<(), git2::Error> {
+        let current = std::env::current_dir().unwrap();
+        let out_dir = current.join(".op/checked_out");
+
+        fs::create_dir_all(&out_dir).unwrap();
+        let repo = Repository::open(&current).unwrap();
+
+        let mut builder = CheckoutBuilder::new();
+        builder.target_dir(&out_dir);
+
+        let mut index = repo.index()?;
+
+        repo.checkout_index(Some(&mut index), Some(&mut builder))
     }
 }

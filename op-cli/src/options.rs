@@ -221,4 +221,7 @@ pub enum Command {
         #[structopt(name = "PATH", default_value = ".", parse(from_os_str))]
         path: PathBuf,
     },
+    /// Initialize empty opereon model
+    #[structopt(name = "init", author = "")]
+    Init,
 }

@@ -6,6 +6,7 @@ use super::*;
 #[serde(tag = "type", content = "arg")]
 pub enum Context {
     ConfigGet,
+    ModelInit,
     ModelList,
     ModelStore(PathBuf),
     ModelQuery {
@@ -60,6 +61,7 @@ impl Context {
         match *self {
             Context::ConfigGet => "config-get",
             Context::ModelList => "model-list",
+            Context::ModelInit => "model-init",
             Context::ModelStore(..) => "model-store",
             Context::ModelQuery {..} => "model-query",
             Context::ModelTest {..} => "model-test",

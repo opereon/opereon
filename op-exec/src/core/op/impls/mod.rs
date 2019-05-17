@@ -43,6 +43,7 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
+        Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
     };
 
     op_impl.init()?;
