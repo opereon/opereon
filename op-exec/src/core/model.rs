@@ -301,7 +301,7 @@ impl std::fmt::Debug for ModelManager {
 mod tests {
     use super::*;
     use git2::build::CheckoutBuilder;
-    use git2::{ObjectType, Oid};
+    use git2::{ObjectType, Oid, DiffOptions, DiffFormat, DiffFindOptions};
 
     #[test]
     fn checkout_to_dir(){
@@ -327,7 +327,51 @@ mod tests {
 
     #[test]
     fn diff(){
+        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
+//        let out_dir = current.join(".op/checked_out");
 
+        let commit_hash1 = Oid::from_str("a3ca881d021826b463c5e98d524895ca035acbf6").expect("Cannot parse commit hash");
+        let commit_hash2 = Oid::from_str("6db345323484818f405ade3e52a4072789e493ef").expect("Cannot parse commit hash");
+
+        let repo = Repository::open(&current).expect("Cannot open repository");
+
+        let commit1 = repo.find_commit(commit_hash1).expect("Cannot find commit");
+        let commit2 = repo.find_commit(commit_hash2).expect("Cannot find commit");
+
+        let tree1 = commit1.tree().expect("Cannot get commit tree");
+        let tree2 = commit2.tree().expect("Cannot get commit tree");
+
+        let mut opts = DiffOptions::new();
+        opts.minimal(true);
+
+        let mut diff = repo.diff_tree_to_tree(Some(&tree1), Some(&tree2), Some(&mut opts)).expect("Cannot get diff");
+//        let diff = repo.diff_tree_to_workdir(Some(&tree1), Some(&mut diffOpts)).expect("Cannot get diff");
+
+        let mut find_opts = DiffFindOptions::new();
+        find_opts.all(true);
+
+        diff.find_similar(Some(&mut find_opts)).expect("Cannot find similar!");
+        println!("Diffs:");
+        diff.print(DiffFormat::Patch, |delta, hunk , line|{
+            println!("======");
+            eprintln!("Change type: {:?}", delta.status());
+            let old = delta.old_file();
+            let new = delta.new_file();
+            eprintln!("old = id: {:?}, path: {:?}", old.id(), old.path());
+            eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
+
+            if let Some(hunk) = hunk{
+                eprintln!("hunk.new_lines() = {:?}", hunk.new_lines());
+                eprintln!("hunk.old_lines() = {:?}", hunk.old_lines());
+            }
+
+            eprintln!("line.content() = {}", String::from_utf8_lossy(line.content()));
+
+//            if old.id().is_zero() {
+//                eprintln!("File  = {:?}", old.path);
+//            }
+            true
+        }).expect("Cannot print diff")
     }
 
 }
