@@ -301,21 +301,33 @@ impl std::fmt::Debug for ModelManager {
 mod tests {
     use super::*;
     use git2::build::CheckoutBuilder;
-    use git2::ObjectType;
+    use git2::{ObjectType, Oid};
 
     #[test]
-    fn git_diff_test()-> Result<(), git2::Error> {
-        let current = std::env::current_dir().unwrap();
+    fn checkout_to_dir(){
+        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
         let out_dir = current.join(".op/checked_out");
 
-        fs::create_dir_all(&out_dir).unwrap();
-        let repo = Repository::open(&current).unwrap();
+        let commit_hash = Oid::from_str("996d94321d833a918842c69531197f9d368ec4b6").expect("Cannot parse commit hash");
+
+        let repo = Repository::open(&current).expect("Cannot open repository");
+
+        let commit = repo.find_commit(commit_hash).expect("Cannot find commit");
+        let tree = commit.tree().expect("Cannot get commit tree");
 
         let mut builder = CheckoutBuilder::new();
         builder.target_dir(&out_dir);
+        // cannot update current index
+        builder.update_index(false);
+        // override everything in out_dir with commit state
+        builder.force();
 
-        let mut index = repo.index()?;
-
-        repo.checkout_index(Some(&mut index), Some(&mut builder))
+        repo.checkout_tree(tree.as_object(), Some(&mut builder)).expect("Cannot checkout tree!");
     }
+
+    #[test]
+    fn diff(){
+
+    }
+
 }
