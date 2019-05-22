@@ -113,7 +113,7 @@ impl ModelManager {
             path_map: HashMap::new(),
             current: Sha1Hash::nil(),
             repository: None,
-            logger
+            logger,
         }
     }
 
@@ -142,7 +142,7 @@ impl ModelManager {
 
         let current_file_path = self.config().data_dir().join("current");
         if current_file_path.exists() {
-            let mut current = String:: new();
+            let mut current = String::new();
             kg_io::fs::read_to_string(&current_file_path, &mut current)?;
             match Sha1Hash::from_str(&current) {
                 Ok(id) => {
@@ -159,8 +159,7 @@ impl ModelManager {
         Ok(())
     }
 
-    pub fn init_model(&mut self) -> IoResult<()>{
-
+    pub fn init_model(&mut self) -> IoResult<()> {
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
 
@@ -176,7 +175,7 @@ impl ModelManager {
     pub fn store<P: AsRef<Path>>(&mut self, metadata: Metadata, path: P) -> IoResult<ModelRef> {
         debug!(self.logger, "Saving new model"; o!("source_path"=> path.as_ref().display()));
 
-        let (path, _) =  Model::search_manifest(path.as_ref())?;
+        let (path, _) = Model::search_manifest(path.as_ref())?;
 
         let mut sha1 = Sha1::new();
 
@@ -301,10 +300,10 @@ impl std::fmt::Debug for ModelManager {
 mod tests {
     use super::*;
     use git2::build::CheckoutBuilder;
-    use git2::{ObjectType, Oid, DiffOptions, DiffFormat, DiffFindOptions};
+    use git2::{ObjectType, Oid, DiffOptions, DiffFormat, DiffFindOptions, IndexAddOption, Index};
 
     #[test]
-    fn checkout_to_dir(){
+    fn checkout_to_dir() {
         let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
         let out_dir = current.join(".op/checked_out");
 
@@ -326,52 +325,48 @@ mod tests {
     }
 
     #[test]
-    fn diff(){
+    fn diff() {
         let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-//        let out_dir = current.join(".op/checked_out");
 
-        let commit_hash1 = Oid::from_str("a3ca881d021826b463c5e98d524895ca035acbf6").expect("Cannot parse commit hash");
-        let commit_hash2 = Oid::from_str("6db345323484818f405ade3e52a4072789e493ef").expect("Cannot parse commit hash");
+        let commit_hash1 = Oid::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8").expect("Cannot parse commit hash");
 
         let repo = Repository::open(&current).expect("Cannot open repository");
 
         let commit1 = repo.find_commit(commit_hash1).expect("Cannot find commit");
-        let commit2 = repo.find_commit(commit_hash2).expect("Cannot find commit");
-
         let tree1 = commit1.tree().expect("Cannot get commit tree");
-        let tree2 = commit2.tree().expect("Cannot get commit tree");
 
         let mut opts = DiffOptions::new();
         opts.minimal(true);
 
-        let mut diff = repo.diff_tree_to_tree(Some(&tree1), Some(&tree2), Some(&mut opts)).expect("Cannot get diff");
-//        let diff = repo.diff_tree_to_workdir(Some(&tree1), Some(&mut diffOpts)).expect("Cannot get diff");
+        let mut index = repo.index().expect("Cannot get index!");
+
+//         TODO what about .operc [[exclude]]? Should it be equal to .gitignore?
+        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
+        // Changes in index won't be saved to disk until index.write*() called.
+        index.clear().expect("Cannot clear index");
+        index.add_all(&["*"], IndexAddOption::default(), None).expect("Cannot update index");
+
+//        index.write().expect("cannot write index");
+
+        let mut diff = repo.diff_tree_to_workdir_with_index(Some(&tree1), Some(&mut opts)).expect("Cannot get diff");
 
         let mut find_opts = DiffFindOptions::new();
-        find_opts.all(true);
+        find_opts.renames(true);
+        find_opts.renames_from_rewrites(true);
+        find_opts.remove_unmodified(true);
 
         diff.find_similar(Some(&mut find_opts)).expect("Cannot find similar!");
         println!("Diffs:");
-        diff.print(DiffFormat::Patch, |delta, hunk , line|{
+
+        let deltas = diff.deltas();
+        eprintln!("deltas.size_hint() = {:?}", deltas.size_hint());
+        for delta in deltas {
             println!("======");
             eprintln!("Change type: {:?}", delta.status());
             let old = delta.old_file();
             let new = delta.new_file();
             eprintln!("old = id: {:?}, path: {:?}", old.id(), old.path());
             eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
-
-            if let Some(hunk) = hunk{
-                eprintln!("hunk.new_lines() = {:?}", hunk.new_lines());
-                eprintln!("hunk.old_lines() = {:?}", hunk.old_lines());
-            }
-
-            eprintln!("line.content() = {}", String::from_utf8_lossy(line.content()));
-
-//            if old.id().is_zero() {
-//                eprintln!("File  = {:?}", old.path);
-//            }
-            true
-        }).expect("Cannot print diff")
+        }
     }
-
 }
