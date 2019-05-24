@@ -39,6 +39,10 @@ impl Sha1Hash {
         sha1.result(&mut h.0);
         h
     }
+
+    pub fn as_oid(&self) -> git2::Oid {
+        git2::Oid::from_bytes(&self.0).unwrap()
+    }
 }
 
 impl Default for Sha1Hash {
@@ -91,6 +95,14 @@ impl FromStr for Sha1Hash {
         } else {
             Err(Sha1HashParseError::InvalidLength)
         }
+    }
+}
+
+impl From<git2::Oid> for Sha1Hash {
+    fn from(oid: git2::Oid) -> Self {
+        let mut hash = Sha1Hash::nil();
+        (*hash).copy_from_slice(oid.as_bytes());
+        hash
     }
 }
 

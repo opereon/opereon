@@ -11,6 +11,8 @@ use walkdir::WalkDir;
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 use kg_io::OpType;
+use git2::{Repository, ObjectType, TreeWalkMode};
+use std::str::FromStr;
 
 
 fn hash_file(file_type: FileType, path_abs: &Path, path: &Path, buf: &mut String, sha1: &mut Sha1) -> IoResult<()> {
@@ -103,7 +105,128 @@ impl Model {
 
         m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
 
+        eprintln!("m = {}", serde_json::to_string_pretty(&m).unwrap());
+
         let scope = ScopeMut::new();
+
+        let repo = Repository::open(m.metadata.path()).expect("Cannot open repository");
+
+        let obj = repo.find_object(m.metadata.id().as_oid(), None).expect("cannot find object");
+        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+        tree.walk(TreeWalkMode::PreOrder, |parent_path, entry|{
+            println!("========");
+            eprintln!("parent_path = {:?}", parent_path);
+            eprintln!("entry.name() = {:?}", entry.name());
+            eprintln!("entry.kind() = {:?}", entry.kind());
+            let path = PathBuf::from_str(parent_path).unwrap().join(entry.name().unwrap());
+            let path_abs = m.metadata.path().join(&path);
+
+            let file_type: FileType = match entry.kind().unwrap() {
+                ObjectType::Tree => FileType::Dir,
+                ObjectType::Blob => FileType::File,
+                _ => {
+                    eprintln!("Unknown git object type, skipping = {:?}", entry.kind());
+                    return 1
+                }
+            };
+
+
+            let config = cr.resolve(&path_abs);
+//            eprintln!("config = {:#?}", config);
+            if let Some(inc) = config.find_include(&path, file_type) {
+                let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
+
+                let n = NodeRef::null();
+                n.data_mut().set_file(Some(&file_info));
+
+                let item = inc.item().apply_one(m.root(), &n);
+
+                if item.data().file().is_none() {
+                    item.data_mut().set_file(Some(&file_info));
+                }
+
+                scope.set_var("item".into(), NodeSet::One(item));
+
+                inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
+            }
+            0
+        });
+
+        // defines
+        {
+            let defs = manifest.defines().to_node();
+            if manifest.defines().is_user_defined() {
+                defs.data_mut().set_file(Some(&FileInfo::new(&m.metadata.path().join(DEFAULT_MANIFEST_FILENAME), FileType::File, FileFormat::Toml)));
+            }
+
+            let scope_def = m.scoped.scope_def_mut();
+
+            scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
+            scope_def.set_var_def("$hosts".into(), ValueDef::Resolvable(manifest.defines().hosts().clone()));
+            scope_def.set_var_def("$users".into(), ValueDef::Resolvable(manifest.defines().users().clone()));
+            scope_def.set_var_def("$procs".into(), ValueDef::Resolvable(manifest.defines().procs().clone()));
+        }
+
+        // overrides
+        for (path, config) in cr.iter() {
+            if !config.overrides().is_empty() {
+                let path = if path.as_os_str().is_empty() {
+                    Opath::parse("@").unwrap()
+                } else {
+                    Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
+                };
+
+                let current = path.apply_one(m.root(), m.root());
+                eprintln!(" m : {} = {}", path, serde_json::to_string_pretty(&m).unwrap());
+
+
+                for (p, e) in config.overrides().iter() {
+                    let res = p.apply(m.root(), &current);
+                    for n in res.into_iter() {
+                        e.apply(m.root(), &n);
+                    }
+                }
+            }
+        }
+
+        // interpolations
+        let mut resolver = TreeResolver::new();
+        resolver.resolve(m.root());
+
+        {
+            let scope = m.scoped.scope_mut();
+
+            // definitions (hosts, users, processors)
+            //FIXME (jc) error handling
+            let mut hosts = Vec::new();
+            for h in scope.get_var("$hosts").unwrap().iter() {
+                match HostDef::parse(&m, &m.scoped, h) {
+                    Ok(host) => hosts.push(host),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.hosts = hosts;
+
+            let mut users = Vec::new();
+            for u in scope.get_var("$users").unwrap().iter() {
+                match UserDef::parse(&m, &m.scoped, u) {
+                    Ok(user) => users.push(user),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.users = users;
+
+            let mut procs = Vec::new();
+            for p in scope.get_var("$procs").unwrap().iter() {
+                match ProcDef::parse(&m, &m.scoped, p) {
+                    Ok(p) => procs.push(p),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.procs = procs;
+        }
+
+        return Ok(m);
 
         for e in WalkDir::new(m.metadata.path())
             .min_depth(1)
@@ -549,3 +672,17 @@ impl Eq for ModelRef {}
 unsafe impl Send for ModelRef {}
 
 unsafe impl Sync for ModelRef {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    #[test]
+    fn read_test() {
+        let mut metadata = Metadata::default();
+        metadata.set_id(Sha1Hash::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8").unwrap());
+        let model = Model::read(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
+        eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
+    }
+}
