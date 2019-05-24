@@ -1,28 +1,8 @@
 #[macro_use]
 extern crate structopt;
 
-extern crate futures;
-extern crate uuid;
-
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate serde_yaml;
-extern crate toml;
-
-extern crate actix;
-extern crate url;
-
-extern crate kg_diag;
-extern crate kg_tree;
-extern crate kg_utils;
-extern crate op_exec;
-
 #[macro_use]
 extern crate slog;
-extern crate core;
-extern crate slog_async;
-extern crate slog_term;
 
 use slog::Drain;
 use slog::FnValue;
