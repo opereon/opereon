@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 use kg_io::OpType;
-use git2::{Repository, ObjectType, TreeWalkMode};
+use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult};
 use std::str::FromStr;
 
 
@@ -101,7 +101,7 @@ impl Model {
             ..Model::empty()
         };
 
-        let cr = ConfigResolver::scan(m.metadata.path())?;
+        let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())?;
 
         m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
 
@@ -126,7 +126,7 @@ impl Model {
                 ObjectType::Blob => FileType::File,
                 _ => {
                     eprintln!("Unknown git object type, skipping = {:?}", entry.kind());
-                    return 1
+                    return TreeWalkResult::Ok
                 }
             };
 
@@ -149,7 +149,7 @@ impl Model {
 
                 inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
             }
-            0
+            TreeWalkResult::Ok
         });
 
         // defines
@@ -681,7 +681,7 @@ mod tests {
     #[test]
     fn read_test() {
         let mut metadata = Metadata::default();
-        metadata.set_id(Sha1Hash::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8").unwrap());
+        metadata.set_id(Sha1Hash::from_str("c19352072c9cafeb8dc41329d5a23849c9787f49").unwrap());
         let model = Model::read(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }
