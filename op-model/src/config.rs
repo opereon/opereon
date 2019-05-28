@@ -376,11 +376,11 @@ impl ConfigResolver {
     pub fn resolve(&self, path: &Path) -> &Config {
         debug_assert!(path.starts_with(&self.model_dir));
 
-        let path = if !path.is_dir() {
-            path.parent().unwrap()
-        } else {
-            path
-        };
+//        let path = if !path.is_dir() {
+//            path.parent().unwrap()
+//        } else {
+//            path
+//        };
 
         let path = path.strip_prefix(&self.model_dir).unwrap();
 
