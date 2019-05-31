@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 use kg_io::OpType;
-use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult};
+use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult, Oid};
 use std::str::FromStr;
 
 
@@ -36,6 +36,68 @@ pub struct Model {
     procs: Vec<ProcDef>,
     #[serde(skip)]
     lookup: ModelLookup,
+}
+
+#[derive(Debug, Clone)]
+struct LoadFileFunc {
+    model_dir: PathBuf,
+    model_oid: Oid
+}
+
+impl LoadFileFunc {
+    pub fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
+        Self {
+            model_dir,
+            model_oid
+        }
+    }
+}
+
+impl FuncCallable for LoadFileFunc {
+    fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
+        eprintln!("name = {:?}", name);
+        args.check_count_func(&FuncId::Custom(name.to_string()), 1, 2)?;
+
+        let repo = Repository::open(&self.model_dir).expect("Cannot open repository");
+        let odb = repo.odb().expect("Cannot get git object database");
+        let obj = repo.find_object(self.model_oid, None).expect("cannot find object");
+        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+
+        let paths = args.resolve_column(false,0, env);
+
+        if args.count() == 1 {
+            for path in paths.into_iter() {
+                let path = PathBuf::from(path.as_string());
+                let entry = tree.get_path(&path).expect("file not found");
+                let obj = odb.read(entry.id()).expect("Cannot find object!");
+
+                let format = path.extension().map_or(FileFormat::Text, |ext| FileFormat::from(ext.to_str().unwrap()));
+
+                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+
+                out.add(node)
+            }
+        } else {
+            let formats = args.resolve_column(false, 1, env);
+
+            for (p, f) in paths.into_iter().zip(formats.into_iter()) {
+                let path = PathBuf::from(p.as_string());
+                let entry = tree.get_path(&path).expect("file not found");
+                let obj = odb.read(entry.id()).expect("Cannot find object!");
+
+                let format: FileFormat = f.data().as_string().as_ref().into();
+                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+
+                out.add(node)
+            }
+        }
+
+        Ok(())
+    }
+
+    fn clone(&self) -> Box<FuncCallable> {
+        Box::new(std::clone::Clone::clone(self))
+    }
 }
 
 impl Model {
@@ -105,19 +167,22 @@ impl Model {
 
         m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
 
-        eprintln!("m = {}", serde_json::to_string_pretty(&m).unwrap());
+        let commit = m.metadata.id().as_oid();
+        let model_dir = m.metadata.path().to_owned();
+        // FIXME ws error handling
+        let repo = Repository::open(&model_dir).expect("Cannot open repository");
+        let odb = repo.odb().expect("Cannot get git object database");
+        let obj = repo.find_object(commit, None).expect("cannot find object");
+        let tree = obj.peel_to_tree().expect("Non-tree oid found");
 
         let scope = ScopeMut::new();
+        scope.set_func("loadFile".into(), Box::new(LoadFileFunc::new(model_dir, commit)));
 
-        let repo = Repository::open(m.metadata.path()).expect("Cannot open repository");
-
-        let obj = repo.find_object(m.metadata.id().as_oid(), None).expect("cannot find object");
-        let tree = obj.peel_to_tree().expect("Non-tree oid found");
         tree.walk(TreeWalkMode::PreOrder, |parent_path, entry|{
-            println!("========");
-            eprintln!("parent_path = {:?}", parent_path);
-            eprintln!("entry.name() = {:?}", entry.name());
-            eprintln!("entry.kind() = {:?}", entry.kind());
+//            println!("========");
+//            eprintln!("parent_path = {:?}", parent_path);
+//            eprintln!("entry.name() = {:?}", entry.name());
+//            eprintln!("entry.kind() = {:?}", entry.kind());
             let path = PathBuf::from_str(parent_path).unwrap().join(entry.name().unwrap());
             let path_abs = m.metadata.path().join(&path);
 
@@ -136,7 +201,9 @@ impl Model {
             if let Some(inc) = config.find_include(&path, file_type) {
                 let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                let n = NodeRef::null();
+                let obj = odb.read(entry.id()).expect("Cannot get git object!");
+
+                let n = NodeRef::binary(obj.data());
                 n.data_mut().set_file(Some(&file_info));
 
                 let item = inc.item().apply_one(m.root(), &n);
@@ -561,7 +628,7 @@ mod tests {
     #[test]
     fn read_test() {
         let mut metadata = Metadata::default();
-        metadata.set_id(Sha1Hash::from_str("c19352072c9cafeb8dc41329d5a23849c9787f49").unwrap());
+        metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
         let model = Model::read(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }
