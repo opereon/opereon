@@ -55,9 +55,9 @@ impl LoadFileFunc {
 
 impl FuncCallable for LoadFileFunc {
     fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
-        eprintln!("name = {:?}", name);
         args.check_count_func(&FuncId::Custom(name.to_string()), 1, 2)?;
 
+        // TODO ws error handling
         let repo = Repository::open(&self.model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database");
         let obj = repo.find_object(self.model_oid, None).expect("cannot find object");
@@ -74,7 +74,6 @@ impl FuncCallable for LoadFileFunc {
                 let format = path.extension().map_or(FileFormat::Text, |ext| FileFormat::from(ext.to_str().unwrap()));
 
                 let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
-
                 out.add(node)
             }
         } else {
@@ -86,8 +85,8 @@ impl FuncCallable for LoadFileFunc {
                 let obj = odb.read(entry.id()).expect("Cannot find object!");
 
                 let format: FileFormat = f.data().as_string().as_ref().into();
-                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
 
+                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
                 out.add(node)
             }
         }
@@ -146,7 +145,7 @@ impl Model {
         return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
-    fn read(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
+    fn read_revision(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
         let mut sha1 = Sha1::new();
         let mut buf = String::new();
 
@@ -197,7 +196,6 @@ impl Model {
 
 
             let config = cr.resolve(&path_abs);
-//            eprintln!("config = {:#?}", config);
             if let Some(inc) = config.find_include(&path, file_type) {
                 let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
@@ -206,7 +204,7 @@ impl Model {
                 let n = NodeRef::binary(obj.data());
                 n.data_mut().set_file(Some(&file_info));
 
-                let item = inc.item().apply_one(m.root(), &n);
+                let item = inc.item().apply_one_ext(m.root(), &n, scope.as_ref());
 
                 if item.data().file().is_none() {
                     item.data_mut().set_file(Some(&file_info));
@@ -243,9 +241,146 @@ impl Model {
                     Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
                 };
 
-                let current = path.apply_one(m.root(), m.root());
-                eprintln!(" m : {} = {}", path, serde_json::to_string_pretty(&m).unwrap());
+                let current = path.apply_one_ext(m.root(), m.root(), scope.as_ref());
 
+                for (p, e) in config.overrides().iter() {
+                    let res = p.apply_ext(m.root(), &current, scope.as_ref());
+                    for n in res.into_iter() {
+                        e.apply_ext(m.root(), &n, scope.as_ref());
+                    }
+                }
+            }
+        }
+
+        // interpolations
+        let mut resolver = TreeResolver::new();
+        resolver.resolve(m.root());
+
+        {
+            let scope = m.scoped.scope_mut();
+
+            // definitions (hosts, users, processors)
+            //FIXME (jc) error handling
+            let mut hosts = Vec::new();
+            for h in scope.get_var("$hosts").unwrap().iter() {
+                match HostDef::parse(&m, &m.scoped, h) {
+                    Ok(host) => hosts.push(host),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.hosts = hosts;
+
+            let mut users = Vec::new();
+            for u in scope.get_var("$users").unwrap().iter() {
+                match UserDef::parse(&m, &m.scoped, u) {
+                    Ok(user) => users.push(user),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.users = users;
+
+            let mut procs = Vec::new();
+            for p in scope.get_var("$procs").unwrap().iter() {
+                match ProcDef::parse(&m, &m.scoped, p) {
+                    Ok(p) => procs.push(p),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            m.procs = procs;
+        }
+
+        return Ok(m);
+    }
+
+    fn read(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
+        let mut sha1 = Sha1::new();
+        let mut buf = String::new();
+
+        let path = path.canonicalize()?;
+        let (model_dir, manifest) = Model::search_manifest(&path)?;
+
+        assert!(model_dir.is_dir());
+
+        kg_tree::set_base_path(&model_dir);
+        metadata.set_path(model_dir);
+
+        let mut m = Model {
+            metadata,
+            ..Model::empty()
+        };
+
+        let cr = ConfigResolver::scan(m.metadata.path())?;
+
+        m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
+
+        let scope = ScopeMut::new();
+
+        for e in WalkDir::new(m.metadata.path())
+            .min_depth(1)
+            .sort_by(|a, b| a.path().cmp(b.path()))
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+            let path_abs = e.path();
+            let path = path_abs.strip_prefix(m.metadata.path()).unwrap();
+            let file_type: FileType = e.file_type().into();
+
+            if path.starts_with(".op/") {
+                continue;
+            }
+
+            if file_type == FileType::File {
+                let file_name = path.file_name().unwrap();
+                if file_name == DEFAULT_MANIFEST_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
+                    hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
+                    continue;
+                }
+            }
+
+            hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
+
+            let config = cr.resolve(path_abs);
+
+            if let Some(inc) = config.find_include(path, file_type) {
+                let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
+
+                let n = NodeRef::null();
+                n.data_mut().set_file(Some(&file_info));
+
+                let item = inc.item().apply_one(m.root(), &n);
+                if item.data().file().is_none() {
+                    item.data_mut().set_file(Some(&file_info));
+                }
+
+                scope.set_var("item".into(), NodeSet::One(item));
+
+                inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
+            }
+        }
+
+        // defines
+        {
+            let defs = manifest.defines().to_node();
+            if manifest.defines().is_user_defined() {
+                defs.data_mut().set_file(Some(&FileInfo::new(&m.metadata.path().join(DEFAULT_MANIFEST_FILENAME), FileType::File, FileFormat::Toml)));
+            }
+
+            let scope_def = m.scoped.scope_def_mut();
+            scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
+            scope_def.set_var_def("$hosts".into(), ValueDef::Resolvable(manifest.defines().hosts().clone()));
+            scope_def.set_var_def("$users".into(), ValueDef::Resolvable(manifest.defines().users().clone()));
+            scope_def.set_var_def("$procs".into(), ValueDef::Resolvable(manifest.defines().procs().clone()));
+        }
+
+        // overrides
+        for (path, config) in cr.iter() {
+            if !config.overrides().is_empty() {
+                let path = if path.as_os_str().is_empty() {
+                    Opath::parse("@").unwrap()
+                } else {
+                    Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
+                };
+
+                let current = path.apply_one(m.root(), m.root());
 
                 for (p, e) in config.overrides().iter() {
                     let res = p.apply(m.root(), &current);
@@ -293,7 +428,12 @@ impl Model {
             m.procs = procs;
         }
 
-        return Ok(m);
+        if m.metadata.id().is_nil() {
+            m.metadata.set_id(Sha1Hash::result(&mut sha1));
+        } else {
+            assert_eq!(m.metadata.id(), Sha1Hash::result(&mut sha1));
+        }
+        Ok(m)
     }
 
     pub fn copy(src_path: &Path, dst_path: &Path) -> IoResult<Sha1Hash> {
@@ -629,7 +769,7 @@ mod tests {
     fn read_test() {
         let mut metadata = Metadata::default();
         metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
-        let model = Model::read(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
+        let model = Model::read_revision(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }
 }

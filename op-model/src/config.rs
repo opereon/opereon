@@ -282,7 +282,6 @@ impl ConfigResolver {
     }
 
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
-        eprintln!("model_dir = {:?}, commit: {}", model_dir, commit_hash);
 
         let repo = Repository::open(model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
@@ -298,14 +297,9 @@ impl ConfigResolver {
                 || entry.name() != Some(DEFAULT_CONFIG_FILENAME) {
                 return TreeWalkResult::Ok
             }
-            println!("========");
-            eprintln!("parent_path = {:?}", parent_path);
-            eprintln!("entry.name() = {:?}", entry.name());
-            eprintln!("entry.kind() = {:?}", entry.kind());
             // FIXME ws error handling
             let obj = odb.read(entry.id()).expect("Cannot get git object!");
             let content = String::from_utf8(obj.data().to_vec()).expect("Config file is not valid utf8!");
-            eprintln!("content = {}", content);
 
             let config: Config = toml::from_str(&content).unwrap();
             cr.add_file(&model_dir.join(parent_path), config);
