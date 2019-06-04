@@ -93,14 +93,12 @@ impl From<ModelRef> for Bins {
     }
 }
 
-type RepositoryRef = Arc<Mutex<Repository>>;
-
+#[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Sha1Hash, Bins>,
     path_map: HashMap<PathBuf, Sha1Hash>,
     current: Sha1Hash,
-    repository: Option<RepositoryRef>,
     logger: slog::Logger,
 }
 
@@ -112,7 +110,6 @@ impl ModelManager {
             model_cache,
             path_map: HashMap::new(),
             current: Sha1Hash::nil(),
-            repository: None,
             logger,
         }
     }
@@ -167,7 +164,7 @@ impl ModelManager {
         let repo = Repository::init_opts(fs::current_dir()?, &opts).expect("Cannot create git repository!");
 //        repo.add_ignore_rule(".op").unwrap();
 
-        self.repository = Some(Arc::new(Mutex::new(repo)));
+        // TODO initialize new model - add default .gitignore, op.toml etc...
 
         Ok(())
     }
@@ -287,12 +284,6 @@ impl ModelManager {
         for (&id, b) in self.model_cache.iter() {
             self.path_map.insert(b.any().lock().metadata().path().to_owned(), id);
         }
-    }
-}
-
-impl std::fmt::Debug for ModelManager {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        unimplemented!()
     }
 }
 

@@ -4,8 +4,6 @@ use regex::Regex;
 
 use kg_tree::diff::Diff;
 use std::sync::Mutex;
-use git2::Repository;
-
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
