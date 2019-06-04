@@ -45,7 +45,7 @@ struct LoadFileFunc {
 }
 
 impl LoadFileFunc {
-    pub fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
+    fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
         Self {
             model_dir,
             model_oid
@@ -146,9 +146,6 @@ impl Model {
     }
 
     fn read_revision(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
-        let mut sha1 = Sha1::new();
-        let mut buf = String::new();
-
         let path = path.canonicalize()?;
         let (model_dir, manifest) = Model::search_manifest(&path)?;
 
@@ -178,10 +175,6 @@ impl Model {
         scope.set_func("loadFile".into(), Box::new(LoadFileFunc::new(model_dir, commit)));
 
         tree.walk(TreeWalkMode::PreOrder, |parent_path, entry|{
-//            println!("========");
-//            eprintln!("parent_path = {:?}", parent_path);
-//            eprintln!("entry.name() = {:?}", entry.name());
-//            eprintln!("entry.kind() = {:?}", entry.kind());
             let path = PathBuf::from_str(parent_path).unwrap().join(entry.name().unwrap());
             let path_abs = m.metadata.path().join(&path);
 
@@ -215,7 +208,7 @@ impl Model {
                 inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
             }
             TreeWalkResult::Ok
-        });
+        }).expect("Error reading tree"); // FIXME ws error handling
 
         // defines
         {
