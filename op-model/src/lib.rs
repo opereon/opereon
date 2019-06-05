@@ -3,15 +3,6 @@
 #[cfg(test)]
 #[macro_use]
 extern crate indoc;
-
-extern crate walkdir;
-extern crate globset;
-extern crate uuid;
-extern crate heapsize;
-extern crate chrono;
-extern crate users;
-extern crate crypto;
-
 #[macro_use]
 extern crate serde_derive;
 
