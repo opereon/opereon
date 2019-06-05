@@ -486,7 +486,7 @@ impl Future for ModelProbeOperation {
                             e.prepare(&model, p, exec_dir)?;
                             e.store()?;
 
-                            let proc_op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                            let proc_op: OperationRef = Context::ProcExec { bin_id: self.operation.read().id(), exec_path: e.path().to_path_buf() }.into();
                             proc_ops.push(proc_op);
 
                             println!("Probe \"{}\": prepared in {}", id, e.path().display());
