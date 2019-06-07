@@ -6,8 +6,6 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use serde::{ser, de};
-use crypto::sha1::Sha1;
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sha1HashParseError {
@@ -30,14 +28,6 @@ impl Sha1Hash {
             }
         }
         true
-    }
-
-    pub fn result(sha1: &mut Sha1) -> Sha1Hash {
-        use crypto::digest::Digest;
-
-        let mut h = Sha1Hash::nil();
-        sha1.result(&mut h.0);
-        h
     }
 
     pub fn as_oid(&self) -> git2::Oid {

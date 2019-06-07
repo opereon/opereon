@@ -91,37 +91,35 @@ impl OperationImpl for ModelListOperation {
 
 
 #[derive(Debug)]
-pub struct ModelStoreOperation {
+pub struct ModelCommitOperation {
     operation: OperationRef,
     engine: EngineRef,
-    path: PathBuf,
+    message: String,
 }
 
-impl ModelStoreOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, path: PathBuf) -> ModelStoreOperation {
-        ModelStoreOperation {
+impl ModelCommitOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, message: &str) -> ModelCommitOperation {
+        ModelCommitOperation {
             operation,
             engine,
-            path,
+            message: message.to_string(),
         }
     }
 }
 
-impl Future for ModelStoreOperation {
+impl Future for ModelCommitOperation {
     type Item = Outcome;
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
-        let metadata = Metadata::new(Sha1Hash::default(), self.path.clone(), User::current(), Utc::now());
-        let m = e.model_manager_mut().store(metadata, &self.path)?;
+        let m = e.model_manager_mut().commit(&self.message)?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }
 
-impl OperationImpl for ModelStoreOperation {
+impl OperationImpl for ModelCommitOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
-        self.path = self.path.canonicalize()?;
         Ok(())
     }
 }

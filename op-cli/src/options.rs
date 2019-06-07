@@ -89,12 +89,12 @@ pub enum Command {
         )]
         format: DisplayFormat,
     },
-    /// Store model from given path as current version
-    #[structopt(name = "store", author = "")]
-    Store {
+    /// Commit current model
+    #[structopt(name = "commit", author = "")]
+    Commit {
         /// Optional path to read model from. By default current directory model is used.
-        #[structopt(name = "PATH", parse(from_os_str))]
-        path: Option<PathBuf>,
+        #[structopt(name = "MESSAGE", default_value = "Model update")]
+        message: String,
     },
     /// Query model
     #[structopt(name = "query", author = "")]

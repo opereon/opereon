@@ -155,19 +155,9 @@ fn main() {
 
             ExecContext::ModelList
         }
-        Command::Store { path } => {
+        Command::Commit { message } => {
             disp_format = DisplayFormat::Text;
-            let mut model_path = PathBuf::from(".");
-
-            if let Some(path) = path {
-                model_path = make_path_absolute(&path);
-            } else {
-                model_path = model_path
-                    .canonicalize()
-                    .expect("Cannot canonicalize path.")
-            }
-
-            ExecContext::ModelStore(model_path)
+            ExecContext::ModelCommit(message)
         }
         Command::Query {
             expr,

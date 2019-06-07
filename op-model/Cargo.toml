@@ -24,7 +24,6 @@ uuid = { version = "0.7.4", features = ["serde", "v1", "v3", "v4", "v5"] }
 heapsize = "0.4.2"
 chrono = { version = "0.4.6", features = ["serde"] }
 users = "0.9.1"
-rust-crypto = "0.2.36"
 git2 = "0.8"
 
 [dev-dependencies]

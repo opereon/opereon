@@ -8,7 +8,7 @@ pub enum Context {
     ConfigGet,
     ModelInit,
     ModelList,
-    ModelStore(PathBuf),
+    ModelCommit(String),
     ModelQuery {
         model: ModelPath,
         expr: String,
@@ -62,7 +62,7 @@ impl Context {
             Context::ConfigGet => "config-get",
             Context::ModelList => "model-list",
             Context::ModelInit => "model-init",
-            Context::ModelStore(..) => "model-store",
+            Context::ModelCommit(..) => "model-store",
             Context::ModelQuery {..} => "model-query",
             Context::ModelTest {..} => "model-test",
             Context::ModelDiff {..} => "model-diff",

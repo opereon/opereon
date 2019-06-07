@@ -2,8 +2,7 @@ use super::*;
 
 use std::collections::HashMap;
 
-use crypto::sha1::Sha1;
-use git2::{Repository, RepositoryInitOptions, IndexAddOption};
+use git2::{Repository, RepositoryInitOptions, IndexAddOption, Index, Oid, ObjectType, Signature, Tree, Commit};
 use std::sync::{Mutex, Arc, RwLock};
 use std::fmt::Formatter;
 
@@ -204,30 +203,28 @@ impl ModelManager {
         Ok(())
     }
 
-    pub fn store<P: AsRef<Path>>(&mut self, metadata: Metadata, path: P) -> IoResult<ModelRef> {
-        unimplemented!(); // TODO
-//        debug!(self.logger, "Saving new model"; o!("source_path"=> path.as_ref().display()));
-//
-//        let (path, _) = Model::search_manifest(path.as_ref())?;
-//
-//        let mut sha1 = Sha1::new();
-//
-//        let tmp_model_dir = self.config().data_dir().join(Uuid::new_v4().to_string());
-//        let tmp_files_dir = tmp_model_dir.join("files");
-//        std::fs::create_dir_all(&tmp_files_dir)?;
-//
-//        let id = Model::copy(&path, &tmp_files_dir)?;
-//        let model_dir = self.config().data_dir().join(id.to_string());
-//        let files_dir = model_dir.join("files");
-//
-//        std::fs::rename(tmp_model_dir, &model_dir)?;
-//        std::fs::write(model_dir.join("_model.yaml"), serde_yaml::to_string(&metadata).unwrap())?;
-//
-//        let model = ModelRef::read(metadata, &files_dir)?;
-//        model.lock().metadata_mut().set_stored(true);
-//        self.cache_model(Bin::new(Uuid::nil(), model.clone()));
-//
-//        Ok(model)
+    /// Commit current model
+    pub fn commit(&mut self, message: &str) -> IoResult<ModelRef> {
+        // TODO ws error handling
+        let mut repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let mut index = repo.index().expect("Cannot get index!");
+
+        let oid = Self::update_index(&mut index)?;
+        let parent = Self::find_last_commit(&repo)?;
+        let tree = repo.find_tree(oid).expect("Cannot get tree!");
+        let signature = Signature::now("opereon", "example@email.com").unwrap();
+
+        let commit = repo.commit(Some("HEAD"),
+        &signature,
+        &signature,
+        message,
+        &tree,
+        &[&parent]).expect("Cannot commit model!");
+
+        repo.checkout_index(None, None).unwrap();
+
+        self.get(oid.into())
+
     }
 
     pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
@@ -291,8 +288,21 @@ impl ModelManager {
     /// Returns current model - model represented by content of the git index
     pub fn current(&mut self) -> IoResult<ModelRef> {
         // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let mut repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
+
+        let oid = Self::update_index(&mut index)?;
+
+        let mut meta = Metadata::default();
+        meta.set_id(oid.into());
+        meta.set_path(self.model_dir().to_owned());
+
+        Ok(ModelRef::read(meta)?)
+    }
+
+    /// Update provided index and return created tree Oid
+    fn update_index(index: &mut Index) -> IoResult<Oid> {
+        // TODO ws error handling
 
         // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
         // Changes in index won't be saved to disk until index.write*() called.
@@ -301,12 +311,14 @@ impl ModelManager {
 
         // get oid of index tree
         let oid = index.write_tree().expect("Cannot write index");
+        Ok(oid)
+    }
 
-        let mut meta = Metadata::default();
-        meta.set_id(oid.into());
-        meta.set_path(self.model_dir().to_owned());
-
-        Ok(ModelRef::read(meta)?)
+    fn find_last_commit(repo: &Repository) -> IoResult<Commit> {
+        // TODO error handling
+        let obj = repo.head().unwrap().resolve().unwrap().peel(ObjectType::Commit).unwrap();
+        let commit = obj.peel_to_commit().unwrap();
+        Ok(commit)
     }
 
     pub fn current_bin(&mut self, bin_id: Uuid) -> IoResult<ModelRef> {
