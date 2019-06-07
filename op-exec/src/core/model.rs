@@ -99,7 +99,6 @@ impl From<ModelRef> for Bins {
 pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Sha1Hash, Bins>,
-    path_map: HashMap<PathBuf, Sha1Hash>,
     /// Path do model dir.
     model_dir: PathBuf,
     logger: slog::Logger,
@@ -111,7 +110,6 @@ impl ModelManager {
         ModelManager {
             config,
             model_cache,
-            path_map: HashMap::new(),
             model_dir,
             logger,
         }
@@ -293,11 +291,7 @@ impl ModelManager {
 
         let oid = Self::update_index(&mut index)?;
 
-        let mut meta = Metadata::default();
-        meta.set_id(oid.into());
-        meta.set_path(self.model_dir().to_owned());
-
-        Ok(ModelRef::read(meta)?)
+        self.get(oid.into())
     }
 
     /// Update provided index and return created tree Oid
@@ -329,10 +323,6 @@ impl ModelManager {
     fn cache_model(&mut self, bin: Bin) {
         let id = bin.model.lock().metadata().id();
         self.model_cache.insert(id, bin.into());
-        self.path_map.clear();
-        for (&id, b) in self.model_cache.iter() {
-            self.path_map.insert(b.any().lock().metadata().path().to_owned(), id);
-        }
     }
 }
 
