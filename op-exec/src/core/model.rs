@@ -11,8 +11,11 @@ use std::fmt::Formatter;
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
 pub enum ModelPath {
+    /// Current working directory
     Current,
-    Id(Sha1Hash),
+    /// Git revision string http://git-scm.com/docs/git-rev-parse.html#_specifying_revisions
+    Revision(String),
+    /// Path to model directory. Currently unimplemented.
     Path(PathBuf),
 }
 
@@ -20,7 +23,7 @@ impl std::fmt::Display for ModelPath {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             ModelPath::Current => write!(f, "@"),
-            ModelPath::Id(id) => write!(f, "id:{}", id),
+            ModelPath::Revision(ref id) => write!(f, "id:{}", id),
             ModelPath::Path(ref path) => write!(f, "{}", path.display()),
         }
     }
@@ -32,7 +35,7 @@ impl std::str::FromStr for ModelPath {
     fn from_str(s: &str) -> Result<ModelPath, Self::Err> {
         Ok(match s {
             "@" | "@current" => ModelPath::Current,
-            _ => ModelPath::Path(PathBuf::from(s)),
+            _ => ModelPath::Revision(s.to_string()),
         })
     }
 }
@@ -98,18 +101,18 @@ pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Sha1Hash, Bins>,
     path_map: HashMap<PathBuf, Sha1Hash>,
-    current: Sha1Hash,
+    model_dir: PathBuf,
     logger: slog::Logger,
 }
 
 impl ModelManager {
-    pub fn new(config: ConfigRef, logger: slog::Logger) -> ModelManager {
+    pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
         let model_cache = LruCache::new(config.model().cache_limit());
         ModelManager {
             config,
             model_cache,
             path_map: HashMap::new(),
-            current: Sha1Hash::nil(),
+            model_dir,
             logger,
         }
     }
@@ -135,23 +138,23 @@ impl ModelManager {
 //            }
 //        };
 
-        kg_io::fs::create_dir_all(self.config().data_dir())?;
-
-        let current_file_path = self.config().data_dir().join("current");
-        if current_file_path.exists() {
-            let mut current = String::new();
-            kg_io::fs::read_to_string(&current_file_path, &mut current)?;
-            match Sha1Hash::from_str(&current) {
-                Ok(id) => {
-                    let m = self.get(id)?;
-                    self.current = id;
-                }
-                Err(_err) => return Err(std::io::ErrorKind::InvalidData.into()),
-            }
-        } else {
-            let m = ModelRef::default();
-            self.cache_model(Bin::new(Uuid::nil(), m));
-        }
+//        kg_io::fs::create_dir_all(self.config().data_dir())?;
+//
+//        let current_file_path = self.config().data_dir().join("current");
+//        if current_file_path.exists() {
+//            let mut current = String::new();
+//            kg_io::fs::read_to_string(&current_file_path, &mut current)?;
+//            match Sha1Hash::from_str(&current) {
+//                Ok(id) => {
+//                    let m = self.get(id)?;
+//                    self.current = id;
+//                }
+//                Err(_err) => return Err(std::io::ErrorKind::InvalidData.into()),
+//            }
+//        } else {
+//            let m = ModelRef::default();
+//            self.cache_model(Bin::new(Uuid::nil(), m));
+//        }
 
         Ok(())
     }
@@ -232,7 +235,7 @@ impl ModelManager {
     pub fn resolve_bin(&mut self, model_path: &ModelPath, bin_id: Uuid) -> IoResult<ModelRef> {
         match *model_path {
             ModelPath::Current => self.current_bin(bin_id),
-            ModelPath::Id(id) => self.get_bin(id, bin_id),
+            ModelPath::Revision(ref id) => self.get_bin(id, bin_id),
             ModelPath::Path(ref path) => self.read_bin(path, bin_id),
         }
     }

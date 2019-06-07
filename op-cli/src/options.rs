@@ -40,6 +40,15 @@ pub struct Opts {
     )]
     pub config_file_path: String,
 
+    /// Path to model directory
+    #[structopt(
+        short = "m",
+        long = "model-dir",
+        name = "MODEL_DIR",
+        default_value = "."
+    )]
+    pub model_dir_path: String,
+
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     pub verbose: u8,

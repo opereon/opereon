@@ -70,7 +70,7 @@ impl ProcExec {
         self.kind = proc.kind();
 
         self.curr_model = if model.metadata().is_stored() {
-            ModelPath::Id(model.metadata().id())
+            ModelPath::Revision(model.metadata().id().to_string())
         } else {
             ModelPath::Path(model.metadata().path().to_path_buf())
         };

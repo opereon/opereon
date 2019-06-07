@@ -169,7 +169,9 @@ impl Default for User {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
+    /// Model identifier as git Oid
     id: Sha1Hash,
+    /// Path to model git repository
     path: PathBuf,
     user: User,
     timestamp: DateTime<Utc>,
