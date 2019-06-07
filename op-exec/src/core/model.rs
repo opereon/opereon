@@ -160,15 +160,42 @@ impl ModelManager {
     }
 
     pub fn init_model(&mut self) -> IoResult<()> {
-        let mut opts = RepositoryInitOptions::new();
-        opts.no_reinit(true);
+
+        let current_dir = fs::current_dir()?;
 
         // TODO error handling
-        let repo = Repository::init_opts(fs::current_dir()?, &opts).expect("Cannot create git repository!");
-//        repo.add_ignore_rule(".op").unwrap();
+        Self::init_git_repo(&current_dir)?;
+        Self::init_manifest(&current_dir)?;
 
-        // TODO initialize new model - add default .gitignore, op.toml etc...
+        Ok(())
+    }
 
+    fn init_git_repo<P: AsRef<Path>>(path: P) -> IoResult<()> {
+        use std::fmt::Write;
+        let mut opts = RepositoryInitOptions::new();
+        opts.no_reinit(true);
+        // TODO error handling
+        let repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
+
+        // ignore ./op directory
+        let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
+        let mut content = fs::read_string(&excludes)?;
+        writeln!(&mut content, "# Opereon tmp directory")?;
+        writeln!(&mut content, ".op/")?;
+        fs::write(excludes, content)?;
+        Ok(())
+    }
+
+    fn init_manifest<P: AsRef<Path>>(path: P) -> IoResult<()> {
+        use std::fmt::Write;
+
+        // ignore ./op directory
+        let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
+        let mut content = String::new();
+        writeln!(&mut content, "[info]")?;
+        writeln!(&mut content, "authors = [\"\"]")?;
+        writeln!(&mut content, "description = \"Opereon model\"")?;
+        fs::write(manifest_path, content)?;
         Ok(())
     }
 

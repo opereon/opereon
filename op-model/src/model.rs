@@ -714,7 +714,7 @@ impl ModelRef {
     }
 
     pub fn read<P: AsRef<Path>>(metadata: Metadata, path: P) -> IoResult<ModelRef> {
-        Ok(Self::new(Model::read(metadata, path.as_ref())?))
+        Ok(Self::new(Model::read_revision(metadata, path.as_ref())?))
     }
 
     pub fn lock(&self) -> MutexGuard<Model> {
