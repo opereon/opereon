@@ -158,10 +158,10 @@ pub enum Command {
         )]
         method: DiffMethod,
         /// Target model path, defaults to current working directory
-        #[structopt(name = "TARGET", default_value = ".")]
+        #[structopt(name = "TARGET", default_value = "@")]
         target: ModelPath,
         /// Source model path, defaults to current model
-        #[structopt(name = "SOURCE", default_value = "@")]
+        #[structopt(name = "SOURCE", default_value = "HEAD")]
         source: ModelPath,
     },
     /// Update model to a new version
