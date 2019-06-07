@@ -171,7 +171,7 @@ impl Default for User {
 pub struct Metadata {
     /// Model identifier as git Oid
     id: Sha1Hash,
-    /// Path to model git repository
+    /// Path to model dir
     path: PathBuf,
     user: User,
     timestamp: DateTime<Utc>,
@@ -194,7 +194,7 @@ impl Metadata {
         self.id
     }
 
-    pub (super) fn set_id(&mut self, id: Sha1Hash) {
+    pub fn set_id(&mut self, id: Sha1Hash) {
         self.id = id;
     }
 
@@ -210,7 +210,7 @@ impl Metadata {
         &self.path
     }
 
-    pub (super) fn set_path(&mut self, path: PathBuf) {
+    pub fn set_path(&mut self, path: PathBuf) {
         self.path = path;
     }
 

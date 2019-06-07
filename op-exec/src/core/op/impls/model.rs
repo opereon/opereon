@@ -115,7 +115,6 @@ impl Future for ModelStoreOperation {
         let mut e = self.engine.write();
         let metadata = Metadata::new(Sha1Hash::default(), self.path.clone(), User::current(), Utc::now());
         let m = e.model_manager_mut().store(metadata, &self.path)?;
-        e.model_manager_mut().set_current(m)?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }

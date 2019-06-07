@@ -145,8 +145,8 @@ impl Model {
         return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
-    fn read_revision(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
-        let path = path.canonicalize()?;
+    fn read_revision(mut metadata: Metadata) -> IoResult<Model> {
+        let path = metadata.path();
         let (model_dir, manifest) = Model::search_manifest(&path)?;
 
         assert!(model_dir.is_dir());
@@ -713,8 +713,8 @@ impl ModelRef {
         m
     }
 
-    pub fn read<P: AsRef<Path>>(metadata: Metadata, path: P) -> IoResult<ModelRef> {
-        Ok(Self::new(Model::read_revision(metadata, path.as_ref())?))
+    pub fn read(metadata: Metadata) -> IoResult<ModelRef> {
+        Ok(Self::new(Model::read_revision(metadata)?))
     }
 
     pub fn lock(&self) -> MutexGuard<Model> {
@@ -762,7 +762,8 @@ mod tests {
     fn read_test() {
         let mut metadata = Metadata::default();
         metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
-        let model = Model::read_revision(metadata, &PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap()).expect("Cannot read model");
+        metadata.set_path(PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap());
+        let model = Model::read_revision(metadata).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }
 }

@@ -111,7 +111,7 @@ pub enum Command {
         )]
         format: DisplayFormat,
         /// Model path, defaults to current working directory
-        #[structopt(short = "m", long = "model", default_value = ".")]
+        #[structopt(short = "m", long = "model", default_value = "@")]
         model: ModelPath,
         /// Query expression
         #[structopt(name = "OPATH")]
@@ -132,7 +132,7 @@ pub enum Command {
         )]
         format: DisplayFormat,
         /// Model path, defaults to current working directory
-        #[structopt(name = "MODEL", default_value = ".")]
+        #[structopt(name = "MODEL", default_value = "@")]
         model: ModelPath,
     },
     /// Compare two model versions

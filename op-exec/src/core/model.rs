@@ -3,7 +3,7 @@ use super::*;
 use std::collections::HashMap;
 
 use crypto::sha1::Sha1;
-use git2::{Repository, RepositoryInitOptions};
+use git2::{Repository, RepositoryInitOptions, IndexAddOption};
 use std::sync::{Mutex, Arc, RwLock};
 use std::fmt::Formatter;
 
@@ -101,6 +101,7 @@ pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Sha1Hash, Bins>,
     path_map: HashMap<PathBuf, Sha1Hash>,
+    /// Path do model dir.
     model_dir: PathBuf,
     logger: slog::Logger,
 }
@@ -119,6 +120,10 @@ impl ModelManager {
 
     fn config(&self) -> &ModelConfig {
         self.config.model()
+    }
+
+    fn model_dir(&self) -> &Path {
+        &self.model_dir
     }
 
     pub fn init(&mut self) -> IoResult<()> {
@@ -200,28 +205,29 @@ impl ModelManager {
     }
 
     pub fn store<P: AsRef<Path>>(&mut self, metadata: Metadata, path: P) -> IoResult<ModelRef> {
-        debug!(self.logger, "Saving new model"; o!("source_path"=> path.as_ref().display()));
-
-        let (path, _) = Model::search_manifest(path.as_ref())?;
-
-        let mut sha1 = Sha1::new();
-
-        let tmp_model_dir = self.config().data_dir().join(Uuid::new_v4().to_string());
-        let tmp_files_dir = tmp_model_dir.join("files");
-        std::fs::create_dir_all(&tmp_files_dir)?;
-
-        let id = Model::copy(&path, &tmp_files_dir)?;
-        let model_dir = self.config().data_dir().join(id.to_string());
-        let files_dir = model_dir.join("files");
-
-        std::fs::rename(tmp_model_dir, &model_dir)?;
-        std::fs::write(model_dir.join("_model.yaml"), serde_yaml::to_string(&metadata).unwrap())?;
-
-        let model = ModelRef::read(metadata, &files_dir)?;
-        model.lock().metadata_mut().set_stored(true);
-        self.cache_model(Bin::new(Uuid::nil(), model.clone()));
-
-        Ok(model)
+        unimplemented!(); // TODO
+//        debug!(self.logger, "Saving new model"; o!("source_path"=> path.as_ref().display()));
+//
+//        let (path, _) = Model::search_manifest(path.as_ref())?;
+//
+//        let mut sha1 = Sha1::new();
+//
+//        let tmp_model_dir = self.config().data_dir().join(Uuid::new_v4().to_string());
+//        let tmp_files_dir = tmp_model_dir.join("files");
+//        std::fs::create_dir_all(&tmp_files_dir)?;
+//
+//        let id = Model::copy(&path, &tmp_files_dir)?;
+//        let model_dir = self.config().data_dir().join(id.to_string());
+//        let files_dir = model_dir.join("files");
+//
+//        std::fs::rename(tmp_model_dir, &model_dir)?;
+//        std::fs::write(model_dir.join("_model.yaml"), serde_yaml::to_string(&metadata).unwrap())?;
+//
+//        let model = ModelRef::read(metadata, &files_dir)?;
+//        model.lock().metadata_mut().set_stored(true);
+//        self.cache_model(Bin::new(Uuid::nil(), model.clone()));
+//
+//        Ok(model)
     }
 
     pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
@@ -232,28 +238,17 @@ impl ModelManager {
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.get(bin_id));
         }
-        let model_dir = self.config().data_dir().join(id.to_string());
-        let s = std::fs::read_to_string(model_dir.join("_model.yaml"))?;
-        let mut meta: Metadata = serde_yaml::from_str(&s).unwrap(); //FIXME
-        meta.set_stored(true);
 
-        let model = ModelRef::read(meta, &model_dir.join("files"))?;
+        let mut meta = Metadata::default();
+
+        meta.set_id(id);
+        meta.set_path(self.model_dir().to_owned());
+
+        let model = ModelRef::read(meta)?;
         self.cache_model(Bin::new(bin_id, model.clone()));
         Ok(model)
     }
 
-    pub fn read(&mut self, path: &Path) -> IoResult<ModelRef> {
-        self.read_bin(path, Uuid::nil())
-    }
-
-    pub fn read_bin(&mut self, path: &Path, bin_id: Uuid) -> IoResult<ModelRef> {
-        if let Some(&id) = self.path_map.get(path) {
-            return self.get_bin(id, bin_id);
-        }
-        let model = ModelRef::read(Metadata::default(), path)?;
-        self.cache_model(Bin::new(bin_id, model.clone()));
-        Ok(model)
-    }
 
     pub fn resolve(&mut self, model_path: &ModelPath) -> IoResult<ModelRef> {
         self.resolve_bin(model_path, Uuid::nil())
@@ -262,9 +257,16 @@ impl ModelManager {
     pub fn resolve_bin(&mut self, model_path: &ModelPath, bin_id: Uuid) -> IoResult<ModelRef> {
         match *model_path {
             ModelPath::Current => self.current_bin(bin_id),
-            ModelPath::Revision(ref id) => self.get_bin(id, bin_id),
-            ModelPath::Path(ref path) => self.read_bin(path, bin_id),
+            ModelPath::Revision(ref rev) => self.get_bin(self.resolve_revision_str(rev)?, bin_id),
+            ModelPath::Path(ref path) => unimplemented!(),
         }
+    }
+
+    fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
+        // TODO ws error handling
+        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let obj = repo.revparse_single(spec).expect("Cannot find revision!");
+        Ok(obj.id().into())
     }
 
     pub fn list(&self) -> std::io::Result<Vec<Metadata>> {
@@ -286,25 +288,30 @@ impl ModelManager {
         Ok(list)
     }
 
+    /// Returns current model - model represented by content of the git index
     pub fn current(&mut self) -> IoResult<ModelRef> {
-        let id = self.current;
-        self.get(id)
+        // TODO ws error handling
+        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let mut index = repo.index().expect("Cannot get index!");
+
+        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
+        // Changes in index won't be saved to disk until index.write*() called.
+        index.clear().expect("Cannot clear index");
+        index.add_all(&["*"], IndexAddOption::default(), None).expect("Cannot update index");
+
+        // get oid of index tree
+        let oid = index.write_tree().expect("Cannot write index");
+
+        let mut meta = Metadata::default();
+        meta.set_id(oid.into());
+        meta.set_path(self.model_dir().to_owned());
+
+        Ok(ModelRef::read(meta)?)
     }
 
     pub fn current_bin(&mut self, bin_id: Uuid) -> IoResult<ModelRef> {
-        let id = self.current;
-        self.get_bin(id, bin_id)
-    }
-
-    pub fn set_current(&mut self, model: ModelRef) -> IoResult<()> {
-        assert!(model.lock().metadata().is_stored());
-        let id = model.lock().metadata().id();
-        self.current = id;
-        let current_file_path = self.config().data_dir().join("current");
-        kg_io::fs::write(current_file_path, id.to_string())?;
-        self.cache_model(Bin::new(Uuid::nil(), model));
-        info!(self.logger, "Current model changed to {}", id);
-        Ok(())
+        // FIXME is this ok?
+        self.current()
     }
 
     fn cache_model(&mut self, bin: Bin) {
