@@ -1,2 +1,2 @@
 
-<% $$host.stringify('yaml') %>
+<% stringify($$host, 'yaml') %>
