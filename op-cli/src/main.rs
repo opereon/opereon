@@ -60,10 +60,10 @@ fn make_path_absolute(path: &Path) -> PathBuf {
 }
 
 /// start engine and execute provided operation
-fn local_run(config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
+fn local_run(model_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
     let logger = init_file_logger(&config);
 
-    let engine = check(EngineRef::start(config, logger.clone()));
+    let engine = check(EngineRef::start(model_dir, config, logger.clone()));
     let outcome_fut: OutcomeFuture = engine
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");
@@ -126,9 +126,12 @@ fn main() {
 
     let Opts {
         config_file_path,
+        model_dir_path,
         command,
         verbose,
     } = Opts::from_clap(&matches);
+
+    let model_dir_path = PathBuf::from(model_dir_path).canonicalize().expect("Cannot find model directory");
 
     let config = match ConfigRef::read(&config_file_path) {
         Err(err) => {
@@ -147,24 +150,9 @@ fn main() {
 
             ExecContext::ConfigGet
         }
-        Command::List { format } => {
-            disp_format = format;
-
-            ExecContext::ModelList
-        }
-        Command::Store { path } => {
+        Command::Commit { message } => {
             disp_format = DisplayFormat::Text;
-            let mut model_path = PathBuf::from(".");
-
-            if let Some(path) = path {
-                model_path = make_path_absolute(&path);
-            } else {
-                model_path = model_path
-                    .canonicalize()
-                    .expect("Cannot canonicalize path.")
-            }
-
-            ExecContext::ModelStore(model_path)
+            ExecContext::ModelCommit(message)
         }
         Command::Query {
             expr,
@@ -267,9 +255,12 @@ fn main() {
                 args,
             }
         }
+        Command::Init => {
+            ExecContext::ModelInit
+        }
     };
 
     actix::System::run(move || {
-        local_run(config, cmd, disp_format);
+        local_run(model_dir_path, config, cmd, disp_format);
     });
 }

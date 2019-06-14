@@ -3,7 +3,7 @@ use super::*;
 use regex::Regex;
 
 use kg_tree::diff::Diff;
-
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -24,72 +24,69 @@ impl std::str::FromStr for DiffMethod {
     }
 }
 
-
 #[derive(Debug)]
-pub struct ModelListOperation {
+pub struct ModelInitOperation {
     operation: OperationRef,
     engine: EngineRef,
 }
 
-impl ModelListOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef) -> ModelListOperation {
-        ModelListOperation {
+impl ModelInitOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef) -> ModelInitOperation {
+        ModelInitOperation {
             operation,
             engine,
         }
     }
 }
 
-impl Future for ModelListOperation {
-    type Item = Outcome;
-    type Error = RuntimeError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let list = to_tree(&self.engine.read().model_manager().list().unwrap()).unwrap();
-        Ok(Async::Ready(Outcome::NodeSet(list.into())))
-    }
-}
-
-impl OperationImpl for ModelListOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-}
-
-
-#[derive(Debug)]
-pub struct ModelStoreOperation {
-    operation: OperationRef,
-    engine: EngineRef,
-    path: PathBuf,
-}
-
-impl ModelStoreOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, path: PathBuf) -> ModelStoreOperation {
-        ModelStoreOperation {
-            operation,
-            engine,
-            path,
-        }
-    }
-}
-
-impl Future for ModelStoreOperation {
+impl Future for ModelInitOperation {
     type Item = Outcome;
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
-        let metadata = Metadata::new(Sha1Hash::default(), self.path.clone(), User::current(), Utc::now());
-        let m = e.model_manager_mut().store(metadata, &self.path)?;
-        e.model_manager_mut().set_current(m)?;
+        // TODO handle result
+        e.model_manager_mut().init_model().unwrap();
         Ok(Async::Ready(Outcome::Empty))
     }
 }
 
-impl OperationImpl for ModelStoreOperation {
+impl OperationImpl for ModelInitOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
-        self.path = self.path.canonicalize()?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct ModelCommitOperation {
+    operation: OperationRef,
+    engine: EngineRef,
+    message: String,
+}
+
+impl ModelCommitOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, message: &str) -> ModelCommitOperation {
+        ModelCommitOperation {
+            operation,
+            engine,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl Future for ModelCommitOperation {
+    type Item = Outcome;
+    type Error = RuntimeError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let mut e = self.engine.write();
+        let m = e.model_manager_mut().commit(&self.message)?;
+        Ok(Async::Ready(Outcome::Empty))
+    }
+}
+
+impl OperationImpl for ModelCommitOperation {
+    fn init(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
 }

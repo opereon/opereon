@@ -34,7 +34,7 @@ impl SshAuth {
                 cmd.arg("-o").arg("NumberOfPasswordPrompts=1");
                 cmd.env("DISPLAY", ":0");
                 cmd.env("SSH_ASKPASS", OP_ASK_PATH.display().to_string());
-                cmd.env("OPEREON_PASSWD", password);
+                cmd.env("OPEREON_PASSWD", password.to_owned());
                 cmd.setsid(true);
             }
         }

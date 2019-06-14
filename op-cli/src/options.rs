@@ -40,6 +40,15 @@ pub struct Opts {
     )]
     pub config_file_path: String,
 
+    /// Path to model directory
+    #[structopt(
+        short = "m",
+        long = "model-dir",
+        name = "MODEL_DIR",
+        default_value = "."
+    )]
+    pub model_dir_path: String,
+
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     pub verbose: u8,
@@ -65,27 +74,12 @@ pub enum Command {
         )]
         format: DisplayFormat,
     },
-    /// Output list of known model versions
-    #[structopt(name = "list", author = "")]
-    List {
-        /// Output format
-        #[structopt(
-            short = "f",
-            long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
-            default_value = "table"
-        )]
-        format: DisplayFormat,
-    },
-    /// Store model from given path as current version
-    #[structopt(name = "store", author = "")]
-    Store {
+    /// Commit current model
+    #[structopt(name = "commit", author = "")]
+    Commit {
         /// Optional path to read model from. By default current directory model is used.
-        #[structopt(name = "PATH", parse(from_os_str))]
-        path: Option<PathBuf>,
+        #[structopt(name = "MESSAGE", default_value = "Model update")]
+        message: String,
     },
     /// Query model
     #[structopt(name = "query", author = "")]
@@ -102,7 +96,7 @@ pub enum Command {
         )]
         format: DisplayFormat,
         /// Model path, defaults to current working directory
-        #[structopt(short = "m", long = "model", default_value = ".")]
+        #[structopt(short = "m", long = "model", default_value = "@")]
         model: ModelPath,
         /// Query expression
         #[structopt(name = "OPATH")]
@@ -123,7 +117,7 @@ pub enum Command {
         )]
         format: DisplayFormat,
         /// Model path, defaults to current working directory
-        #[structopt(name = "MODEL", default_value = ".")]
+        #[structopt(name = "MODEL", default_value = "@")]
         model: ModelPath,
     },
     /// Compare two model versions
@@ -149,10 +143,10 @@ pub enum Command {
         )]
         method: DiffMethod,
         /// Target model path, defaults to current working directory
-        #[structopt(name = "TARGET", default_value = ".")]
+        #[structopt(name = "TARGET", default_value = "@")]
         target: ModelPath,
         /// Source model path, defaults to current model
-        #[structopt(name = "SOURCE", default_value = "@")]
+        #[structopt(name = "SOURCE", default_value = "HEAD")]
         source: ModelPath,
     },
     /// Update model to a new version
@@ -173,10 +167,10 @@ pub enum Command {
         #[structopt(short = "d", long = "dry-run")]
         dry_run: bool,
         /// Target model path, defaults to current working directory
-        #[structopt(name = "TARGET", default_value = ".")]
+        #[structopt(name = "TARGET", default_value = "@")]
         target: ModelPath,
-        /// Source model path, defaults to current model
-        #[structopt(name = "SOURCE", default_value = "@")]
+        /// Source model path, defaults to current model(HEAD)
+        #[structopt(name = "SOURCE", default_value = "HEAD")]
         source: ModelPath,
     },
     /// Run checks from a model
@@ -221,4 +215,7 @@ pub enum Command {
         #[structopt(name = "PATH", default_value = ".", parse(from_os_str))]
         path: PathBuf,
     },
+    /// Initialize empty opereon model
+    #[structopt(name = "init", author = "")]
+    Init,
 }

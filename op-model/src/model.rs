@@ -8,21 +8,9 @@ use std::any::TypeId;
 use std::collections::HashMap;
 
 use walkdir::WalkDir;
-use crypto::sha1::Sha1;
-use crypto::digest::Digest;
 use kg_io::OpType;
-
-
-fn hash_file(file_type: FileType, path_abs: &Path, path: &Path, buf: &mut String, sha1: &mut Sha1) -> IoResult<()> {
-    sha1.input(path.to_str().unwrap().as_bytes());
-    if file_type == FileType::File {
-        buf.clear();
-        kg_io::fs::read_to_string(path_abs, buf)?;
-        sha1.input(buf.as_bytes());
-    }
-    Ok(())
-}
-
+use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult, Oid};
+use std::str::FromStr;
 
 #[derive(Debug, Serialize)]
 pub struct Model {
@@ -34,6 +22,67 @@ pub struct Model {
     procs: Vec<ProcDef>,
     #[serde(skip)]
     lookup: ModelLookup,
+}
+
+#[derive(Debug, Clone)]
+struct LoadFileFunc {
+    model_dir: PathBuf,
+    model_oid: Oid
+}
+
+impl LoadFileFunc {
+    fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
+        Self {
+            model_dir,
+            model_oid
+        }
+    }
+}
+
+impl FuncCallable for LoadFileFunc {
+    fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
+        args.check_count_func(&FuncId::Custom(name.to_string()), 1, 2)?;
+
+        // TODO ws error handling
+        let repo = Repository::open(&self.model_dir).expect("Cannot open repository");
+        let odb = repo.odb().expect("Cannot get git object database");
+        let obj = repo.find_object(self.model_oid, None).expect("cannot find object");
+        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+
+        let paths = args.resolve_column(false,0, env);
+
+        if args.count() == 1 {
+            for path in paths.into_iter() {
+                let path = PathBuf::from(path.as_string());
+                let entry = tree.get_path(&path).expect("file not found");
+                let obj = odb.read(entry.id()).expect("Cannot find object!");
+
+                let format = path.extension().map_or(FileFormat::Text, |ext| FileFormat::from(ext.to_str().unwrap()));
+
+                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+                out.add(node)
+            }
+        } else {
+            let formats = args.resolve_column(false, 1, env);
+
+            for (p, f) in paths.into_iter().zip(formats.into_iter()) {
+                let path = PathBuf::from(p.as_string());
+                let entry = tree.get_path(&path).expect("file not found");
+                let obj = odb.read(entry.id()).expect("Cannot find object!");
+
+                let format: FileFormat = f.data().as_string().as_ref().into();
+
+                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+                out.add(node)
+            }
+        }
+
+        Ok(())
+    }
+
+    fn clone(&self) -> Box<FuncCallable> {
+        Box::new(std::clone::Clone::clone(self))
+    }
 }
 
 impl Model {
@@ -82,11 +131,8 @@ impl Model {
         return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
-    fn read(mut metadata: Metadata, path: &Path) -> IoResult<Model> {
-        let mut sha1 = Sha1::new();
-        let mut buf = String::new();
-
-        let path = path.canonicalize()?;
+    fn read_revision(mut metadata: Metadata) -> IoResult<Model> {
+        let path = metadata.path();
         let (model_dir, manifest) = Model::search_manifest(&path)?;
 
         assert!(model_dir.is_dir());
@@ -99,44 +145,46 @@ impl Model {
             ..Model::empty()
         };
 
-        let cr = ConfigResolver::scan(m.metadata.path())?;
+        let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())?;
 
         m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
 
+        let commit = m.metadata.id().as_oid();
+        let model_dir = m.metadata.path().to_owned();
+        // FIXME ws error handling
+        let repo = Repository::open(&model_dir).expect("Cannot open repository");
+        let odb = repo.odb().expect("Cannot get git object database");
+        let obj = repo.find_object(commit, None).expect("cannot find object");
+        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+
         let scope = ScopeMut::new();
+        scope.set_func("loadFile".into(), Box::new(LoadFileFunc::new(model_dir, commit)));
 
-        for e in WalkDir::new(m.metadata.path())
-            .min_depth(1)
-            .sort_by(|a, b| a.path().cmp(b.path()))
-            .into_iter()
-            .filter_map(|e| e.ok()) {
-            let path_abs = e.path();
-            let path = path_abs.strip_prefix(m.metadata.path()).unwrap();
-            let file_type: FileType = e.file_type().into();
+        tree.walk(TreeWalkMode::PreOrder, |parent_path, entry|{
+            let path = PathBuf::from_str(parent_path).unwrap().join(entry.name().unwrap());
+            let path_abs = m.metadata.path().join(&path);
 
-            if path.starts_with(".op/") {
-                continue;
-            }
-
-            if file_type == FileType::File {
-                let file_name = path.file_name().unwrap();
-                if file_name == DEFAULT_MANIFEST_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
-                    hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
-                    continue;
+            let file_type: FileType = match entry.kind().unwrap() {
+                ObjectType::Tree => FileType::Dir,
+                ObjectType::Blob => FileType::File,
+                _ => {
+                    eprintln!("Unknown git object type, skipping = {:?}", entry.kind());
+                    return TreeWalkResult::Ok
                 }
-            }
+            };
 
-            hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
 
-            let config = cr.resolve(path_abs);
-
-            if let Some(inc) = config.find_include(path, file_type) {
+            let config = cr.resolve(&path_abs);
+            if let Some(inc) = config.find_include(&path, file_type) {
                 let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                let n = NodeRef::null();
+                let obj = odb.read(entry.id()).expect("Cannot get git object!");
+
+                let n = NodeRef::binary(obj.data());
                 n.data_mut().set_file(Some(&file_info));
 
-                let item = inc.item().apply_one(m.root(), &n);
+                let item = inc.item().apply_one_ext(m.root(), &n, scope.as_ref());
+
                 if item.data().file().is_none() {
                     item.data_mut().set_file(Some(&file_info));
                 }
@@ -145,7 +193,8 @@ impl Model {
 
                 inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
             }
-        }
+            TreeWalkResult::Ok
+        }).expect("Error reading tree"); // FIXME ws error handling
 
         // defines
         {
@@ -155,6 +204,7 @@ impl Model {
             }
 
             let scope_def = m.scoped.scope_def_mut();
+
             scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
             scope_def.set_var_def("$hosts".into(), ValueDef::Resolvable(manifest.defines().hosts().clone()));
             scope_def.set_var_def("$users".into(), ValueDef::Resolvable(manifest.defines().users().clone()));
@@ -170,12 +220,12 @@ impl Model {
                     Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
                 };
 
-                let current = path.apply_one(m.root(), m.root());
+                let current = path.apply_one_ext(m.root(), m.root(), scope.as_ref());
 
                 for (p, e) in config.overrides().iter() {
-                    let res = p.apply(m.root(), &current);
+                    let res = p.apply_ext(m.root(), &current, scope.as_ref());
                     for n in res.into_iter() {
-                        e.apply(m.root(), &n);
+                        e.apply_ext(m.root(), &n, scope.as_ref());
                     }
                 }
             }
@@ -218,50 +268,10 @@ impl Model {
             m.procs = procs;
         }
 
-        if m.metadata.id().is_nil() {
-            m.metadata.set_id(Sha1Hash::result(&mut sha1));
-        } else {
-            assert_eq!(m.metadata.id(), Sha1Hash::result(&mut sha1));
-        }
-        Ok(m)
+        return Ok(m);
     }
 
-    pub fn copy(src_path: &Path, dst_path: &Path) -> IoResult<Sha1Hash> {
-        let mut sha1 = Sha1::new();
-        let mut buf = String::new();
 
-        let path = src_path.canonicalize()?;
-        let (model_dir, manifest)= Model::search_manifest(&path)?;
-
-        assert!(model_dir.is_dir());
-
-        for e in WalkDir::new(&model_dir)
-            .min_depth(1)
-            .sort_by(|a, b| a.path().cmp(b.path()))
-            .into_iter()
-            .filter_map(|e| e.ok()) {
-            let path_abs = e.path();
-            let path = path_abs.strip_prefix(&model_dir).unwrap();
-            let file_type: FileType = e.file_type().into();
-
-            if path.starts_with(".op/") {
-                continue;
-            }
-
-            hash_file(file_type, path_abs, path, &mut buf, &mut sha1)?;
-
-            let dst_path = dst_path.join(path);
-            if !path.as_os_str().is_empty() {
-                if file_type == FileType::Dir {
-                    std::fs::create_dir(dst_path)?;
-                } else {
-                    std::fs::copy(path, dst_path)?;
-                }
-            }
-        }
-
-        Ok(Sha1Hash::result(&mut sha1))
-    }
 
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
@@ -510,8 +520,8 @@ impl ModelRef {
         m
     }
 
-    pub fn read<P: AsRef<Path>>(metadata: Metadata, path: P) -> IoResult<ModelRef> {
-        Ok(Self::new(Model::read(metadata, path.as_ref())?))
+    pub fn read(metadata: Metadata) -> IoResult<ModelRef> {
+        Ok(Self::new(Model::read_revision(metadata)?))
     }
 
     pub fn lock(&self) -> MutexGuard<Model> {
@@ -549,3 +559,18 @@ impl Eq for ModelRef {}
 unsafe impl Send for ModelRef {}
 
 unsafe impl Sync for ModelRef {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    #[test]
+    fn read_test() {
+        let mut metadata = Metadata::default();
+        metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
+        metadata.set_path(PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap());
+        let model = Model::read_revision(metadata).expect("Cannot read model");
+        eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
+    }
+}

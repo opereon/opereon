@@ -6,6 +6,7 @@ use std::cell::{RefCell, Ref};
 
 use toml;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder, Candidate};
+use git2::{Repository, TreeWalkMode, ObjectType, TreeWalkResult};
 
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
 
@@ -132,19 +133,19 @@ impl Config {
                 Include {
                     path: "**/_.{yaml,yml,toml,json}".into(),
                     file_type: Some(FileType::File),
-                    item: Opath::parse("readFile(@file_path, @file_ext)").unwrap(),
+                    item: Opath::parse("loadFile(@file_path, @file_ext)").unwrap(),
                     mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).extend($item)").unwrap(),
                 },
                 Include {
                     path: "**/*.{yaml,yml,toml,json}".into(),
                     file_type: Some(FileType::File),
-                    item: Opath::parse("readFile(@file_path, @file_ext)").unwrap(),
+                    item: Opath::parse("loadFile(@file_path, @file_ext)").unwrap(),
                     mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_stem, $item)").unwrap(),
                 },
                 Include {
                     path: "**/*".into(),
                     file_type: Some(FileType::File),
-                    item: Opath::parse("readFile(@file_path, 'text')").unwrap(),
+                    item: Opath::parse("loadFile(@file_path, 'text')").unwrap(),
                     mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_stem, $item)").unwrap(),
                 },
             ],
@@ -277,6 +278,68 @@ impl ConfigResolver {
         }
 
         cr.configs = configs;
+        Ok(cr)
+    }
+
+    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
+
+        let repo = Repository::open(model_dir).expect("Cannot open repository");
+        let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
+
+        // FIXME ws error handling
+        let obj = repo.find_object(commit_hash.as_oid(), None).expect("cannot find object");
+        let commit_tree = obj.peel_to_tree().expect("Non-tree oid found");
+
+        let mut cr = ConfigResolver::new(&model_dir);
+
+        commit_tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
+            if entry.kind() != Some(ObjectType::Blob)
+                || entry.name() != Some(DEFAULT_CONFIG_FILENAME) {
+                return TreeWalkResult::Ok
+            }
+            // FIXME ws error handling
+            let obj = odb.read(entry.id()).expect("Cannot get git object!");
+            let content = String::from_utf8(obj.data().to_vec()).expect("Config file is not valid utf8!");
+
+            let config: Config = toml::from_str(&content).unwrap();
+            cr.add_file(&model_dir.join(parent_path), config);
+
+            TreeWalkResult::Ok
+        }).expect("Error reading git tree");// FIXME ws error handling
+
+        let mut configs = BTreeMap::new();
+        for path in cr.configs.keys() {
+            let mut config = Config::standard();
+            for (p, c) in cr.configs.iter() {
+                if p.as_os_str().is_empty() || path.starts_with(p) {
+                    if let Some(false) = c.inherit_excludes {
+                        config.excludes.clear();
+                    }
+                    for e in c.excludes.iter() {
+                        config.excludes.push(e.clone().with_base_path(p));
+                    }
+                    if let Some(false) = c.inherit_includes {
+                        config.includes.clear();
+                    }
+                    for i in c.includes.iter() {
+                        config.includes.push(i.clone().with_base_path(p));
+                    }
+                    if let Some(false) = c.inherit_overrides {
+                        config.overrides.clear();
+                    }
+                    for (k, v) in c.overrides.iter() {
+                        config.overrides.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            configs.insert(path.clone(), config);
+        }
+
+        if !configs.contains_key(Path::new("")) {
+            configs.insert(PathBuf::new(), Config::standard());
+        }
+
+        cr.configs = configs;
 
         Ok(cr)
     }
@@ -315,11 +378,11 @@ impl ConfigResolver {
     pub fn resolve(&self, path: &Path) -> &Config {
         debug_assert!(path.starts_with(&self.model_dir));
 
-        let path = if !path.is_dir() {
-            path.parent().unwrap()
-        } else {
-            path
-        };
+//        let path = if !path.is_dir() {
+//            path.parent().unwrap()
+//        } else {
+//            path
+//        };
 
         let path = path.strip_prefix(&self.model_dir).unwrap();
 

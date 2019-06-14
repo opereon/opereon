@@ -6,8 +6,6 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 use serde::{ser, de};
-use crypto::sha1::Sha1;
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sha1HashParseError {
@@ -32,12 +30,8 @@ impl Sha1Hash {
         true
     }
 
-    pub fn result(sha1: &mut Sha1) -> Sha1Hash {
-        use crypto::digest::Digest;
-
-        let mut h = Sha1Hash::nil();
-        sha1.result(&mut h.0);
-        h
+    pub fn as_oid(&self) -> git2::Oid {
+        git2::Oid::from_bytes(&self.0).unwrap()
     }
 }
 
@@ -91,6 +85,14 @@ impl FromStr for Sha1Hash {
         } else {
             Err(Sha1HashParseError::InvalidLength)
         }
+    }
+}
+
+impl From<git2::Oid> for Sha1Hash {
+    fn from(oid: git2::Oid) -> Self {
+        let mut hash = Sha1Hash::nil();
+        (*hash).copy_from_slice(oid.as_bytes());
+        hash
     }
 }
 
@@ -157,12 +159,12 @@ impl Default for User {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
+    /// Model identifier as git Oid
     id: Sha1Hash,
+    /// Path to model dir
     path: PathBuf,
     user: User,
     timestamp: DateTime<Utc>,
-    #[serde(skip)]
-    stored: bool,
 }
 
 impl Metadata {
@@ -171,8 +173,7 @@ impl Metadata {
             id,
             path,
             user,
-            timestamp,
-            stored: false,
+            timestamp
         }
     }
 
@@ -180,7 +181,7 @@ impl Metadata {
         self.id
     }
 
-    pub (super) fn set_id(&mut self, id: Sha1Hash) {
+    pub fn set_id(&mut self, id: Sha1Hash) {
         self.id = id;
     }
 
@@ -196,16 +197,8 @@ impl Metadata {
         &self.path
     }
 
-    pub (super) fn set_path(&mut self, path: PathBuf) {
+    pub fn set_path(&mut self, path: PathBuf) {
         self.path = path;
-    }
-
-    pub fn is_stored(&self) -> bool {
-        self.stored
-    }
-
-    pub fn set_stored(&mut self, stored: bool) {
-        self.stored = stored;
     }
 }
 
@@ -215,8 +208,7 @@ impl Default for Metadata {
             id: Sha1Hash::nil(),
             user: User::default(),
             timestamp: Utc.timestamp(0, 0),
-            path: PathBuf::new(),
-            stored: false,
+            path: PathBuf::new()
         }
     }
 }

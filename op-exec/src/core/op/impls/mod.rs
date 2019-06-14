@@ -30,8 +30,7 @@ pub type OperationImplType = OperationImpl<Item = Outcome, Error = RuntimeError>
 pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Result<Box<OperationImplType>, RuntimeError> {
     let mut op_impl: Box<OperationImplType> = match *operation.read().context() {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
-        Context::ModelList => Box::new(ModelListOperation::new(operation.clone(), engine.clone())),
-        Context::ModelStore(ref path) => Box::new(ModelStoreOperation::new(operation.clone(), engine.clone(), path.to_path_buf())),
+        Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(operation.clone(), engine.clone(), path)),
         Context::ModelQuery { ref model, ref expr } => Box::new(ModelQueryOperation::new(operation.clone(), engine.clone(), model.clone(), expr.clone())),
         Context::ModelTest { ref model } => Box::new(ModelTestOperation::new(operation.clone(), engine.clone(), model.clone())),
         Context::ModelDiff { ref prev_model, ref next_model, method } => Box::new(ModelDiffOperation::new(operation.clone(), engine.clone(), prev_model.clone(), next_model.clone(), method)),
@@ -43,6 +42,7 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
+        Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
     };
 
     op_impl.init()?;

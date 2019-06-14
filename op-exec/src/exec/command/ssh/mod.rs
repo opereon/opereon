@@ -277,7 +277,9 @@ impl CommandExecutor for SshSession {
 
 impl Drop for SshSession {
     fn drop(&mut self) {
-        if let Err(_err) = self.close() { } //FIXME (jc) log error
+        if let Err(err) = self.close() {
+            eprintln!("Error closing ssh connection! {:?}", err);
+        }
     }
 }
 
