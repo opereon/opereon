@@ -69,11 +69,7 @@ impl ProcExec {
         self.label = proc.label().to_string();
         self.kind = proc.kind();
 
-        self.curr_model = if model.metadata().is_stored() {
-            ModelPath::Revision(model.metadata().id().to_string())
-        } else {
-            ModelPath::Path(model.metadata().path().to_path_buf())
-        };
+        self.curr_model = ModelPath::Revision(model.metadata().id().to_string());
 
         self.proc_path = proc.node().path();
 

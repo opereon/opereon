@@ -74,21 +74,6 @@ pub enum Command {
         )]
         format: DisplayFormat,
     },
-    /// Output list of known model versions
-    #[structopt(name = "list", author = "")]
-    List {
-        /// Output format
-        #[structopt(
-            short = "f",
-            long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
-            default_value = "table"
-        )]
-        format: DisplayFormat,
-    },
     /// Commit current model
     #[structopt(name = "commit", author = "")]
     Commit {
@@ -182,10 +167,10 @@ pub enum Command {
         #[structopt(short = "d", long = "dry-run")]
         dry_run: bool,
         /// Target model path, defaults to current working directory
-        #[structopt(name = "TARGET", default_value = ".")]
+        #[structopt(name = "TARGET", default_value = "@")]
         target: ModelPath,
-        /// Source model path, defaults to current model
-        #[structopt(name = "SOURCE", default_value = "@")]
+        /// Source model path, defaults to current model(HEAD)
+        #[structopt(name = "SOURCE", default_value = "HEAD")]
         source: ModelPath,
     },
     /// Run checks from a model

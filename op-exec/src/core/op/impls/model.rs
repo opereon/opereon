@@ -57,39 +57,6 @@ impl OperationImpl for ModelInitOperation {
     }
 }
 
-
-#[derive(Debug)]
-pub struct ModelListOperation {
-    operation: OperationRef,
-    engine: EngineRef,
-}
-
-impl ModelListOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef) -> ModelListOperation {
-        ModelListOperation {
-            operation,
-            engine,
-        }
-    }
-}
-
-impl Future for ModelListOperation {
-    type Item = Outcome;
-    type Error = RuntimeError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let list = to_tree(&self.engine.read().model_manager().list().unwrap()).unwrap();
-        Ok(Async::Ready(Outcome::NodeSet(list.into())))
-    }
-}
-
-impl OperationImpl for ModelListOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-}
-
-
 #[derive(Debug)]
 pub struct ModelCommitOperation {
     operation: OperationRef,

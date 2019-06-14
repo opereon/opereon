@@ -150,11 +150,6 @@ fn main() {
 
             ExecContext::ConfigGet
         }
-        Command::List { format } => {
-            disp_format = format;
-
-            ExecContext::ModelList
-        }
         Command::Commit { message } => {
             disp_format = DisplayFormat::Text;
             ExecContext::ModelCommit(message)

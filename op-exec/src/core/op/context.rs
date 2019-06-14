@@ -7,7 +7,6 @@ use super::*;
 pub enum Context {
     ConfigGet,
     ModelInit,
-    ModelList,
     ModelCommit(String),
     ModelQuery {
         model: ModelPath,
@@ -60,7 +59,6 @@ impl Context {
     pub fn label(&self) -> &str {
         match *self {
             Context::ConfigGet => "config-get",
-            Context::ModelList => "model-list",
             Context::ModelInit => "model-init",
             Context::ModelCommit(..) => "model-store",
             Context::ModelQuery {..} => "model-query",

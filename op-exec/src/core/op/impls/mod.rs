@@ -30,7 +30,6 @@ pub type OperationImplType = OperationImpl<Item = Outcome, Error = RuntimeError>
 pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Result<Box<OperationImplType>, RuntimeError> {
     let mut op_impl: Box<OperationImplType> = match *operation.read().context() {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
-        Context::ModelList => Box::new(ModelListOperation::new(operation.clone(), engine.clone())),
         Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(operation.clone(), engine.clone(), path)),
         Context::ModelQuery { ref model, ref expr } => Box::new(ModelQueryOperation::new(operation.clone(), engine.clone(), model.clone(), expr.clone())),
         Context::ModelTest { ref model } => Box::new(ModelTestOperation::new(operation.clone(), engine.clone(), model.clone())),

@@ -165,8 +165,6 @@ pub struct Metadata {
     path: PathBuf,
     user: User,
     timestamp: DateTime<Utc>,
-    #[serde(skip)]
-    stored: bool,
 }
 
 impl Metadata {
@@ -175,8 +173,7 @@ impl Metadata {
             id,
             path,
             user,
-            timestamp,
-            stored: false,
+            timestamp
         }
     }
 
@@ -203,14 +200,6 @@ impl Metadata {
     pub fn set_path(&mut self, path: PathBuf) {
         self.path = path;
     }
-
-    pub fn is_stored(&self) -> bool {
-        self.stored
-    }
-
-    pub fn set_stored(&mut self, stored: bool) {
-        self.stored = stored;
-    }
 }
 
 impl Default for Metadata {
@@ -219,8 +208,7 @@ impl Default for Metadata {
             id: Sha1Hash::nil(),
             user: User::default(),
             timestamp: Utc.timestamp(0, 0),
-            path: PathBuf::new(),
-            stored: false,
+            path: PathBuf::new()
         }
     }
 }
