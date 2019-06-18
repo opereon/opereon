@@ -2,7 +2,7 @@ use super::*;
 
 use regex::Regex;
 
-use kg_tree::diff::Diff;
+use kg_tree::diff::ModelDiff;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -212,8 +212,8 @@ impl Future for ModelDiffOperation {
         let m1 = e.model_manager_mut().resolve(&self.source)?;
         let m2 = e.model_manager_mut().resolve(&self.target)?;
         let diff = match self.method {
-            DiffMethod::Minimal => Diff::minimal(m1.lock().root(), m2.lock().root()),
-            DiffMethod::Full => Diff::full(m1.lock().root(), m2.lock().root()),
+            DiffMethod::Minimal => ModelDiff::minimal(m1.lock().root(), m2.lock().root()),
+            DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root()),
         };
         Ok(Async::Ready(Outcome::NodeSet(to_tree(&diff).unwrap().into())))
     }
