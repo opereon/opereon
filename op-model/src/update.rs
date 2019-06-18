@@ -1,11 +1,12 @@
 use super::*;
-use git2::{Oid, Repository, DiffOptions, DiffFindOptions};
+use git2::{Oid, Repository, DiffOptions, DiffFindOptions, ObjectType};
 
 
 #[derive(Debug)]
 pub struct ModelUpdate<'a> {
     cache: NodePathCache,
-    diff: ModelDiff,
+    model_diff: ModelDiff,
+    file_diff: FileDiff,
     matcher1_r: NodePathMatcher,
     matcher2_a: NodePathMatcher,
     matcher2_u: NodePathMatcher,
@@ -16,11 +17,12 @@ pub struct ModelUpdate<'a> {
 impl<'a> ModelUpdate<'a> {
     pub fn new(model1: &'a Model, model2: &'a Model) -> ModelUpdate<'a> {
         let mut cache = NodePathCache::new();
-        let diff = ModelDiff::full_cache(model1.root(), model2.root(), &mut cache);
-
+        let model_diff = ModelDiff::full_cache(model1.root(), model2.root(), &mut cache);
+        let file_diff = FileDiff::minimal(model1, model2);
         ModelUpdate {
             cache,
-            diff,
+            model_diff,
+            file_diff,
             matcher1_r: NodePathMatcher::new(),
             matcher2_a: NodePathMatcher::new(),
             matcher2_u: NodePathMatcher::new(),
@@ -29,8 +31,8 @@ impl<'a> ModelUpdate<'a> {
         }
     }
 
-    pub fn diff(&self) -> &ModelDiff {
-        &self.diff
+    pub fn model_diff(&self) -> &ModelDiff {
+        &self.model_diff
     }
 
     pub fn check_updater(&mut self, u: &ProcDef) -> Vec<&ModelChange> {
@@ -58,7 +60,7 @@ impl<'a> ModelUpdate<'a> {
         }
 
         let mut changes = Vec::new();
-        for c in self.diff.changes().iter() {
+        for c in self.model_diff.changes().iter() {
             match c.kind() {
                 ChangeKind::Removed => if self.matcher1_r.matches(c.path()) {
                     changes.push(c)
@@ -93,7 +95,7 @@ impl From<git2::Delta> for FileChangeKind {
             Delta::Deleted => FileChangeKind::Removed,
             Delta::Modified => FileChangeKind::Updated,
             Delta::Renamed => FileChangeKind::Renamed,
-            _=> {panic!("Unsupported")}
+            _ => { panic!("Unsupported") }
         }
     }
 }
@@ -103,7 +105,7 @@ impl From<git2::Delta> for FileChangeKind {
 pub struct FileChange {
     kind: FileChangeKind,
     old: Option<PathBuf>,
-    new: Option<PathBuf>
+    new: Option<PathBuf>,
 }
 
 impl FileChange {
@@ -119,8 +121,18 @@ impl FileChange {
 impl From<git2::DiffDelta<'_>> for FileChange {
     fn from(diff_delta: git2::DiffDelta) -> Self {
         let kind: FileChangeKind = diff_delta.status().into();
-        let old = diff_delta.old_file().path().map(|p|p.to_owned());
-        let new = diff_delta.old_file().path().map(|p|p.to_owned());
+
+        let old = if diff_delta.old_file().id().is_zero() {
+            None
+        } else {
+            Some(diff_delta.old_file().path().expect("Path cannot be None!").to_owned())
+        };
+
+        let new = if diff_delta.new_file().id().is_zero() {
+            None
+        } else {
+            Some(diff_delta.new_file().path().expect("Path cannot be None!").to_owned())
+        };
 
         FileChange::new(kind, old, new)
     }
@@ -142,11 +154,11 @@ impl FileDiff {
         let old: Oid = model1.metadata().id().as_oid();
         let new: Oid = model2.metadata().id().as_oid();
 
-        let old_commit = repo.find_commit(old).expect("Cannot find commit");
-        let new_commit = repo.find_commit(new).expect("Cannot find commit");
+        let old_commit = repo.find_object(old, None).expect("Cannot find commit");
+        let new_commit = repo.find_object(new, None).expect("Cannot find commit");
 
-        let old_tree = old_commit.tree().expect("Cannot get commit tree");
-        let new_tree = new_commit.tree().expect("Cannot get commit tree");
+        let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
+        let new_tree = new_commit.peel_to_tree().expect("Cannot get commit tree");
 
         let mut opts = DiffOptions::new();
         opts.minimal(true);
@@ -160,7 +172,7 @@ impl FileDiff {
 
         diff.find_similar(Some(&mut find_opts)).expect("Cannot find similar!");
 
-        let changes = diff.deltas().map(|d|d.into()).collect();
+        let changes = diff.deltas().map(|d| d.into()).collect();
 
         Self {
             changes
