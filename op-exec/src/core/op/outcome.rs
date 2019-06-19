@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 pub enum Outcome {
     Empty,
     NodeSet(NodeSetRef),
-    Diff(Diff),
+    Diff(ModelDiff),
     File(PathBuf),
     Many(Vec<Outcome>),
 }

@@ -1,16 +1,17 @@
 use super::*;
-
+use globset::{Glob, GlobBuilder};
+use serde::Serializer;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Watch {
+pub struct ModelWatch {
     path: Opath,
     mask: ChangeKindMask,
 }
 
-impl Watch {
-    pub fn parse(path: &str, mask: &str) -> Result<Watch, DefsParseError> {
+impl ModelWatch {
+    pub fn parse(path: &str, mask: &str) -> Result<ModelWatch, DefsParseError> {
         //FIXME (jc) handle opath parse errors
-        Ok(Watch {
+        Ok(ModelWatch {
             path: Opath::parse(path).unwrap(),
             mask: ChangeKindMask::parse(mask),
         })
@@ -18,6 +19,39 @@ impl Watch {
 
     pub fn path(&self) -> &Opath {
         &self.path
+    }
+
+    pub fn mask(&self) -> ChangeKindMask {
+        self.mask
+    }
+}
+
+fn glob_serialize<S>(glob: &Glob, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+{
+    s.serialize_str(glob.glob())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FileWatch {
+    #[serde(serialize_with = "glob_serialize")]
+    glob: Glob,
+    mask: ChangeKindMask,
+}
+
+impl FileWatch {
+    pub fn parse(glob: &str, mask: &str) -> Result<FileWatch, DefsParseError> {
+        //FIXME ws glob parse errors
+        let glob = GlobBuilder::new(glob).build().expect("Cannot build glob!");
+        Ok(FileWatch {
+            glob,
+            mask: ChangeKindMask::parse(mask),
+        })
+    }
+
+    pub fn glob(&self) -> &Glob {
+        &self.glob
     }
 
     pub fn mask(&self) -> ChangeKindMask {

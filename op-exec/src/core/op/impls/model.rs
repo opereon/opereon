@@ -2,7 +2,7 @@ use super::*;
 
 use regex::Regex;
 
-use kg_tree::diff::Diff;
+use kg_tree::diff::ModelDiff;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -212,8 +212,8 @@ impl Future for ModelDiffOperation {
         let m1 = e.model_manager_mut().resolve(&self.source)?;
         let m2 = e.model_manager_mut().resolve(&self.target)?;
         let diff = match self.method {
-            DiffMethod::Minimal => Diff::minimal(m1.lock().root(), m2.lock().root()),
-            DiffMethod::Full => Diff::full(m1.lock().root(), m2.lock().root()),
+            DiffMethod::Minimal => ModelDiff::minimal(m1.lock().root(), m2.lock().root()),
+            DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root()),
         };
         Ok(Async::Ready(Outcome::NodeSet(to_tree(&diff).unwrap().into())))
     }
@@ -281,23 +281,30 @@ impl Future for ModelUpdateOperation {
                     if p.kind() == ProcKind::Update {
                         let id = p.id();
 
-                        let changes = update.check_updater(p);
-                        if !changes.is_empty() {
-                            let mut args = ArgumentsBuilder::new(model2.root());
-                            args.set_arg("$changes".into(), &changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
-                            args.set_arg("$old".into(), &model1.root().clone().into());
+                        let (model_changes, file_changes) = update.check_updater(p);
 
-                            let mut e = ProcExec::with_args(Utc::now(), args.build());
-                            e.prepare(&model2, p, exec_dir)?;
-                            e.store()?;
-
-                            let op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
-                            proc_ops.push(op);
-
-                            println!("Update \"{}\": prepared in {}", id, e.path().display());
-                        } else {
-                            println!("Update \"{}\": skipped", id);
+                        if model_changes.is_empty() && file_changes.is_empty() {
+                            println!("Update \"{}\": skipped - no changes", id);
+                            continue
                         }
+
+                        let mut args = ArgumentsBuilder::new(model2.root());
+
+                        if !model_changes.is_empty() {
+                            args.set_arg("$model_changes".into(), &model_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                        }
+                        if !file_changes.is_empty() {
+                            args.set_arg("$file_changes".into(), &file_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                        }
+                        args.set_arg("$old".into(), &model1.root().clone().into());
+
+                        let mut e = ProcExec::with_args(Utc::now(), args.build());
+                        e.prepare(&model2, p, exec_dir)?;
+                        e.store()?;
+
+                        let op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                        proc_ops.push(op);
+                        println!("Update \"{}\": prepared in {}", id, e.path().display());
                     }
                 }
             }
