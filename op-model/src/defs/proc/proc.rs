@@ -39,7 +39,9 @@ pub struct ProcDef {
     scoped: Scoped,
     kind: ProcKind,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    watches: Vec<Watch>,
+    model_watches: Vec<ModelWatch>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    file_watches: Vec<FileWatch>,
     run: Run,
     id: String,
     label: String,
@@ -72,8 +74,12 @@ impl ProcDef {
         &self.run
     }
 
-    pub fn watches(&self) -> &[Watch] {
-        &self.watches
+    pub fn model_watches(&self) -> &[ModelWatch] {
+        &self.model_watches
+    }
+
+    pub fn file_watches(&self) -> &[FileWatch] {
+        &self.file_watches
     }
 }
 
@@ -120,7 +126,8 @@ impl ParsedModelDef for ProcDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: ProcKind::Exec,
             run: Run::new(),
-            watches: Vec::new(),
+            model_watches: Vec::new(),
+            file_watches: Vec::new(),
             id: String::new(),
             label: String::new(),
             path: PathBuf::new(),
@@ -142,8 +149,20 @@ impl ParsedModelDef for ProcDef {
                         match *wn.data().value() {
                             Value::Object(ref props) => {
                                 for (k, v) in props.iter() {
-                                    let w = Watch::parse(k.as_ref(), &v.data().as_string())?;
-                                    p.watches.push(w);
+                                    let w = ModelWatch::parse(k.as_ref(), &v.data().as_string())?;
+                                    p.model_watches.push(w);
+                                }
+                            }
+                            Value::Null => {}
+                            _ => return perr!("watch definition must be an object"), //FIXME (jc)
+                        }
+                    }
+                    if let Some(wn) = node.get_child_key("watch_file") {
+                        match *wn.data().value() {
+                            Value::Object(ref props) => {
+                                for (k, v) in props.iter() {
+                                    let w = FileWatch::parse(k.as_ref(), &v.data().as_string())?;
+                                    p.file_watches.push(w);
                                 }
                             }
                             Value::Null => {}

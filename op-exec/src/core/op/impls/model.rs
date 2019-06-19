@@ -281,23 +281,30 @@ impl Future for ModelUpdateOperation {
                     if p.kind() == ProcKind::Update {
                         let id = p.id();
 
-                        let changes = update.check_updater(p);
-                        if !changes.is_empty() {
-                            let mut args = ArgumentsBuilder::new(model2.root());
-                            args.set_arg("$changes".into(), &changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
-                            args.set_arg("$old".into(), &model1.root().clone().into());
+                        let (model_changes, file_changes) = update.check_updater(p);
 
-                            let mut e = ProcExec::with_args(Utc::now(), args.build());
-                            e.prepare(&model2, p, exec_dir)?;
-                            e.store()?;
-
-                            let op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
-                            proc_ops.push(op);
-
-                            println!("Update \"{}\": prepared in {}", id, e.path().display());
-                        } else {
-                            println!("Update \"{}\": skipped", id);
+                        if model_changes.is_empty() && file_changes.is_empty() {
+                            println!("Update \"{}\": skipped - no changes", id);
+                            continue
                         }
+
+                        let mut args = ArgumentsBuilder::new(model2.root());
+
+                        if !model_changes.is_empty() {
+                            args.set_arg("$model_changes".into(), &model_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                        }
+                        if !file_changes.is_empty() {
+                            args.set_arg("$file_changes".into(), &file_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                        }
+                        args.set_arg("$old".into(), &model1.root().clone().into());
+
+                        let mut e = ProcExec::with_args(Utc::now(), args.build());
+                        e.prepare(&model2, p, exec_dir)?;
+                        e.store()?;
+
+                        let op: OperationRef = Context::ProcExec { bin_id: Uuid::nil(), exec_path: e.path().to_path_buf() }.into();
+                        proc_ops.push(op);
+                        println!("Update \"{}\": prepared in {}", id, e.path().display());
                     }
                 }
             }

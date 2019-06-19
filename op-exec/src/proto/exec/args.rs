@@ -53,7 +53,6 @@ impl Default for Arguments {
         Arguments::new()
     }
 }
-
 pub struct ArgumentsBuilder {
     root: NodeRef,
     args: Arguments,
