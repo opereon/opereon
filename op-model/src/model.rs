@@ -441,8 +441,8 @@ impl ScopedModelDef for Model {
 
 
 struct ModelLookup {
-    node_map: HashMap<*const Node, &'static ModelDef>,
-    path_map: HashMap<Opath, &'static ModelDef>,
+    node_map: HashMap<*const Node, &'static dyn ModelDef>,
+    path_map: HashMap<Opath, &'static dyn ModelDef>,
 }
 
 impl ModelLookup {
@@ -470,8 +470,8 @@ impl ModelLookup {
     }
 
     fn put(&mut self, def: &ModelDef) {
-        self.node_map.insert(def.node().data_ptr(), unsafe { std::mem::transmute::<&ModelDef, &'static ModelDef>(def) });
-        self.path_map.insert(def.node().path(), unsafe { std::mem::transmute::<&ModelDef, &'static ModelDef>(def) });
+        self.node_map.insert(def.node().data_ptr(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
+        self.path_map.insert(def.node().path(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
     }
 }
 
