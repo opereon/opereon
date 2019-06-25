@@ -28,3 +28,4 @@ git2 = "0.8"
 
 [dev-dependencies]
 indoc = "0.3.3"
+difference = "2.0.0"

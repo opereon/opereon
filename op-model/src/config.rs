@@ -11,7 +11,7 @@ use git2::{Repository, TreeWalkMode, ObjectType, TreeWalkResult};
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
 
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Include {
     path: PathBuf,
     file_type: Option<FileType>,
@@ -47,7 +47,7 @@ impl Include {
 }
 
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Exclude {
     path: PathBuf,
     file_type: Option<FileType>,
@@ -76,14 +76,14 @@ impl Exclude {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
+    inherit_excludes: Option<bool>,
+    inherit_includes: Option<bool>,
+    inherit_overrides: Option<bool>,
     #[serde(rename = "exclude")]
     excludes: Vec<Exclude>,
-    inherit_excludes: Option<bool>,
     #[serde(rename = "include")]
     includes: Vec<Include>,
-    inherit_includes: Option<bool>,
     overrides: LinkedHashMap<Opath, Opath>,
-    inherit_overrides: Option<bool>,
 
     #[serde(skip)]
     include_globset: RefCell<Option<GlobSet>>,
@@ -102,12 +102,12 @@ fn build_glob(path: &Path) -> Glob {
 impl Config {
     fn empty() -> Self {
         Config {
-            excludes: Vec::new(),
             inherit_excludes: None,
-            includes: Vec::new(),
             inherit_includes: None,
-            overrides: LinkedHashMap::new(),
             inherit_overrides: None,
+            excludes: Vec::new(),
+            includes: Vec::new(),
+            overrides: LinkedHashMap::new(),
 
             include_globset: RefCell::new(None),
             exclude_globset: RefCell::new(None),
@@ -116,13 +116,15 @@ impl Config {
 
     fn standard() -> Self {
         Config {
+            inherit_excludes: Some(true),
+            inherit_includes: Some(true),
+            inherit_overrides: Some(true),
             excludes: vec![
                 Exclude {
                     path: "**/.*/**".into(),
                     file_type: None,
                 },
             ],
-            inherit_excludes: Some(true),
             includes: vec![
                 Include {
                     path: "**/*".into(),
@@ -149,10 +151,7 @@ impl Config {
                     mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_stem, $item)").unwrap(),
                 },
             ],
-            inherit_includes: Some(true),
             overrides: LinkedHashMap::new(),
-            inherit_overrides: Some(true),
-
             include_globset: RefCell::new(None),
             exclude_globset: RefCell::new(None),
         }
@@ -225,6 +224,32 @@ impl Default for Config {
         Config::empty()
     }
 }
+
+impl PartialEq for Config {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inherit_excludes != other.inherit_excludes {
+            return false;
+        }
+        if self.inherit_includes != other.inherit_includes {
+            return false;
+        }
+        if self.inherit_overrides != other.inherit_overrides {
+            return false;
+        }
+        if self.includes != other.includes {
+            return false;
+        }
+        if self.excludes != other.excludes {
+            return false;
+        }
+        if self.overrides != other.overrides {
+            return false;
+        }
+        true
+    }
+}
+
+impl Eq for Config {}
 
 
 #[derive(Debug)]
@@ -397,5 +422,62 @@ impl ConfigResolver {
 
     pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &Config)> {
         self.configs.iter()
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use difference::Changeset;
+
+    static CONFIG_STANDARD_TOML: &str = indoc!(r#"
+    inherit_excludes = true
+    inherit_includes = true
+    inherit_overrides = true
+
+    [[exclude]]
+    path = "**/.*/**"
+
+    [[include]]
+    path = "**/*"
+    file_type = "dir"
+    item = "${map()}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_name, $item)}"
+
+    [[include]]
+    path = "**/_.{yaml,yml,toml,json}"
+    file_type = "file"
+    item = "${loadFile(@.@file_path, @.@file_ext)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).extend($item)}"
+
+    [[include]]
+    path = "**/*.{yaml,yml,toml,json}"
+    file_type = "file"
+    item = "${loadFile(@.@file_path, @.@file_ext)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_stem, $item)}"
+
+    [[include]]
+    path = "**/*"
+    file_type = "file"
+    item = "${loadFile(@.@file_path, 'text')}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_stem, $item)}"
+
+    [overrides]
+    "#);
+
+    #[test]
+    fn standard_config_serialize() {
+        let config = Config::standard();
+
+        let toml = toml::to_string(&config).unwrap();
+        assert_eq!(&toml, CONFIG_STANDARD_TOML);
+    }
+
+    #[test]
+    fn standard_config_deserialize() {
+        let config1 = Config::standard();
+        let config2: Config = toml::from_str(CONFIG_STANDARD_TOML).unwrap();
+        assert_eq!(&config1, &config2);
     }
 }
