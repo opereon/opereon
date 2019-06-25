@@ -70,13 +70,13 @@ yum_check:
       output:
         var: missing_packages
         format: json
-#    - task: switch
-#      cases:
-#      - when: ${$missing_packages.length() > 0}
-#        run:
-#        - tasks:
-#          - task: exec
-#            scope:
-#              exec: ${$$procs[@.@key == 'yum_install']}
-#              yum_packages: ${map($$host.hostname, $missing_packages)}
-#              yum_hosts: ${$$host}
+    - task: switch
+      cases:
+      - when: ${$missing_packages.length() > 0}
+        run:
+        - tasks:
+          - task: exec
+            scope:
+              exec: ${$$procs[@.@key == 'yum_install']}
+              yum_packages: ${map($$host.hostname, $missing_packages)}
+              yum_hosts: ${$$host}

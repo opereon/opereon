@@ -6,6 +6,8 @@ extern crate indoc;
 #[macro_use]
 extern crate serde_derive;
 
+extern crate parking_lot;
+
 use std::path::{Path, PathBuf};
 
 use chrono::prelude::*;

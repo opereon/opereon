@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 use kg_io::OpType;
 use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult, Oid};
 use std::str::FromStr;
+use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 #[derive(Debug, Serialize)]
 pub struct Model {
@@ -329,7 +330,7 @@ impl Model {
         self.lookup.get_path(self.root(), node_path)
     }
 
-    unsafe fn init(&mut self) {
+    unsafe fn init(&self) {
         unsafe fn init_proc<T: AsScoped>(lookup: &mut ModelLookup, parent: &T, p: &ProcDef) {
             lookup.put(p);
             parent.as_scoped().add_child(p);
@@ -356,10 +357,13 @@ impl Model {
         for p in self.procs() {
             init_proc(&mut lookup, self, p);
         }
-        self.lookup = lookup;
+        let ptr = std::mem::transmute::<&Model, *const()>(self);
+        let mut_model = std::mem::transmute::<*const(), &mut Model>(ptr);
+
+        mut_model.lookup = lookup;
     }
 
-    fn reset(&mut self) {
+    fn reset(&self) {
         self.as_scoped().clear_scope();
     }
 
@@ -511,11 +515,11 @@ impl std::fmt::Debug for ModelLookup {
 
 
 #[derive(Debug, Clone)]
-pub struct ModelRef(Arc<Mutex<Model>>);
+pub struct ModelRef(Arc<ReentrantMutex<Model>>);
 
 impl ModelRef {
     fn new(model: Model) -> ModelRef {
-        let m = ModelRef(Arc::new(Mutex::new(model)));
+        let m = ModelRef(Arc::new(ReentrantMutex::new(model)));
         unsafe { m.lock().init() };
         m
     }
@@ -524,8 +528,8 @@ impl ModelRef {
         Ok(Self::new(Model::read_revision(metadata)?))
     }
 
-    pub fn lock(&self) -> MutexGuard<Model> {
-        self.0.lock().unwrap()
+    pub fn lock(&self) -> ReentrantMutexGuard<Model> {
+        self.0.lock()
     }
 
     pub fn deep_copy(&self) -> ModelRef {
@@ -544,7 +548,7 @@ impl ModelRef {
 
 impl Default for ModelRef {
     fn default() -> Self {
-        ModelRef(Arc::new(Mutex::new(Model::empty())))
+        ModelRef(Arc::new(ReentrantMutex::new(Model::empty())))
     }
 }
 
