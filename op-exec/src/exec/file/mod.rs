@@ -5,6 +5,7 @@ mod rsync;
 
 pub use self::config::FileConfig;
 pub use self::rsync::RsyncConfig;
+pub use self::rsync::FileCopyOperation;
 
 use self::rsync::RsyncExecutor;
 use self::rsync::RsyncError;

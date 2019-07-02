@@ -18,6 +18,7 @@ pub use self::context::Context;
 pub use self::impls::DiffMethod;
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
+pub use self::impls::OperationImpl;
 
 use self::impls::{create_operation_impl, OperationImplType};
 
@@ -110,6 +111,10 @@ impl Operation {
     pub fn cancel(&mut self) {
         self.cancelled = true;
         self.outcome_task.notify();
+    }
+
+    pub fn notify(&mut self) {
+        self.task.notify();
     }
 }
 

@@ -21,9 +21,9 @@ updates:
           src_path: etc/hosts
       - task: file-copy
         scope:
-          src_path: etc/hosts
-          dst_path: /etc/hosts
-          chown: root:root
+          src_path: /home/wiktor/Downloads/rsync_large_files
+          dst_path: /home/wiktor/Desktop/rsync_test
+#          chown: root:root
           chmod: u+rw,g+r,o+r
 
 #checks:

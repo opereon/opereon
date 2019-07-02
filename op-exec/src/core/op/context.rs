@@ -51,6 +51,15 @@ pub enum Context {
         step_index: usize,
         task_index: usize,
     },
+    FileCopyExec {
+        bin_id: Uuid,
+        curr_dir: PathBuf,
+        src_path: PathBuf,
+        dst_path: PathBuf,
+        chown: Option<String>,
+        chmod: Option<String>,
+        host: Host,
+    },
     Sequence(Vec<OperationRef>),
     Parallel(Vec<OperationRef>),
 }
@@ -70,6 +79,7 @@ impl Context {
             Context::ProcExec {..} => "proc-exec",
             Context::StepExec {..} => "step-exec",
             Context::TaskExec {..} => "task-exec",
+            Context::FileCopyExec {..} => "file-copy-exec",
             Context::Sequence(..) => "sequence",
             Context::Parallel(..) => "parallel",
         }

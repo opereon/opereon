@@ -343,13 +343,24 @@ impl Future for TaskExecOperation {
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
                         let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
-                        executor.file_compare(&self.engine,
-                                              base_path,
-                                              &src_path,
-                                              &dst_path,
-                                              chown.as_ref().map(|s| s.as_ref()),
-                                              chmod.as_ref().map(|s| s.as_ref()),
-                                              &output)?
+//                        executor.file_copy(&self.engine,
+//                                              base_path,
+//                                              &src_path,
+//                                              &dst_path,
+//                                              chown.as_ref().map(|s| s.as_ref()),
+//                                              chmod.as_ref().map(|s| s.as_ref()),
+//                                              &output)?
+                        let op: OperationRef = Context::FileCopyExec {
+                            bin_id: self.bin_id,
+                            curr_dir: base_path.to_path_buf(),
+                            src_path,
+                            dst_path,
+                            chown,
+                            chmod,
+                            host: step_exec.host().clone()
+                        }.into();
+                        self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                        return self.poll();
                     }
                     TaskKind::FileCompare => {
                         let src_path: PathBuf = scope.get_var_value("src_path")?;
@@ -358,7 +369,7 @@ impl Future for TaskExecOperation {
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
                         let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
-                        executor.file_copy(&self.engine,
+                        executor.file_compare(&self.engine,
                                            base_path,
                                            &src_path,
                                            &dst_path,

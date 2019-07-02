@@ -43,6 +43,7 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
+        Context::FileCopyExec { bin_id, ref curr_dir, ref src_path, ref dst_path, ref chown, ref chmod, ref host} => Box::new(FileCopyOperation::new(operation.clone(), engine.clone(), bin_id, curr_dir, src_path, dst_path, chown, chmod, host)),
     };
 
     op_impl.init()?;
