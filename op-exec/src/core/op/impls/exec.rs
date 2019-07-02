@@ -342,14 +342,6 @@ impl Future for TaskExecOperation {
                         let dst_path: PathBuf = scope.get_var_value_or_default("dst_path", &src_path);
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
-                        let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
-//                        executor.file_copy(&self.engine,
-//                                              base_path,
-//                                              &src_path,
-//                                              &dst_path,
-//                                              chown.as_ref().map(|s| s.as_ref()),
-//                                              chmod.as_ref().map(|s| s.as_ref()),
-//                                              &output)?
                         let op: OperationRef = Context::FileCopyExec {
                             bin_id: self.bin_id,
                             curr_dir: base_path.to_path_buf(),
