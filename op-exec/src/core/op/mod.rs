@@ -72,25 +72,25 @@ impl Operation {
         &self.context
     }
 
-    pub(super) fn update_progress_value(&mut self, value: f64) {
+    pub(crate) fn update_progress_value(&mut self, value: f64) {
         if self.progress.set_value(value) {
             self.progress_task.notify();
         }
     }
 
-    pub(super) fn update_progress_value_done(&mut self) {
+    pub(crate) fn update_progress_value_done(&mut self) {
         if self.progress.set_value_done() {
             self.progress_task.notify();
         }
     }
 
-    pub(super) fn update_progress_step_value(&mut self, step: usize, value: f64) {
+    pub(crate) fn update_progress_step_value(&mut self, step: usize, value: f64) {
         if self.progress.set_step_value(step, value) {
             self.progress_task.notify();
         }
     }
 
-    pub(super) fn update_progress_step_value_done(&mut self, step: usize) {
+    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
         if self.progress.set_step_value_done(step) {
             self.progress_task.notify();
         }

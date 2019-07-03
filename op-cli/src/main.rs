@@ -68,6 +68,12 @@ fn local_run(model_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");
 
+//    outcome_fut.progress()
+//        .for_each(|p| {
+//            eprintln!("p = {:?}", p);
+//            Ok(())
+//        });
+
     Arbiter::spawn(engine.clone().then(|_| {
         // Nothing to do when engine future complete
         System::current().stop();

@@ -4,15 +4,36 @@ use std::io::BufRead;
 use std::thread::JoinHandle;
 use std::process::Stdio;
 use std::time::Duration;
+use regex::Regex;
 
+type Loaded = u64;
+type FileSize = u64;
+
+#[inline(always)]
+fn check_progress_info(progress_info: &Vec<&str>) -> Result<(), ParseError> {
+    if progress_info.len() == 4 || progress_info.len() == 6 {
+        return Ok(());
+    }
+    Err(ParseError { line: line!() })
+}
+
+
+#[inline(always)]
+fn check_file_info(file_info: &Vec<&str>) -> Result<(), ParseError> {
+    if file_info.len() != 2 {
+        return Err(ParseError { line: line!() });
+    }
+    Ok(())
+}
 
 fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
     let mut file_size: u64 = 0;
     let mut file_name: String = String::new();
     let mut file_completed = true;
 
-    /*let lines = stdout.lines()
+    let lines = out.lines()
         .skip(1); // skip first line: "sending incremental file list"
+
 
     let line_endings_reg = Regex::new(r"\n\r|\r|\n").unwrap();
     let file_reg = Regex::new(r"[\[\]]").unwrap();
@@ -25,7 +46,7 @@ fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
                     .filter(|s| !s.is_empty());
 
                 'inner: for line in lines {
-                    if !file_completed {
+                    if !file_completed && !line.starts_with("["){
                         let progress_info = progress_reg.split(line)
                             .filter(|s| !s.is_empty())
                             .collect::<Vec<&str>>();
@@ -40,11 +61,14 @@ fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
                         }
                         let loaded_bytes = loaded_bytes.unwrap();
 
-                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
+                        eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+
+//                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
 
                         if progress_info.len() == 6 {
-                            sent_files.lock().unwrap().push(file_name.clone());
-                            rsync.trigger_on_file_complete(file_name.clone());
+//                            sent_files.lock().unwrap().push(file_name.clone());
+//                            rsync.trigger_on_file_complete(file_name.clone());
+                            eprintln!("file_completed: {:?}", file_name);
 
                             file_completed = true;
                         }
@@ -66,20 +90,19 @@ fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
                     file_size = res.unwrap();
 
 
-                    if file_name.ends_with("/") { // no need to notify about directories processing
+                    if file_name.ends_with("/") || file_name.ends_with("/."){ // no need to notify about directories processing
                         file_completed = true;
                         continue 'inner;
                     }
                     file_completed = false;
-                    rsync.trigger_on_file_begin(file_name.clone(), file_size);
+//                    rsync.trigger_on_file_begin(file_name.clone(), file_size);
                 }
             }
             Err(err) => {
-                eprintln!("err = {:?}", err);
                 return Err(ParseError { line: line!() });
             }
         }
-    }*/
+    }
     Ok(())
 }
 
@@ -208,15 +231,23 @@ impl FileCopyOperation {
         let (stdout, stdout_writer) = pipe()?;
         let (stderr, stderr_writer) = pipe()?;
 
-        let run_stdout = move || {
-            let buf = BufReader::new(stdout);
+        let operation = self.operation.clone();
 
-            for line in buf.lines() {
-                match line {
-                    Ok(line) => println!("out: {}", line),
-                    Err(err) => return Err(err),
-                }
-            }
+        let run_stdout = move || {
+            let mut buf = BufReader::new(stdout);
+
+//            for line in buf.lines() {
+//                match line {
+//                    Ok(line) => {
+//                        println!("out: {}", line);
+//                        operation.write().update_progress_value(1.0);
+//                    },
+//                    Err(err) => return Err(err),
+//                }
+//            }
+            if let Err(err) = parse_progress(&mut buf){
+                println!("Error parsing rsync progress: {:?}", err)
+            };
             Ok(())
         };
 
@@ -247,10 +278,8 @@ impl FileCopyOperation {
 
         std::thread::spawn(move || {
             let execute_cmd = move || -> Result<ExitStatus, RuntimeError> {
-                let mut child = {
-                    let mut rsync_cmd = params.to_cmd(&config);
-                    rsync_cmd
-                        .arg("--progress")
+                let mut command = params.to_cmd(&config);
+                command.arg("--progress")
                         .arg("--super") // fail on permission denied
                         .arg("--recursive")
                         .arg("--links") // copy symlinks as symlinks
@@ -259,10 +288,12 @@ impl FileCopyOperation {
                         .env("TERM", "xterm-256color")
                         .stdin(Stdio::null())
                         .stdout(Stdio::from(stdout))
-                        .stderr(Stdio::from(stderr))
-                        .spawn()?
-                };
-                Ok(child.wait()?)
+                        .stderr(Stdio::from(stderr));
+
+//                eprintln!("command = {:?}", command);
+
+                let mut child = command.spawn()?;
+                    Ok(child.wait()?)
             };
 
             match execute_cmd() {
@@ -287,8 +318,6 @@ impl Future for FileCopyOperation {
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        println!("File copy!");
-
         if !self.running {
             self.start_copying()?;
 
@@ -296,19 +325,18 @@ impl Future for FileCopyOperation {
             return Ok(Async::NotReady)
         }
 
-        if let Some(ref res) = *self.status() {
-            match res {
-                Ok(status) => {
-                    if status.success() {
-                        Ok(Async::Ready(Outcome::Empty))
-                    } else {
-                        Err(RuntimeError::Custom)
-                    }
+        match *self.status() {
+            Some(Ok(ref status)) =>{
+                if status.success() {
+                    Ok(Async::Ready(Outcome::Empty))
+                } else {
+                    Err(RuntimeError::Custom)
                 }
-                Err(err) => Err(RuntimeError::Custom)
             }
-        } else {
-            Ok(Async::NotReady)
+            Some(Err(ref err)) => {
+                Err(RuntimeError::Custom)
+            }
+            None => Ok(Async::NotReady)
         }
     }
 }
