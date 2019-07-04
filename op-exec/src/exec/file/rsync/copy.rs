@@ -7,7 +7,6 @@ use std::time::Duration;
 use regex::Regex;
 
 type Loaded = u64;
-type FileSize = u64;
 
 #[inline(always)]
 fn check_progress_info(progress_info: &Vec<&str>) -> Result<(), ParseError> {
@@ -190,7 +189,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
             .arg("--recursive")
             .arg("--links") // copy symlinks as symlinks
             .arg("--times") // preserve modification times
-            .arg("--out-format=[%f][%l]")
+            .arg("--out-format=[%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
             .env("TERM", "xterm-256color")
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout_writer))

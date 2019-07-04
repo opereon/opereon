@@ -17,6 +17,7 @@ use os_pipe::PipeWriter;
 use std::str::Utf8Error;
 
 pub type RsyncResult<T> = Result<T, RsyncError>;
+type FileSize = u64;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -219,7 +220,7 @@ impl FileExecutor for RsyncExecutor {
             params.chmod(chmod);
         }
 
-        let diffs = self::rsync::compare::rsync_compare(self.config(), &params)?;
+        let diffs = self::rsync::compare::rsync_compare(self.config(), &params, true)?;
         let mut result = 0;
         for diff in diffs {
             if diff.state().is_modified_chown() {
