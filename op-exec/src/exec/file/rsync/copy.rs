@@ -70,19 +70,10 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
     let mut file_name: String = String::new();
     let mut file_completed = true;
 
-//
-//    let lines = out.lines()
-//        .skip(1); // skip first line: "sending incremental file list"
-
-
-    let line_endings_reg = Regex::new(r"\n\r|\r|\n").unwrap();
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
 
-
     let mut buf = Vec::new();
-
-    let mut line = String::new();
 
     let delimiter = |b| { b == b'\n' || b == b'\r' };
 

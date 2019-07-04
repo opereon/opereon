@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate structopt;
 
 #[macro_use]
@@ -30,7 +29,6 @@ use display::DisplayFormat;
 use options::*;
 
 use chrono::{Utc, DateTime, FixedOffset};
-use chrono::offset::TimeZone;
 
 pub static SHORT_VERSION: &'static str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &'static str = env!("OP_LONG_VERSION");
@@ -74,7 +72,7 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
             Ok(())
         });
 
-    Arbiter::spawn(x.map_err(|err| ()));
+    Arbiter::spawn(x.map_err(|_err| ()));
 
     Arbiter::spawn(engine.clone().then(|_| {
         // Nothing to do when engine future complete
@@ -136,7 +134,7 @@ fn main() {
         config_file_path,
         model_dir_path,
         command,
-        verbose,
+        verbose: _,
     } = Opts::from_clap(&matches);
 
     let model_dir_path = PathBuf::from(model_dir_path).canonicalize().expect("Cannot find model directory");
@@ -270,5 +268,5 @@ fn main() {
 
     actix::System::run(move || {
         local_run(model_dir_path, config, cmd, disp_format);
-    });
+    }).unwrap();
 }
