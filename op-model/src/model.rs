@@ -99,47 +99,19 @@ impl Model {
         }
     }
 
-    /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
-    /// # Returns
-    /// Tuple containing path to manifest dir and manifest itself.
-    pub fn search_manifest(start_dir: &Path) -> IoResult<(PathBuf, Manifest)> {
-        let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
-
-        let mut parent = Some(start_dir);
-
-        while parent.is_some() {
-            let curr_dir = parent.unwrap();
-            let manifest = curr_dir.join(&manifest_filename);
-
-            let mut content = String::new();
-
-            match kg_io::fs::read_to_string(&manifest, &mut content) {
-                Ok(_) => {
-                    let manifest: Manifest = toml::from_str(&content).unwrap();
-
-                    return Ok((curr_dir.to_owned(), manifest));
-                }
-                Err(err) => {
-                    if err.kind() != std::io::ErrorKind::NotFound {
-                        return Err(err);
-                    } else {
-                        parent = curr_dir.parent();
-                    }
-                }
-            }
-        }
-
-        return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
+    pub fn load_manifest(model_dir: &Path) -> IoResult<Manifest> {
+        let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
+        let mut content = String::new();
+        kg_io::fs::read_to_string(&path, &mut content)?;
+        // FIXME ws error handling
+        let manifest: Manifest = toml::from_str(&content).expect("Cannot parse manifest file!");
+        Ok(manifest)
     }
 
     fn read_revision(mut metadata: Metadata) -> IoResult<Model> {
-        let path = metadata.path();
-        let (model_dir, manifest) = Model::search_manifest(&path)?;
+        let manifest = Model::load_manifest(metadata.path())?;
 
-        assert!(model_dir.is_dir());
-
-        kg_tree::set_base_path(&model_dir);
-        metadata.set_path(model_dir);
+        kg_tree::set_base_path(metadata.path());
 
         let mut m = Model {
             metadata,
@@ -524,6 +496,8 @@ impl ModelRef {
         m
     }
 
+    /// Read model for provided metadata.
+    /// Returns error if `metadata.path()` is not model dir
     pub fn read(metadata: Metadata) -> IoResult<ModelRef> {
         Ok(Self::new(Model::read_revision(metadata)?))
     }

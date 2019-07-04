@@ -1,1 +1,1 @@
-example config to be placed in $HOME/.operon for testing
+example config to be placed in $HOME/.opereon for testing

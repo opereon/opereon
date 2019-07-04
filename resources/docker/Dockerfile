@@ -1,9 +1,9 @@
 FROM fedora
-# copy operon binary
-COPY ./op ./opt/operon/op
+# copy opereon binary
+COPY ./op ./opt/opereon/op
 
-# copy operon config to $HOME
-COPY ./.operon /root/.operon
+# copy opereon config to $HOME
+COPY ./.opereon /root/.opereon
 
 # enable rust backtraces
 ENV RUST_BACKTRACE=1
@@ -11,8 +11,8 @@ ENV RUST_BACKTRACE=1
 # enable logging for op-net
 #ENV RUST_LOG="op_net=debug"
 
-# add operon executable to path
-ENV PATH="${PATH}:/opt/operon/"
+# add opereon executable to path
+ENV PATH="${PATH}:/opt/opereon/"
 
 # install some network tools for convenience
 #RUN dnf install -y iproute
@@ -20,5 +20,5 @@ ENV PATH="${PATH}:/opt/operon/"
 
 EXPOSE 6666/tcp
 EXPOSE 6666/udp
-# start operon service
-CMD ["op","start","--pid-path","/var/run/operon/op.pid","--do-not-daemonize"]
+# start opereon service
+CMD ["op","start","--pid-path","/var/run/opereon/op.pid","--do-not-daemonize"]

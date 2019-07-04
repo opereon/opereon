@@ -40,7 +40,7 @@ fn check<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
     match result {
         Ok(t) => t,
         Err(err) => {
-            eprintln!("Error starting operon: {}", err);
+            eprintln!("Error starting opereon: {}", err);
             std::process::exit(-1);
         }
     }
@@ -60,10 +60,10 @@ fn make_path_absolute(path: &Path) -> PathBuf {
 }
 
 /// start engine and execute provided operation
-fn local_run(model_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
+fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
     let logger = init_file_logger(&config);
 
-    let engine = check(EngineRef::start(model_dir, config, logger.clone()));
+    let engine = check(EngineRef::start(current_dir, config, logger.clone()));
     let outcome_fut: OutcomeFuture = engine
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");

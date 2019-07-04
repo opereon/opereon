@@ -123,40 +123,42 @@ impl ModelManager {
         &self.model_dir
     }
 
+    /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
+    /// # Returns
+    /// path to manifest dir.
+    pub fn search_manifest(start_dir: &Path) -> IoResult<PathBuf> {
+        let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
+
+        let mut parent = Some(start_dir);
+
+        while parent.is_some() {
+            let curr_dir = parent.unwrap();
+            let manifest = curr_dir.join(&manifest_filename);
+
+            match kg_io::fs::metadata(manifest){
+                Ok(_) => {
+                    return Ok(curr_dir.to_owned());
+                }
+                Err(err) => {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        return Err(err);
+                    } else {
+                        parent = curr_dir.parent();
+                    }
+                }
+            }
+        }
+
+        return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
+    }
+
     pub fn init(&mut self) -> IoResult<()> {
         debug!(self.logger, "Initializing model manager");
         use std::str::FromStr;
-//
-//        let current_dir = fs::current_dir()?;
-//
-//        self.repository = match Repository::discover(&current_dir) {
-//            Ok(repository) => {
-//                debug!(self.logger, "Git repository found in path {}", repository.path().display());
-//                Some(Arc::new(Mutex::new(repository)))
-//            },
-//            Err(err) => {
-//                warn!(self.logger, "Git repository not found! {:?}", err);
-//                None
-//            }
-//        };
 
-//        kg_io::fs::create_dir_all(self.config().data_dir())?;
-//
-//        let current_file_path = self.config().data_dir().join("current");
-//        if current_file_path.exists() {
-//            let mut current = String::new();
-//            kg_io::fs::read_to_string(&current_file_path, &mut current)?;
-//            match Sha1Hash::from_str(&current) {
-//                Ok(id) => {
-//                    let m = self.get(id)?;
-//                    self.current = id;
-//                }
-//                Err(_err) => return Err(std::io::ErrorKind::InvalidData.into()),
-//            }
-//        } else {
-//            let m = ModelRef::default();
-//            self.cache_model(Bin::new(Uuid::nil(), m));
-//        }
+        let model_dir = Self::search_manifest(&self.model_dir)?;
+        info!(self.logger, "Model dir found {}", model_dir.display());
+        self.model_dir = model_dir;
 
         Ok(())
     }
@@ -286,6 +288,7 @@ impl ModelManager {
     /// Returns current model - model represented by content of the git index
     pub fn current(&mut self) -> IoResult<ModelRef> {
         // TODO ws error handling
+        eprintln!("self.model_dir() = {:?}", self.model_dir());
         let mut repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
 
