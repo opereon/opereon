@@ -36,7 +36,7 @@ impl SshConfig {
 impl Default for SshConfig {
     fn default() -> Self {
         SshConfig {
-            socket_dir: PathBuf::from("/var/run/operon/ssh"),
+            socket_dir: PathBuf::from("/var/run/opereon/ssh"),
             ssh_cmd: "/bin/ssh".into(),
             runas_cmd: "/bin/sudo".into(),
             shell_cmd: "/bin/bash".into(),
