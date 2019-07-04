@@ -14,94 +14,148 @@ fn check_progress_info(progress_info: &Vec<&str>) -> Result<(), ParseError> {
     if progress_info.len() == 4 || progress_info.len() == 6 {
         return Ok(());
     }
-    Err(ParseError { line: line!() })
+    Err(ParseError::Line(line!()))
 }
 
 
 #[inline(always)]
 fn check_file_info(file_info: &Vec<&str>) -> Result<(), ParseError> {
     if file_info.len() != 2 {
-        return Err(ParseError { line: line!() });
+        return Err(ParseError::Line(line!()))
     }
     Ok(())
 }
 
-fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
+fn read_until<R: BufRead + ?Sized>(r: &mut R, pred: impl Fn(u8) -> bool, buf: &mut Vec<u8>)
+                                   -> std::io::Result<usize> {
+    let mut read = 0;
+    loop {
+        let (done, used) = {
+            let available = match r.fill_buf() {
+                Ok(n) => n,
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(e)
+            };
+
+            let mut found = None;
+
+            for i in 0..available.len() {
+                if pred(available[i]) {
+                    found = Some(i);
+                    break
+                }
+            }
+
+            match found {
+                Some(i) => {
+                    buf.extend_from_slice(&available[..=i]);
+                    (true, i + 1)
+                }
+                None => {
+                    buf.extend_from_slice(available);
+                    (false, available.len())
+                }
+            }
+        };
+        r.consume(used);
+        read += used;
+        if done || used == 0 {
+            return Ok(read);
+        }
+    }
+}
+
+fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
     let mut file_size: u64 = 0;
     let mut file_name: String = String::new();
     let mut file_completed = true;
 
-    let lines = out.lines()
-        .skip(1); // skip first line: "sending incremental file list"
+//
+//    let lines = out.lines()
+//        .skip(1); // skip first line: "sending incremental file list"
 
 
     let line_endings_reg = Regex::new(r"\n\r|\r|\n").unwrap();
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
 
-    'outer: for res in lines {
-        match res {
-            Ok(line) => {
-                let lines = line_endings_reg.split(&line)
-                    .filter(|s| !s.is_empty());
 
-                'inner: for line in lines {
-                    if !file_completed && !line.starts_with("["){
-                        let progress_info = progress_reg.split(line)
-                            .filter(|s| !s.is_empty())
-                            .collect::<Vec<&str>>();
+    let mut buf = Vec::new();
 
-                        check_progress_info(&progress_info)?;
+    let mut line = String::new();
 
-                        let loaded_bytes = progress_info[0].replace(",", "");
-                        let loaded_bytes = loaded_bytes.parse::<Loaded>();
+    let delimiter = |b| { b == b'\n' || b == b'\r' };
 
-                        if loaded_bytes.is_err() {
-                            return Err(ParseError { line: line!() });
-                        }
-                        let loaded_bytes = loaded_bytes.unwrap();
+    // skip first line: "sending incremental file list"
+    read_until(&mut out, delimiter, &mut buf)?;
+    buf.clear();
 
-                        eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+    let line = std::str::from_utf8(buf.as_slice())?;
+
+    while read_until(&mut out, delimiter, &mut buf)? != 0 {
+        let line = std::str::from_utf8(buf.as_slice())?;
+        // skip parsing when line is empty
+        if line == "\n" || line == "\r" || line.is_empty(){
+            buf.clear();
+            continue
+        }
+        // skip \n or \r at the end of line
+        let line = &line[..line.len()-1];
+
+        if !file_completed && !line.starts_with("[") {
+            let progress_info = progress_reg.split(&line)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>();
+
+            check_progress_info(&progress_info)?;
+
+            let loaded_bytes = progress_info[0].replace(",", "");
+            let loaded_bytes = loaded_bytes.parse::<Loaded>();
+
+            if loaded_bytes.is_err() {
+                Err(ParseError::Line(line!()))?;
+            }
+            let loaded_bytes = loaded_bytes.unwrap();
+
+            operation.write().update_progress_value(loaded_bytes as f64);
+
+            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
 
 //                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
 
-                        if progress_info.len() == 6 {
+            if progress_info.len() == 6 {
 //                            sent_files.lock().unwrap().push(file_name.clone());
 //                            rsync.trigger_on_file_complete(file_name.clone());
-                            eprintln!("file_completed: {:?}", file_name);
+//                            eprintln!("file_completed: {:?}", file_name);
 
-                            file_completed = true;
-                        }
-                        continue 'inner;
-                    }
-
-                    let file_info = file_reg.split(line)
-                        .filter(|s| !s.is_empty())
-                        .collect::<Vec<&str>>();
-
-                    check_file_info(&file_info)?;
-
-                    let res = file_info[1].parse::<FileSize>();
-                    if res.is_err() {
-                        return Err(ParseError { line: line!() });
-                    }
-
-                    file_name = file_info[0].to_string();
-                    file_size = res.unwrap();
-
-
-                    if file_name.ends_with("/") || file_name.ends_with("/."){ // no need to notify about directories processing
-                        file_completed = true;
-                        continue 'inner;
-                    }
-                    file_completed = false;
-//                    rsync.trigger_on_file_begin(file_name.clone(), file_size);
-                }
+                file_completed = true;
             }
-            Err(err) => {
-                return Err(ParseError { line: line!() });
-            }
+            buf.clear();
+            continue;
         }
+
+        let file_info = file_reg.split(&line)
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>();
+
+        check_file_info(&file_info)?;
+
+        let res = file_info[1].parse::<FileSize>();
+        if res.is_err() {
+            Err(ParseError::Line(line!()))?;
+        }
+
+        file_name = file_info[0].to_string();
+        file_size = res.unwrap();
+
+
+        if file_name.ends_with("/") || file_name.ends_with("/.") { // no need to notify about directories processing
+            file_completed = true;
+            buf.clear();
+            continue;
+        }
+        file_completed = false;
+        buf.clear()
     }
     Ok(())
 }
@@ -234,18 +288,19 @@ impl FileCopyOperation {
         let operation = self.operation.clone();
 
         let run_stdout = move || {
+//            let mut buf = BufReader::new(stdout);
             let mut buf = BufReader::new(stdout);
 
 //            for line in buf.lines() {
 //                match line {
 //                    Ok(line) => {
-//                        println!("out: {}", line);
+//                        println!("out: {:?}", line);
 //                        operation.write().update_progress_value(1.0);
 //                    },
 //                    Err(err) => return Err(err),
 //                }
 //            }
-            if let Err(err) = parse_progress(&mut buf){
+            if let Err(err) = parse_progress(&mut buf, operation){
                 println!("Error parsing rsync progress: {:?}", err)
             };
             Ok(())

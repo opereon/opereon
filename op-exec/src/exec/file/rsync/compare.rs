@@ -26,12 +26,12 @@ impl ModFlags {
             } else if b == b'?' {
                 Ok(None)
             } else {
-                Err(ParseError { line: line!() }) //FIXME (jc)
+                Err(ParseError::Line(line!())) //FIXME (jc)
             }
         }
 
         if s.len() != 9 {
-            Err(ParseError { line: line!() }) //FIXME (jc)
+            Err(ParseError::Line(line!())) //FIXME (jc)
         } else {
             Ok(ModFlags {
                 checksum: parse_flag(s[0], b'c')?,
@@ -163,7 +163,7 @@ impl FileType {
             b'L' => Ok(FileType::Symlink),
             b'D' => Ok(FileType::Device),
             b'S' => Ok(FileType::Special),
-            _ => Err(ParseError { line: line!() }),
+            _ => Err(ParseError::Line(line!())),
         }
     }
 }

@@ -242,7 +242,7 @@ impl Future for OperationTask {
                 Ok(Async::Ready(outcome)) => {
                     let mut o = self.operation.write();
                     o.outcome = Some(Ok(outcome));
-                    o.update_progress_value_done();
+//                    o.update_progress_value_done();
                 }
                 Err(err) => {
                     self.operation.write().outcome = Some(Err(err));
@@ -271,6 +271,10 @@ impl OutcomeFuture {
 
     pub fn into_exec(self) -> OperationExec {
         OperationExec::new(self)
+    }
+
+    pub fn progress(&self) -> ProgressStream {
+        ProgressStream::new(self.operation.clone())
     }
 }
 

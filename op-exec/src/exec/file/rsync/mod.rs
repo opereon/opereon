@@ -14,13 +14,16 @@ use crate::core::OperationImpl;
 use crate::{Host, RuntimeError};
 use std::thread::JoinHandle;
 use os_pipe::PipeWriter;
+use std::str::Utf8Error;
 
 pub type RsyncResult<T> = Result<T, RsyncError>;
 
 #[derive(Debug)]
-pub struct ParseError {
-    line: u32
+pub enum ParseError {
+    Line(u32),
 }
+
+
 
 #[derive(Debug)]
 pub enum RsyncError {
@@ -28,8 +31,14 @@ pub enum RsyncError {
     RsyncProcessTerminated,
     ParseError(ParseError),
     SshError(SshError),
+    Utf8Error(Utf8Error),
 }
 
+impl From<Utf8Error> for RsyncError {
+    fn from(err: Utf8Error) -> Self {
+        RsyncError::Utf8Error(err)
+    }
+}
 impl From<ParseError> for RsyncError {
     fn from(err: ParseError) -> Self {
         RsyncError::ParseError(err)
