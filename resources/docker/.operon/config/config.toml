@@ -1,10 +1,10 @@
-run_dir = "${env:HOME}/.operon/run"
+run_dir = "${env:HOME}/.opereon/run"
 
 [queue]
 persist_dir = "${run_dir}/queue"
 
 [model]
-data_dir = "${env:HOME}/.operon/data"
+data_dir = "${env:HOME}/.opereon/data"
 cache_limit = 10
 
 [exec]
@@ -15,4 +15,4 @@ socket_dir = "${run_dir}/ssh"
 
 [logger]
 level = "debug"
-log_file = "/var/log/operon/operon.log"
+log_file = "/var/log/opereon/opereon.log"

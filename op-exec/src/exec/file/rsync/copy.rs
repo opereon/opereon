@@ -525,7 +525,7 @@ mod tests {
     fn rsync_copy_() {
         let config = RsyncConfig::default();
         let p = RsyncParams::new("./","/home/outsider/Down1/", "/home/outsider/Down2/");
-        //p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.operon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
+        //p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.opereon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
 
         let status = rsync_copy(&config, &p).unwrap();
         println!("{:?}", status);

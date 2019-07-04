@@ -111,8 +111,8 @@ impl EngineRef {
     pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> EngineRef {
         EngineRef(Arc::new(RwLock::new(Engine::new(model_dir, config, logger))))
     }
-    pub fn start(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> IoResult<EngineRef> {
-        let engine = EngineRef::new(model_dir, config, logger.clone());
+    pub fn start(current_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> IoResult<EngineRef> {
+        let engine = EngineRef::new(current_dir, config, logger.clone());
         engine.init_model_manager()?;
         engine.init_ssh_session_cache()?;
         Ok(engine)

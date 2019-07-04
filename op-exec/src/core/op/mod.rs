@@ -375,7 +375,7 @@ mod tests {
         let o = OperationRef::new(
             Uuid::nil(),
             "Main operation".into(),
-            Context::ModelCommit(PathBuf::from("/home/operon/model")),
+            Context::ModelCommit(PathBuf::from("/home/opereon/model")),
         );
         let s = serde_json::to_string(&o).unwrap();
 
@@ -385,7 +385,7 @@ mod tests {
           "label": "Main operation",
           "context": {
             "type": "model-store",
-            "arg": "/home/operon/model"
+            "arg": "/home/opereon/model"
           }
         }
         "#;
@@ -401,7 +401,7 @@ mod tests {
           "label": "Main operation",
           "context": {
             "type": "model-store",
-            "arg": "/home/operon/model"
+            "arg": "/home/opereon/model"
           }
         }
         "#;
@@ -413,7 +413,7 @@ mod tests {
         assert_eq!(o.label(), "Main operation");
         assert_eq!(
             o.context(),
-            &Context::ModelCommit(PathBuf::from("/home/operon/model"))
+            &Context::ModelCommit(PathBuf::from("/home/opereon/model"))
         );
     }
 }
