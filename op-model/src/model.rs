@@ -133,9 +133,8 @@ impl Model {
         let scope = ScopeMut::new();
         scope.set_func("loadFile".into(), Box::new(LoadFileFunc::new(model_dir, commit)));
 
-        tree.walk(TreeWalkMode::PreOrder, |parent_path, entry|{
-            let path = PathBuf::from_str(parent_path).unwrap().join(entry.name().unwrap());
-            let path_abs = m.metadata.path().join(&path);
+        tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
+            let entry_name = entry.name().unwrap();
 
             let file_type: FileType = match entry.kind().unwrap() {
                 ObjectType::Tree => FileType::Dir,
@@ -146,8 +145,14 @@ impl Model {
                 }
             };
 
+            if file_type == FileType::File && (entry_name == DEFAULT_MANIFEST_FILENAME || entry_name == DEFAULT_CONFIG_FILENAME) {
+                return TreeWalkResult::Ok;
+            }
 
+            let path = PathBuf::from_str(parent_path).unwrap().join(entry_name);
+            let path_abs = m.metadata.path().join(&path);
             let config = cr.resolve(&path_abs);
+
             if let Some(inc) = config.find_include(&path, file_type) {
                 let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 

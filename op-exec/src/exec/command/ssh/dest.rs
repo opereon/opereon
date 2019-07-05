@@ -41,8 +41,15 @@ impl SshAuth {
     }
 }
 
+impl Default for SshAuth {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SshDest {
     hostname: String,
     port: u16,
@@ -102,16 +109,47 @@ impl SshDest {
         &self.hostname
     }
 
+    pub fn set_hostname<S: Into<String>>(&mut self, hostname: S) {
+        self.hostname = hostname.into();
+    }
+
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    pub fn set_port(&mut self, port: u16) {
+        self.port = port;
     }
 
     pub fn username(&self) -> &str {
         &self.username
     }
 
+    pub fn set_username<S: Into<String>>(&mut self, username: S) {
+        self.username = username.into();
+    }
+
+    pub fn set_username_current(&mut self) {
+        self.username = users::get_current_username().unwrap().to_str().unwrap().to_string();
+    }
+
     pub fn auth(&self) -> &SshAuth {
         &self.auth
+    }
+
+    pub fn set_auth(&mut self, auth: SshAuth) {
+        self.auth = auth;
+    }
+}
+
+impl Default for SshDest {
+    fn default() -> Self {
+        SshDest {
+            hostname: String::new(),
+            port: 22,
+            username: String::new(),
+            auth: SshAuth::default(),
+        }
     }
 }
 

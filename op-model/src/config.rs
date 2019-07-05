@@ -130,25 +130,25 @@ impl Config {
                     path: "**/*".into(),
                     file_type: Some(FileType::Dir),
                     item: Opath::parse("map()").unwrap(),
-                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_name, $item)").unwrap(),
+                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.', '\"')).set($item.@file_name, $item)").unwrap(),
                 },
                 Include {
                     path: "**/_.{yaml,yml,toml,json}".into(),
                     file_type: Some(FileType::File),
                     item: Opath::parse("loadFile(@file_path, @file_ext)").unwrap(),
-                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).extend($item)").unwrap(),
+                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.', '\"')).extend($item)").unwrap(),
                 },
                 Include {
                     path: "**/*.{yaml,yml,toml,json}".into(),
                     file_type: Some(FileType::File),
                     item: Opath::parse("loadFile(@file_path, @file_ext)").unwrap(),
-                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_stem, $item)").unwrap(),
+                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.', '\"')).set($item.@file_stem, $item)").unwrap(),
                 },
                 Include {
                     path: "**/*".into(),
                     file_type: Some(FileType::File),
                     item: Opath::parse("loadFile(@file_path, 'text')").unwrap(),
-                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.')).set($item.@file_stem, $item)").unwrap(),
+                    mapping: Opath::parse("$.find(array($item.@file_path_components[:-2]).join('.', '\"')).set($item.@file_stem, $item)").unwrap(),
                 },
             ],
             overrides: LinkedHashMap::new(),
@@ -307,7 +307,6 @@ impl ConfigResolver {
     }
 
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
-
         let repo = Repository::open(model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
 

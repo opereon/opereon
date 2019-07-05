@@ -11,6 +11,7 @@ use std::process::{Child, Stdio};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::cell::Cell;
 
 use os_pipe::pipe;
 
@@ -20,6 +21,7 @@ pub enum SshError {
     IoError(kg_io::error::IoError),
     SshOpen(String),
     SshProcessTerminated,
+    SshClosed,
     ScriptOpenError(std::io::Error),
 }
 
@@ -56,7 +58,9 @@ impl SshSessionCache {
     }
 
     pub fn init(&mut self) -> IoResult<()> {
-        kg_io::fs::create_dir_all(self.config.exec().command().ssh().socket_dir())
+        std::fs::remove_dir_all(self.config.exec().command().ssh().socket_dir())?;
+        kg_io::fs::create_dir_all(self.config.exec().command().ssh().socket_dir())?;
+        Ok(())
     }
 
     pub fn get(&mut self, dest: &SshDest) -> SshResult<SshSessionRef> {
@@ -77,6 +81,7 @@ impl SshSessionCache {
 
 #[derive(Debug)]
 pub struct SshSession {
+    opened: Cell<bool>,
     config: ConfigRef,
     id: String,
     socket_path: PathBuf,
@@ -89,6 +94,7 @@ impl SshSession {
         let socket_path = config.exec().command().ssh().socket_dir().join(id.clone() + ".sock");
 
         SshSession {
+            opened: Cell::new(false),
             config,
             id,
             socket_path,
@@ -136,6 +142,7 @@ impl SshSession {
 
         let output = cmd.output()?;
         if output.status.success() {
+            self.opened.set(true);
             Ok(())
         } else {
             Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
@@ -143,6 +150,10 @@ impl SshSession {
     }
 
     fn check(&self) -> SshResult<bool> {
+        if !self.opened.get() {
+            return Err(SshError::SshClosed);
+        }
+
         let mut cmd = self.ssh_cmd()
             .arg("-O").arg("check")
             .arg("-o").arg("ConnectTimeout=2")
@@ -157,6 +168,10 @@ impl SshSession {
     }
 
     fn close(&mut self) -> SshResult<()> {
+        if !self.opened.get() {
+            return Ok(());
+        }
+
         let mut cmd = self.ssh_cmd()
             .arg("-O").arg("exit")
             .arg("-o").arg("ConnectTimeout=2")
@@ -181,6 +196,10 @@ impl SshSession {
         stderr: Stdio,
         log: &OutputLog,
     ) -> Result<Child, SshError> {
+        if !self.opened.get() {
+            return Err(SshError::SshClosed);
+        }
+
         let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
 
         log.log_cmd(&usr_cmd)?;
@@ -207,6 +226,10 @@ impl SshSession {
         stderr: Stdio,
         log: &OutputLog,
     ) -> Result<Child, SshError> {
+        if !self.opened.get() {
+            return Err(SshError::SshClosed);
+        }
+        
         let mut usr_cmd = if let Some(user) = run_as {
             let mut cmd = CommandBuilder::new(self.config().runas_cmd());
             cmd.arg("-u").arg(user).arg(self.config().shell_cmd());

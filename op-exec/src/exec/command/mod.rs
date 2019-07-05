@@ -124,9 +124,10 @@ pub fn resolve_env(
     env: &TaskEnv,
     root: &NodeRef,
     current: &NodeRef,
+    scope: &Scope,
 ) -> EnvVars {
     lazy_static!(
-        static ref VAR_NAME_RE: Regex = Regex::new(r"[^A-Z0-9]").unwrap();
+        static ref VAR_NAME_RE: Regex = Regex::new(r"[^A-Za-z0-9]").unwrap();
     );
 
     fn env_name_from_path(node: &NodeRef) -> Option<String> {
@@ -157,7 +158,7 @@ pub fn resolve_env(
             let mut resolved = LinkedHashMap::with_capacity(items.len());
 
             for expr in items.iter() {
-                let res = expr.apply_one(root, current);
+                let res = expr.apply_one_ext(root, current, scope);
                 if res.is_string() {
                     if let Some(env_name) = env_name_from_path(&res) {
                         let prev = resolved.insert(env_name.clone(), res.as_string());
@@ -179,8 +180,7 @@ pub fn resolve_env(
             let mut resolved = LinkedHashMap::with_capacity(items.len());
 
             for (name, expr) in items.iter() {
-                let res = expr.apply_one(root, current);
-
+                let res = expr.apply_one_ext(root, current, scope);
                 if res.is_string() {
                     resolved.insert(name.clone(), res.as_string());
                 } else {
