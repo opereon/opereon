@@ -251,11 +251,8 @@ impl TaskEnv {
                 let mut envs = LinkedHashMap::with_capacity(props.len());
 
                 for (k, node) in props.iter() {
-                    if node.is_string() {
-                        envs.insert(k.to_string(), Opath::parse(&node.as_string())?);
-                    } else {
-                        return perr!("Unexpected property type") //FIXME (jc)
-                    }
+                    let expr: Opath = serial::from_tree(node)?;
+                    envs.insert(k.to_string(), expr);
                 }
                 TaskEnv::Map(envs)
             }
@@ -263,15 +260,12 @@ impl TaskEnv {
                 let mut envs = Vec::with_capacity(elems.len());
 
                 for node in elems.iter() {
-                    if node.is_string() {
-                        envs.push( Opath::parse(&node.as_string())?)
-                    } else {
-                        return perr!("Unexpected property type") //FIXME (jc)
-                    }
+                    let expr: Opath = serial::from_tree(node)?;
+                    envs.push( expr)
                 }
                 TaskEnv::List(envs)
             }
-            Value::String(ref key) => TaskEnv::List(vec![Opath::parse(&key)?]),
+            Value::String(ref key) => TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?]),
             _ => return perr!("Unexpected property type"), //FIXME (jc)
         };
         Ok(env)

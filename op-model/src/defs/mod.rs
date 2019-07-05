@@ -18,6 +18,14 @@ impl From<opath::OpathParseError> for DefsParseError {
     }
 }
 
+//FIXME (jc)
+impl From<serial::Error> for DefsParseError {
+    fn from(err: serial::Error) -> Self {
+        println!("from: {:?}", err);
+        DefsParseError::Undef
+    }
+}
+
 //FIXME (jc) to be removed
 macro_rules! perr {
     ( $msg:expr ) => {{

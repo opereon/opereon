@@ -38,7 +38,7 @@ impl ProcExecOperation {
             steps
         };
 
-        let op: OperationRef = Context::Parallel(steps).into();
+        let op: OperationRef = Context::Sequence(steps).into();
         let op = engine.enqueue_operation(op, false)?.into_exec();
 
         Ok(ProcExecOperation {
@@ -82,33 +82,12 @@ pub struct StepExecOperation {
 
 impl StepExecOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
-        let bin_id = if bin_id.is_nil() {
-            operation.read().id()
-        } else {
-            bin_id
-        };
-
         let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
 
         let tasks = {
             let proc_exec = proc_exec.lock();
-            let model = engine.write().model_manager_mut().resolve_bin(proc_exec.curr_model(), bin_id)?;
-
-            let model = model.lock();
-
             let ref step_exec = proc_exec.run().steps()[step_index];
             println!("{}: executing step in {}", step_exec.host(), step_exec.path().display());
-
-            let proc = model.get_proc_path(proc_exec.proc_path()).unwrap();
-            {
-                let s = proc.scope_mut();
-                s.set_var("$proc".into(), proc.node().clone().into());
-                let host = match step_exec.host_path() {
-                    Some(p) => model.get_host_path(p).unwrap().node().clone(),
-                    None => to_tree(step_exec.host()).unwrap(),
-                };
-                s.set_var("$host".into(), host.into());
-            }
 
             let mut tasks = Vec::with_capacity(step_exec.tasks().len());
 
@@ -206,7 +185,7 @@ impl Future for TaskExecOperation {
                 let proc_exec = self.engine.write().exec_manager_mut().get(&self.exec_path)?;
                 let proc_exec = proc_exec.lock();
 
-                let curr_model = self.engine.write().model_manager_mut().resolve_bin(proc_exec.curr_model(), self.bin_id)?;
+                let curr_model = self.engine.write().model_manager_mut().resolve(proc_exec.curr_model())?;
                 let curr_model = curr_model.lock();
 
                 let ref step_exec = proc_exec.run().steps()[self.step_index];
@@ -215,6 +194,15 @@ impl Future for TaskExecOperation {
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
+                {
+                    let s = proc.scope_mut();
+                    s.set_var("$proc".into(), proc.node().clone().into());
+                    let host = match step_exec.host_path() {
+                        Some(p) => curr_model.get_host_path(p).unwrap().node().clone(),
+                        None => to_tree(step_exec.host()).unwrap(),
+                    };
+                    s.set_var("$host".into(), host.into());
+                }
                 {
                     let s = task.scope_mut();
                     s.set_var("$task".into(), task.node().clone().into());
@@ -322,9 +310,7 @@ impl Future for TaskExecOperation {
                         let args: Vec<String> = scope.get_var("args").map_or(Vec::new(), |args| args.iter().map(|a| a.as_string()).collect());
                         let cwd: Option<PathBuf> = scope.get_var_value_opt("cwd");
                         let run_as: Option<String> = scope.get_var_value_opt("run_as");
-                        let env: Option<EnvVars> = task.env().map(|e| resolve_env(e,
-                                                                                            task.root(),
-                                                                                            task.node()));
+                        let env: Option<EnvVars> = task.env().map(|e| resolve_env(e, task.root(), task.node(), task.scope()));
                         let out_format = task.output().map(|o| o.format());
                         let mut executor = create_command_executor(step_exec.host(), &self.engine)?;
                         executor.exec_script(&self.engine,

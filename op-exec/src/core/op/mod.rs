@@ -392,7 +392,7 @@ mod tests {
         let o = OperationRef::new(
             Uuid::nil(),
             "Main operation".into(),
-            Context::ModelCommit(PathBuf::from("/home/opereon/model")),
+            Context::ModelCommit(String::from("/home/opereon/model")),
         );
         let s = serde_json::to_string(&o).unwrap();
 
@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(o.label(), "Main operation");
         assert_eq!(
             o.context(),
-            &Context::ModelCommit(PathBuf::from("/home/opereon/model"))
+            &Context::ModelCommit(String::from("/home/opereon/model"))
         );
     }
 }

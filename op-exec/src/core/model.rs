@@ -39,7 +39,7 @@ impl std::str::FromStr for ModelPath {
     }
 }
 
-
+/*
 #[derive(Debug)]
 struct Bin {
     id: Uuid,
@@ -94,11 +94,12 @@ impl From<ModelRef> for Bins {
         Bins(vec![Bin::new(Uuid::nil(), model)])
     }
 }
+*/
 
 #[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,
-    model_cache: LruCache<Sha1Hash, Bins>,
+    model_cache: LruCache<Sha1Hash, ModelRef>,
     /// Path do model dir.
     model_dir: PathBuf,
     logger: slog::Logger,
@@ -228,12 +229,8 @@ impl ModelManager {
     }
 
     pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
-        self.get_bin(id, Uuid::nil())
-    }
-
-    pub fn get_bin(&mut self, id: Sha1Hash, bin_id: Uuid) -> IoResult<ModelRef> {
         if let Some(b) = self.model_cache.get_mut(&id) {
-            return Ok(b.get(bin_id));
+            return Ok(b.clone());
         }
 
         let mut meta = Metadata::default();
@@ -242,19 +239,14 @@ impl ModelManager {
         meta.set_path(self.model_dir().to_owned());
 
         let model = ModelRef::read(meta)?;
-        self.cache_model(Bin::new(bin_id, model.clone()));
+        self.cache_model(model.clone());
         Ok(model)
     }
 
-
     pub fn resolve(&mut self, model_path: &ModelPath) -> IoResult<ModelRef> {
-        self.resolve_bin(model_path, Uuid::nil())
-    }
-
-    pub fn resolve_bin(&mut self, model_path: &ModelPath, bin_id: Uuid) -> IoResult<ModelRef> {
         match *model_path {
-            ModelPath::Current => self.current_bin(bin_id),
-            ModelPath::Revision(ref rev) => self.get_bin(self.resolve_revision_str(rev)?, bin_id),
+            ModelPath::Current => self.current(),
+            ModelPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
             ModelPath::Path(ref path) => unimplemented!(),
         }
     }
@@ -288,7 +280,6 @@ impl ModelManager {
     /// Returns current model - model represented by content of the git index
     pub fn current(&mut self) -> IoResult<ModelRef> {
         // TODO ws error handling
-        eprintln!("self.model_dir() = {:?}", self.model_dir());
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
 
@@ -318,14 +309,9 @@ impl ModelManager {
         Ok(commit)
     }
 
-    pub fn current_bin(&mut self, bin_id: Uuid) -> IoResult<ModelRef> {
-        // FIXME is this ok?
-        self.current()
-    }
-
-    fn cache_model(&mut self, bin: Bin) {
-        let id = bin.model.lock().metadata().id();
-        self.model_cache.insert(id, bin.into());
+    fn cache_model(&mut self, m: ModelRef) {
+        let id = m.lock().metadata().id();
+        self.model_cache.insert(id, m);
     }
 }
 

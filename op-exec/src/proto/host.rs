@@ -11,6 +11,12 @@ impl Host {
     pub fn from_def(host_def: &HostDef) -> Result<Host, ProtoError> {
         let mut h: Host = from_tree(host_def.node())?;
         h.hostname = host_def.hostname().to_string();
+        if h.ssh_dest.hostname().is_empty() {
+            h.ssh_dest.set_hostname(&h.hostname);
+        }
+        if h.ssh_dest.username().is_empty() {
+            h.ssh_dest.set_username_current();
+        }
         Ok(h)
     }
 
