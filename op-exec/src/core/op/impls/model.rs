@@ -256,7 +256,7 @@ impl Future for ModelUpdateOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
-                self.operation.write().update_progress_value(p.value());
+                self.operation.write().update_progress(p);
             }
             if let Async::Ready(outcome) = op.outcome_mut().poll()? {
                 Ok(Async::Ready(outcome))
@@ -353,7 +353,7 @@ impl Future for ModelCheckOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
-                self.operation.write().update_progress_value(p.value());
+                self.operation.write().update_progress(p);
             }
             if let Async::Ready(outcome) = op.outcome_mut().poll()? {
                 Ok(Async::Ready(outcome))
@@ -449,7 +449,7 @@ impl Future for ModelProbeOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
-                self.operation.write().update_progress_value(p.value());
+                self.operation.write().update_progress(p);
             }
             if let Async::Ready(outcome) = op.outcome_mut().poll()? {
                 Ok(Async::Ready(outcome))

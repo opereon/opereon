@@ -55,7 +55,7 @@ impl Future for ProcExecOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress_value(p.value());
+            self.operation.write().update_progress(p);
         }
         if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
             cleanup_resources(&self.engine, self.operation.read().id());
@@ -121,7 +121,7 @@ impl Future for StepExecOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress_value(p.value());
+            self.operation.write().update_progress(p);
         }
         if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
             cleanup_resources(&self.engine, self.operation.read().id());
@@ -171,7 +171,7 @@ impl Future for TaskExecOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
-                self.operation.write().update_progress_value(p.value());
+                self.operation.write().update_progress(p);
             }
             if let Async::Ready(outcome) = op.outcome_mut().poll()? {
                 Ok(Async::Ready(outcome))

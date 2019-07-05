@@ -68,7 +68,14 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
 
     let x = outcome_fut.progress()
         .for_each(|p| {
-            eprintln!("p = {:?}", p);
+            println!("=========================================");
+//            eprintln!("Value: {}/{}", p.value(), p.max());
+//            for p in p.steps() {
+//                eprintln!("#####Sub value: {}/{}", p.value(), p.max());
+//            }
+
+            eprintln!("p = {:#?}", p);
+
             Ok(())
         });
 

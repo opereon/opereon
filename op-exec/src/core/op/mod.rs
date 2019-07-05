@@ -72,36 +72,43 @@ impl Operation {
         &self.context
     }
 
-    pub(crate) fn update_progress_value(&mut self, value: f64) {
-        if self.progress.set_value(value) {
-            self.progress_task.notify();
-        }
+    pub (crate) fn update_progress(&mut self, progress: Progress) {
+        self.progress = progress;
+        self.progress_task.notify();
     }
 
-    pub(crate) fn update_progress_value_done(&mut self) {
-        if self.progress.set_value_done() {
-            self.progress_task.notify();
-        }
+    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
+        self.progress.set_step(step, progress);
+        self.progress_task.notify();
     }
 
+//    pub(crate) fn update_progress_value(&mut self, value: f64) {
+//        if self.progress.set_value(value) {
+//            self.progress_task.notify();
+//        }
+//    }
+//
+//    pub(crate) fn update_progress_value_done(&mut self) {
+//        if self.progress.set_value_done() {
+//            self.progress_task.notify();
+//        }
+//    }
+//
     pub(crate) fn update_progress_step_value(&mut self, step: usize, value: f64) {
         if self.progress.set_step_value(step, value) {
             self.progress_task.notify();
         }
     }
+//
+//    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
+//        if self.progress.set_step_value_done(step) {
+//            self.progress_task.notify();
+//        }
+//    }
 
-    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
-        if self.progress.set_step_value_done(step) {
-            self.progress_task.notify();
-        }
-    }
     pub(crate) fn set_progress(&mut self, progress: Progress) {
         self.progress = progress;
         self.progress_task.notify()
-    }
-
-    pub(crate) fn progress(&self) -> &Progress {
-        &self.progress
     }
 
     pub fn is_blocked(&self) -> bool {

@@ -107,9 +107,9 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
             if loaded_bytes.is_err() {
                 Err(ParseError::Line(line!()))?;
             }
-            let loaded_bytes = loaded_bytes.unwrap();
+            let loaded_bytes = loaded_bytes.unwrap() as f64;
 
-            operation.write().update_progress_step_value(file_idx, loaded_bytes as f64);
+            operation.write().update_progress_step_value(file_idx, loaded_bytes);
 
 //            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
 

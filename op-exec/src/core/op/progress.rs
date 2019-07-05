@@ -117,10 +117,20 @@ impl Progress {
         u
     }
 
-    pub fn set_step_value_done(&mut self, step: usize) -> bool {
-        let value = self.steps[step].max;
-        self.set_step_value(step, value)
+    pub fn set_step(&mut self, step: usize, progress: Progress) {
+        self.steps[step] = progress;
+        if self.unit == Unit::Step {
+            self.value = self.steps.iter().fold(1., |v, s| v + s.is_done() as u32 as f64);
+        } else {
+            self.value = self.steps.iter().fold(0., |v, s| v + s.value - s.min);
+        }
+        self.counter += 1;
     }
+
+//    pub fn set_step_value_done(&mut self, step: usize) -> bool {
+//        let value = self.steps[step].max;
+//        self.set_step_value(step, value)
+//    }
 
     pub fn min(&self) -> f64 {
         self.min
@@ -148,7 +158,7 @@ impl Default for Progress {
         Progress {
             value: 0.,
             min: 0.,
-            max: std::f64::MAX,
+            max: 999999999999.,
             unit: Unit::Scalar,
             steps: Vec::new(),
             counter: 0,
