@@ -5,6 +5,8 @@ use std::thread::JoinHandle;
 use std::process::Stdio;
 use std::time::Duration;
 use regex::Regex;
+use crate::RuntimeError;
+use crate::exec::file::rsync::compare::State;
 
 type Loaded = u64;
 
@@ -68,6 +70,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
     let mut file_size: u64 = 0;
     let mut file_name: String = String::new();
     let mut file_completed = true;
+    let mut file_idx = 0;
 
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
@@ -80,7 +83,6 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
     read_until(&mut out, delimiter, &mut buf)?;
     buf.clear();
 
-    let line = std::str::from_utf8(buf.as_slice())?;
 
     while read_until(&mut out, delimiter, &mut buf)? != 0 {
         let line = std::str::from_utf8(buf.as_slice())?;
@@ -107,9 +109,9 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
             }
             let loaded_bytes = loaded_bytes.unwrap();
 
-            operation.write().update_progress_value(loaded_bytes as f64);
+            operation.write().update_progress_step_value(file_idx, loaded_bytes as f64);
 
-            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+//            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
 
 //                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
 
@@ -118,6 +120,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
 //                            rsync.trigger_on_file_complete(file_name.clone());
 //                            eprintln!("file_completed: {:?}", file_name);
 
+                file_idx +=1;
                 file_completed = true;
             }
             buf.clear();
@@ -141,6 +144,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
 
         if file_name.ends_with("/") || file_name.ends_with("/.") { // no need to notify about directories processing
             file_completed = true;
+            file_idx +=1;
             buf.clear();
             continue;
         }
@@ -353,6 +357,37 @@ impl FileCopyOperation {
         });
         Ok(())
     }
+
+    fn calculate_progress(&mut self) -> Result<(), RuntimeError> {
+        let mut executor = create_file_executor(&self.host, &self.engine)?;
+
+        let result = executor.file_compare(&self.engine,
+                                           &self.curr_dir,
+                                           &self.src_path,
+                                           &self.dst_path,
+                                           self.chown.as_ref().map(|s| s.as_ref()),
+                                           self.chmod.as_ref().map(|s| s.as_ref()),
+                                           false)?;
+
+        let mut progresses = vec![];
+
+        for diff in result.diffs() {
+            match diff.state() {
+                State::Missing | State::Modified(_) => {
+                    let file_max = diff.file_size() as f64;
+                    progresses.push(Progress::new(0., file_max, Unit::Bytes))
+                },
+                _ => {}
+            }
+        }
+
+        let total_progress = Progress::from_steps(progresses);
+
+        self.operation.write().set_progress(total_progress);
+
+        Ok(())
+    }
+
     pub fn status(&self) -> MutexGuard<Option<Result<ExitStatus, RuntimeError>>>{
         self.status.lock().unwrap()
     }
@@ -388,6 +423,8 @@ impl Future for FileCopyOperation {
 
 impl OperationImpl for FileCopyOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
+        // FIXME blocking call - implement as future
+        self.calculate_progress()?;
         Ok(())
     }
 }

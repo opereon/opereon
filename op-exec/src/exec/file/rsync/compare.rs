@@ -219,6 +219,10 @@ impl DiffInfo {
         self.file_type
     }
 
+    pub fn file_size(&self) -> FileSize {
+        self.file_size
+    }
+
     pub fn state(&self) -> &State {
         &self.state
     }

@@ -148,7 +148,7 @@ impl Default for Progress {
         Progress {
             value: 0.,
             min: 0.,
-            max: 999999999999999.,
+            max: std::f64::MAX,
             unit: Unit::Scalar,
             steps: Vec::new(),
             counter: 0,

@@ -95,6 +95,14 @@ impl Operation {
             self.progress_task.notify();
         }
     }
+    pub(crate) fn set_progress(&mut self, progress: Progress) {
+        self.progress = progress;
+        self.progress_task.notify()
+    }
+
+    pub(crate) fn progress(&self) -> &Progress {
+        &self.progress
+    }
 
     pub fn is_blocked(&self) -> bool {
         self.blocked

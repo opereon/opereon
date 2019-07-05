@@ -366,8 +366,7 @@ impl Future for TaskExecOperation {
                                            &src_path,
                                            &dst_path,
                                            chown.as_ref().map(|s| s.as_ref()),
-                                           chmod.as_ref().map(|s| s.as_ref()),
-                                           &output)?
+                                           chmod.as_ref().map(|s| s.as_ref()), true)?.into_task_result()
                     }
                 };
 
