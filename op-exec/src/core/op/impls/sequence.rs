@@ -7,13 +7,15 @@ pub struct SequenceOperation {
     steps: Vec<OperationExec>,
     outcomes: Vec<Outcome>,
     current_step: Option<usize>,
+
+    steps_sync: Vec<OperationRef>,
 }
 
 impl SequenceOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> Result<SequenceOperation, RuntimeError> {
         let n = steps.len();
         let mut steps_ = Vec::with_capacity(steps.len());
-        for s in steps {
+        for s in &steps {
             s.write().block(true);
             let step = engine.enqueue_operation(s.clone(), false)?.into_exec();
             steps_.push(step);
@@ -24,6 +26,7 @@ impl SequenceOperation {
             steps: steps_,
             outcomes: Vec::with_capacity(n),
             current_step: None,
+            steps_sync: steps
         })
     }
 }
@@ -69,6 +72,17 @@ impl OperationImpl for SequenceOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
         self.operation.write().progress = Progress::from_steps(self.steps.iter().map(|o| o.operation.read().progress.clone()).collect());
         Ok(())
+    }
+
+    fn execute(&mut self) -> Result<Outcome, RuntimeError> {
+        let mut outcomes = vec![];
+
+        for op in self.steps_sync.drain(..) {
+            let out = self.engine.run_operation(op)?;
+            outcomes.push(out);
+        }
+
+        Ok(Outcome::Many(outcomes))
     }
 }
 

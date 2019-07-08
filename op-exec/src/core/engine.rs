@@ -1,9 +1,12 @@
 use std::collections::VecDeque;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
 
 use uuid::Uuid;
 
 use super::*;
+use threadpool::ThreadPool;
+use std::sync::mpsc::sync_channel;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -17,6 +20,10 @@ pub struct Engine {
     operations: LinkedHashMap<Uuid, OperationRef>,
     task: AtomicTask,
     stopped: bool,
+
+
+    pool: Mutex<ThreadPool>,
+    operation_queue: VecDeque<OperationRef>,
     logger: slog::Logger,
 }
 
@@ -26,6 +33,8 @@ impl Engine {
         let exec_manager = ExecManager::new(config.clone());
         let resource_manager = ResourceManager::new();
         let ssh_session_cache = SshSessionCache::new(config.clone());
+
+        let pool = ThreadPool::with_name(String::from_str("Engine").unwrap(), 8);
 
         Engine {
             config,
@@ -38,6 +47,10 @@ impl Engine {
             operations: LinkedHashMap::new(),
             task: AtomicTask::new(),
             stopped: false,
+
+
+            pool: Mutex::new(pool),
+            operation_queue: VecDeque::new(),
             logger,
         }
     }
@@ -214,6 +227,32 @@ impl EngineRef {
 
     pub fn cancel_operation(&self, operation: &OperationRef) {
         operation.write().cancel();
+    }
+
+    pub fn run_operation(&mut self, operation: OperationRef) -> Result<Outcome, RuntimeError> {
+
+//        self.write().operation_queue.push_back(operation.clone());
+
+        let pool = self.read().pool.lock().unwrap().clone();
+        let (sender, receiver) = sync_channel(1);
+        let engine = self.clone();
+
+        pool.execute(move ||{
+            let e = engine;
+            let o = operation;
+            match create_operation_impl(&o, &e) {
+                Ok(mut op_impl) => {
+                    sender.send(op_impl.execute()).unwrap();
+                },
+                Err(err) => {
+                    sender.send(Err(err)).unwrap();
+                },
+            }
+        });
+
+        let res = receiver.recv().expect("Operation result sender dropped!");
+
+        res
     }
 }
 

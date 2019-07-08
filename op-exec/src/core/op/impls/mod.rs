@@ -21,6 +21,9 @@ pub trait OperationImpl: Future<Item = Outcome, Error = RuntimeError> + Send + S
     fn on_cancel(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
+
+    /// Executes operation synchronously
+    fn execute(&mut self) -> Result<Outcome, RuntimeError> {Ok(Outcome::Empty)}
 }
 
 pub type OperationImplType = dyn OperationImpl<Item = Outcome, Error = RuntimeError>;

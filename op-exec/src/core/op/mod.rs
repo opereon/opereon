@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::*;
 
 pub use self::context::Context;
-use self::impls::{create_operation_impl, OperationImplType};
+pub use self::impls::{create_operation_impl, OperationImplType};
 pub use self::impls::DiffMethod;
 pub use self::impls::OperationImpl;
 pub use self::outcome::Outcome;
@@ -220,11 +220,11 @@ impl OperationTask {
         operation: OperationRef,
         engine: EngineRef,
     ) -> Result<OperationTask, RuntimeError> {
-        let impl_future = create_operation_impl(&operation, &engine)?;
+        let op_impl = create_operation_impl(&operation, &engine)?;
         Ok(OperationTask {
             operation,
             engine,
-            inner: impl_future,
+            inner: op_impl,
         })
     }
 
