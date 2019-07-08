@@ -16,7 +16,7 @@ impl TemplateResolver {
 }
 
 impl TemplateExecutor for TemplateResolver {
-    fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<TaskResult, RuntimeError> {
+    fn process_template(&mut self, _engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, _log: &OutputLog) -> Result<TaskResult, RuntimeError> {
         let template = {
             let mut f = FileBuffer::open(src_path)?;
             let mut r = f.char_reader();

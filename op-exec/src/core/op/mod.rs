@@ -15,6 +15,7 @@ pub use self::impls::DiffMethod;
 pub use self::impls::OperationImpl;
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
+use std::path::Path;
 
 mod context;
 mod impls;
@@ -76,10 +77,10 @@ impl Operation {
         self.progress_task.notify();
     }
 
-    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
-        self.progress.set_step(step, progress);
-        self.progress_task.notify();
-    }
+//    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
+//        self.progress.set_step(step, progress);
+//        self.progress_task.notify();
+//    }
 
 //    pub(crate) fn update_progress_value(&mut self, value: f64) {
 //        if self.progress.set_value(value) {
@@ -229,10 +230,6 @@ impl OperationTask {
 
     pub fn operation(&self) -> &OperationRef {
         &self.operation
-    }
-
-    pub fn engine(&self) -> &EngineRef {
-        &self.engine
     }
 }
 
@@ -393,28 +390,28 @@ impl OperationExec {
 mod tests {
     use super::*;
 
-    #[test]
-    fn operation_serialize_to_json() {
-        let o = OperationRef::new(
-            Uuid::nil(),
-            "Main operation".into(),
-            Context::ModelCommit(String::from("/home/opereon/model")),
-        );
-        let s = serde_json::to_string(&o).unwrap();
-
-        let json = r#"
-        {
-          "id": "00000000-0000-0000-0000-000000000000",
-          "label": "Main operation",
-          "context": {
-            "type": "model-store",
-            "arg": "/home/opereon/model"
-          }
-        }
-        "#;
-
-        assert!(json_eq!(s, json));
-    }
+//    #[test]
+//    fn operation_serialize_to_json() {
+//        let o = OperationRef::new(
+//            Uuid::nil(),
+//            "Main operation".into(),
+//            Context::ModelCommit(String::from("/home/opereon/model")),
+//        );
+//        let s = serde_json::to_string(&o).unwrap();
+//
+//        let json = r#"
+//        {
+//          "id": "00000000-0000-0000-0000-000000000000",
+//          "label": "Main operation",
+//          "context": {
+//            "type": "model-store",
+//            "arg": "/home/opereon/model"
+//          }
+//        }
+//        "#;
+//
+//        assert!(json_eq!(s, json));
+//    }
 
     #[test]
     fn operation_deserialize_from_json() {

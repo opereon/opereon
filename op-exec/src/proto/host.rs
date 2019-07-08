@@ -89,12 +89,4 @@ mod tests {
 
         assert_eq!(as_host(), host);
     }
-
-    #[test]
-    fn can_serialize() {
-        let host = as_host();
-        let json = serde_json::to_string(&host).unwrap();
-
-        assert!(json_eq!(json, as_json()));
-    }
 }

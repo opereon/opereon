@@ -69,8 +69,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, pred: impl Fn(u8) -> bool, buf: &m
 }
 
 fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
-    let mut file_size: u64 = 0;
-    let mut file_name: String = String::new();
+    let mut file_name: String;
     let mut file_completed = true;
     let mut file_idx = 0;
 
@@ -137,7 +136,6 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
         }
 
         file_name = file_info[0].to_string();
-        file_size = res.unwrap();
 
 
         if file_name.ends_with("/") || file_name.ends_with("/.") {
@@ -201,8 +199,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
             .stderr(Stdio::from(stderr_writer))
             .spawn()?
     };
-
-    let mut status = None;
+    let status;
     loop {
         if let Some(s) = child.try_wait()? {
             status = Some(s);
@@ -276,7 +273,6 @@ impl FileCopyOperation {
     }
 
     fn spawn_std_watchers(&self) -> Result<(PipeWriter, PipeWriter), CommandError>{
-        use std::io::BufRead;
         let (stdout, stdout_writer) = pipe()?;
         let (stderr, stderr_writer) = pipe()?;
 
@@ -303,8 +299,8 @@ impl FileCopyOperation {
             Ok(())
         };
 
-        let hout: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stdout);
-        let herr: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stderr);
+        let _hout: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stdout);
+        let _herr: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stderr);
         Ok((stdout_writer, stderr_writer))
     }
 
@@ -404,7 +400,7 @@ impl Future for FileCopyOperation {
                     Err(RuntimeError::Custom)
                 }
             }
-            Some(Err(ref err)) => {
+            Some(Err(ref _err)) => {
                 Err(RuntimeError::Custom)
             }
             None => Ok(Async::NotReady)

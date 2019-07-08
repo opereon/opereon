@@ -1,4 +1,6 @@
 use super::*;
+use crate::{ProtoError, FileError};
+use kg_diag::{Diag, BasicDiag};
 
 //FIXME (jc)
 #[derive(Debug, Detail)]
@@ -42,7 +44,7 @@ impl From<kg_io::IoError> for RuntimeError {
 
 //FIXME (jc)
 impl From<kg_tree::opath::OpathRuntimeError> for RuntimeError {
-    fn from(err: kg_tree::opath::OpathRuntimeError) -> Self {
+    fn from(_err: kg_tree::opath::OpathRuntimeError) -> Self {
         println!("opath err");
         RuntimeError::Custom
     }
@@ -50,7 +52,7 @@ impl From<kg_tree::opath::OpathRuntimeError> for RuntimeError {
 
 //FIXME (jc)
 impl From<ProtoError> for RuntimeError {
-    fn from(err: ProtoError) -> Self {
+    fn from(_err: ProtoError) -> Self {
         println!("proto err");
         RuntimeError::Custom
     }
@@ -58,7 +60,7 @@ impl From<ProtoError> for RuntimeError {
 
 //FIXME (jc)
 impl From<CommandError> for RuntimeError {
-    fn from(err: CommandError) -> Self {
+    fn from(_err: CommandError) -> Self {
         println!("command err");
         RuntimeError::Custom
     }
@@ -66,7 +68,7 @@ impl From<CommandError> for RuntimeError {
 
 //FIXME (jc)
 impl From<FileError> for RuntimeError {
-    fn from(err: FileError) -> Self {
+    fn from(_err: FileError) -> Self {
         println!("file err");
         RuntimeError::Custom
     }
@@ -74,7 +76,7 @@ impl From<FileError> for RuntimeError {
 
 //FIXME (jc)
 impl From<kg_diag::BasicDiag> for RuntimeError {
-    fn from(err: BasicDiag) -> Self {
+    fn from(_err: BasicDiag) -> Self {
         println!("basic diag err");
         RuntimeError::Custom
     }

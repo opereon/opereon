@@ -1,10 +1,15 @@
-use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::sync::{Arc, Mutex, RwLock};
 
-use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature, Tree};
+
+
+
+use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature};
 
 use super::*;
+use crate::{ConfigRef, ModelConfig};
+use kg_utils::collections::LruCache;
+use std::path::{PathBuf, Path};
+use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
+use kg_io::IoResult;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -154,7 +159,7 @@ impl ModelManager {
 
     pub fn init(&mut self) -> IoResult<()> {
         debug!(self.logger, "Initializing model manager");
-        use std::str::FromStr;
+        
 
         let model_dir = Self::search_manifest(&self.model_dir)?;
         info!(self.logger, "Model dir found {}", model_dir.display());
@@ -179,7 +184,7 @@ impl ModelManager {
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
         // TODO error handling
-        let repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
+        let _repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
 
         // ignore ./op directory
         let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
@@ -214,7 +219,7 @@ impl ModelManager {
         let tree = repo.find_tree(oid).expect("Cannot get tree!");
         let signature = Signature::now("opereon", "example@email.com").unwrap();
 
-        let commit = repo.commit(Some("HEAD"),
+        let _commit = repo.commit(Some("HEAD"),
         &signature,
         &signature,
         message,
@@ -246,7 +251,7 @@ impl ModelManager {
         match *model_path {
             ModelPath::Current => self.current(),
             ModelPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
-            ModelPath::Path(ref path) => unimplemented!(),
+            ModelPath::Path(ref _path) => unimplemented!(),
         }
     }
 

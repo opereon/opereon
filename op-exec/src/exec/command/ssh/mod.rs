@@ -147,6 +147,7 @@ impl SshSession {
         }
     }
 
+    #[allow(dead_code)]
     fn check(&self) -> SshResult<bool> {
         if !self.opened.get() {
             return Err(SshError::SshClosed);
@@ -243,7 +244,7 @@ impl SshSession {
         log.log_cmd(&usr_cmd)?;
 
         let (r_in, mut w_in) = pipe().unwrap();
-        let r = r_in.try_clone().unwrap();
+        let _r = r_in.try_clone().unwrap();
 
         let mut ssh_cmd = self.ssh_cmd()
             .arg("-o").arg("BatchMode=yes")

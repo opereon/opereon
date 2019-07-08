@@ -24,6 +24,7 @@ impl Include {
         &self.path
     }
 
+    #[allow(dead_code)]
     pub fn file_type(&self) -> Option<FileType> {
         self.file_type
     }
@@ -58,6 +59,7 @@ impl Exclude {
         &self.path
     }
 
+    #[allow(dead_code)]
     pub fn file_type(&self) -> Option<FileType> {
         self.file_type
     }
@@ -157,10 +159,12 @@ impl Config {
         }
     }
 
+    #[allow(dead_code)]
     pub fn excludes(&self) -> &Vec<Exclude> {
         &self.excludes
     }
 
+    #[allow(dead_code)]
     pub fn includes(&self) -> &Vec<Include> {
         &self.includes
     }
@@ -259,53 +263,6 @@ pub struct ConfigResolver {
 }
 
 impl ConfigResolver {
-    pub fn scan(model_dir: &Path) -> IoResult<ConfigResolver> {
-        use walkdir::WalkDir;
-
-        let mut cr = ConfigResolver::new(&model_dir);
-        for e in WalkDir::new(&model_dir).into_iter().filter_map(|e| e.ok()) {
-            let ft = e.file_type();
-            if ft.is_dir() {
-                cr.scan_dir(e.path())?;
-            }
-        }
-
-        let mut configs = BTreeMap::new();
-        for path in cr.configs.keys() {
-            let mut config = Config::standard();
-            for (p, c) in cr.configs.iter() {
-                if p.as_os_str().is_empty() || path.starts_with(p) {
-                    if let Some(false) = c.inherit_excludes {
-                        config.excludes.clear();
-                    }
-                    for e in c.excludes.iter() {
-                        config.excludes.push(e.clone().with_base_path(p));
-                    }
-                    if let Some(false) = c.inherit_includes {
-                        config.includes.clear();
-                    }
-                    for i in c.includes.iter() {
-                        config.includes.push(i.clone().with_base_path(p));
-                    }
-                    if let Some(false) = c.inherit_overrides {
-                        config.overrides.clear();
-                    }
-                    for (k, v) in c.overrides.iter() {
-                        config.overrides.insert(k.clone(), v.clone());
-                    }
-                }
-            }
-            configs.insert(path.clone(), config);
-        }
-
-        if !configs.contains_key(Path::new("")) {
-            configs.insert(PathBuf::new(), Config::standard());
-        }
-
-        cr.configs = configs;
-        Ok(cr)
-    }
-
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
         let repo = Repository::open(model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
@@ -384,21 +341,6 @@ impl ConfigResolver {
         self.configs.insert(p.to_path_buf(), config);
     }
 
-    fn scan_dir(&mut self, dir: &Path) -> IoResult<()> {
-        debug_assert!(dir.starts_with(&self.model_dir));
-        let mut content = String::new();
-
-        match fs::read_to_string(dir.join(DEFAULT_CONFIG_FILENAME), &mut content){
-            Err(ref err) if err.kind() == ::std::io::ErrorKind::NotFound => Ok(()),
-            Err(err) => Err(err),
-            Ok(_) => {
-                let config: Config = toml::from_str(&content).unwrap();
-                self.add_file(dir, config);
-                Ok(())
-            }
-        }
-    }
-
     pub fn resolve(&self, path: &Path) -> &Config {
         debug_assert!(path.starts_with(&self.model_dir));
 
@@ -427,7 +369,7 @@ impl ConfigResolver {
 
 #[cfg(test)]
 mod tests {
-    use difference::Changeset;
+    
 
     use super::*;
 

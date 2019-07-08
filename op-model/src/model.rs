@@ -1,15 +1,14 @@
-use std::any::TypeId;
-use std::cmp::Ord;
+use std::any::{TypeId};
+
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc};
 
 use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
-use kg_io::OpType;
+
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use walkdir::WalkDir;
+
 
 use super::*;
 
@@ -108,7 +107,7 @@ impl Model {
         Ok(manifest)
     }
 
-    fn read_revision(mut metadata: Metadata) -> IoResult<Model> {
+    fn read_revision(metadata: Metadata) -> IoResult<Model> {
         let manifest = Model::load_manifest(metadata.path())?;
 
         kg_tree::set_base_path(metadata.path());
@@ -442,7 +441,7 @@ impl ModelLookup {
         }
     }
 
-    fn get_path<T: ModelDef>(&self, root: &NodeRef, node_path: &Opath) -> Option<&T> {
+    fn get_path<T: ModelDef>(&self, _root: &NodeRef, node_path: &Opath) -> Option<&T> {
         if let Some(&p) = self.path_map.get(node_path) {
             p.downcast_ref::<T>()
         } else {

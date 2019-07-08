@@ -1,9 +1,12 @@
-use std::sync::Mutex;
+
 
 use kg_tree::diff::ModelDiff;
 use regex::Regex;
 
 use super::*;
+use kg_tree::opath::Opath;
+use op_model::ModelUpdate;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -80,7 +83,7 @@ impl Future for ModelCommitOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
-        let m = e.model_manager_mut().commit(&self.message)?;
+        let _m = e.model_manager_mut().commit(&self.message)?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }
@@ -121,7 +124,6 @@ impl Future for ModelQueryOperation {
         match Opath::parse(&self.expr) {
             Ok(expr) => {
                 println!("{}", expr);
-                let model_id = m.lock().metadata().id();
                 let res = {
                     let m = m.lock();
                     kg_tree::set_base_path(m.metadata().path());
@@ -430,7 +432,7 @@ pub struct ModelProbeOperation {
 }
 
 impl ModelProbeOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, ssh_dest: SshDest, model_path: ModelPath, filter: Option<String>, args: &[(String, String)]) -> ModelProbeOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, ssh_dest: SshDest, model_path: ModelPath, filter: Option<String>, _args: &[(String, String)]) -> ModelProbeOperation {
         ModelProbeOperation {
             operation,
             engine,

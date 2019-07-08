@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::*;
+use uuid::Uuid;
 
 pub trait Resource: std::fmt::Debug + 'static {
     fn type_id(&self) -> TypeId {
@@ -43,6 +43,7 @@ impl ResourceRef {
     }
 }
 
+#[allow(dead_code)]
 pub struct Lock<'a, R: Resource> {
     guard: MutexGuard<'a, Box<dyn Resource>>,
     value: *mut R,

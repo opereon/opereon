@@ -15,10 +15,10 @@ impl LocalExecutor {
             config,
         }
     }
-
-    fn config(&self) -> &LocalConfig {
-        self.config.exec().command().local()
-    }
+//
+//    fn config(&self) -> &LocalConfig {
+//        self.config.exec().command().local()
+//    }
 
     /*fn exec_command_impl(&mut self,
                          cmd: &str,

@@ -400,15 +400,15 @@ impl CommandBuilder {
         use std::os::unix::process::CommandExt;
 
         if self.setsid {
-            c.before_exec(|| {
-                unsafe {
+            unsafe {
+                c.pre_exec(|| {
                     if libc::setsid() == -1 {
                         Err(std::io::Error::last_os_error())
                     } else {
                         Ok(())
                     }
-                }
-            });
+                });
+            }
         }
     }
 
@@ -462,7 +462,8 @@ mod tests {
 
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
-        let r = resolve_env(&env, &tree, &tree);
+        let scope = ScopeMut::new();
+        let r = resolve_env(&env, &tree, &tree, &scope);
         assert_eq!("localhost.localdomain", r.get("HOST__HOS_TNAME").unwrap())
     }
 
@@ -483,7 +484,8 @@ mod tests {
 
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
-        let r = resolve_env(&env, &tree, &tree);
+        let scope = ScopeMut::new();
+        let r = resolve_env(&env, &tree, &tree, &scope);
 
         assert_eq!("localhost.localdomain", r.get("HOST__HOS_TNAME").unwrap());
         assert_eq!("inner value", r.get("PROP_INN_R1").unwrap());
@@ -506,7 +508,8 @@ mod tests {
 
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
-        let r = resolve_env(&env, &tree, &tree);
+        let scope = ScopeMut::new();
+        let r = resolve_env(&env, &tree, &tree, &scope);
 
         assert_eq!("localhost.localdomain", r.get("HOST_HOSTNAME").unwrap());
         assert_eq!("inner value", r.get("SOME_VAR").unwrap());

@@ -1,12 +1,12 @@
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, ExitStatus};
 use std::str::Utf8Error;
-use std::thread::JoinHandle;
+
 
 use os_pipe::PipeWriter;
 use tokio::prelude::{Async, Future, Poll};
 
-use crate::{Host, RuntimeError};
+use crate::{Host};
 use crate::core::OperationImpl;
 use crate::exec::file::rsync::compare::DiffInfo;
 
@@ -76,6 +76,7 @@ pub struct RsyncParams {
     remote_shell: Option<String>,
 }
 
+#[allow(dead_code)]
 impl RsyncParams {
     pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>, P3: Into<PathBuf>>(current_dir: P1, src_path: P2, dst_path: P3) -> RsyncParams {
         RsyncParams {
@@ -290,7 +291,7 @@ impl FileExecutor for RsyncExecutor {
                  dst_path: &Path,
                  chown: Option<&str>,
                  chmod: Option<&str>,
-                 log: &OutputLog) -> Result<TaskResult, FileError> {
+                 _log: &OutputLog) -> Result<TaskResult, FileError> {
         let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params

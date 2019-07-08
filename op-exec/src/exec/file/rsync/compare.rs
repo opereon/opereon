@@ -296,7 +296,7 @@ fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
         }
 
         let file_path = file_info[0];
-        let file_size = file_info[1].parse::<FileSize>().map_err(|e|ParseError::Line(line!()))?;// FIXME ws
+        let file_size = file_info[1].parse::<FileSize>().map_err(|_e|ParseError::Line(line!()))?;// FIXME ws
 
         let diff = DiffInfo::parse(details, file_path, file_size)?;
         diffs.push(diff);

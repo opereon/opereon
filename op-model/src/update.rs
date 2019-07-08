@@ -1,4 +1,4 @@
-use git2::{DiffFindOptions, DiffOptions, ObjectType, Oid, Repository};
+use git2::{DiffFindOptions, DiffOptions, Oid, Repository};
 
 use super::*;
 
@@ -90,28 +90,28 @@ impl<'a> ModelUpdate<'a> {
                 ChangeKind::Removed => {
                     removed_watches.iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.old_path().unwrap()))
-                        .for_each(|w| {
+                        .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Added => {
                     added_watches.iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.new_path().unwrap()))
-                        .for_each(|w| {
+                        .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Updated => {
                     updated_watches.iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.new_path().unwrap()))
-                        .for_each(|w| {
+                        .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Renamed => {
                     renamed_watches.iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.old_path().unwrap()))
-                        .for_each(|w| {
+                        .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }

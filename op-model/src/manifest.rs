@@ -126,7 +126,7 @@ mod tests {
             d.custom.insert("cust1".into(), Opath::parse("$.cust1").unwrap());
             d.custom.insert("cust2".into(), Opath::parse("$.cust2").unwrap());
 
-            let json = r#"
+            let _json = r#"
             {
               "users": "${$.conf.users.*}",
               "hosts": "${$.conf.hosts.*}",
@@ -136,7 +136,7 @@ mod tests {
             }
             "#;
 
-            let s = serde_json::to_string_pretty(&d).unwrap();
+            let _s = serde_json::to_string_pretty(&d).unwrap();
 //            assert!(json_eq!(json, &s));
         }
 
