@@ -1,21 +1,19 @@
+use std::io::{Cursor, SeekFrom};
+use std::process::{Child, Command};
+use std::thread::JoinHandle;
+
+use rand::Rng;
+use regex::Regex;
+
 use super::*;
+
+pub use self::config::*;
+pub use self::local::*;
+pub use self::ssh::*;
 
 mod local;
 mod ssh;
 mod config;
-
-pub use self::config::*;
-pub use self::ssh::*;
-pub use self::local::*;
-
-
-use std::process::{Child, Command};
-use std::io::{Cursor, SeekFrom};
-use std::thread::JoinHandle;
-
-use regex::Regex;
-use rand::Rng;
-
 
 //FIXME (jc)
 #[derive(Debug, Clone)]

@@ -1,17 +1,17 @@
-use super::*;
-
-use std::path::{Path, PathBuf};
-use std::cmp::Ord;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::io::Read;
 use std::any::TypeId;
+use std::cmp::Ord;
 use std::collections::HashMap;
-
-use walkdir::WalkDir;
-use kg_io::OpType;
-use git2::{Repository, ObjectType, TreeWalkMode, TreeWalkResult, Oid};
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
+use kg_io::OpType;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
+use walkdir::WalkDir;
+
+use super::*;
 
 #[derive(Debug, Serialize)]
 pub struct Model {
@@ -546,8 +546,10 @@ unsafe impl Sync for ModelRef {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
+
     #[test]
     fn read_test() {
         let mut metadata = Metadata::default();

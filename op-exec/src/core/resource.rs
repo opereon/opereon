@@ -1,10 +1,9 @@
-use super::*;
-
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
 use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex, MutexGuard};
 
+use super::*;
 
 pub trait Resource: std::fmt::Debug + 'static {
     fn type_id(&self) -> TypeId {

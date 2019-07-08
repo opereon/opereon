@@ -1,7 +1,6 @@
-use super::*;
-
 use kg_template::parse::Parser;
 
+use super::*;
 
 pub struct TemplateResolver {
     parser: Parser,

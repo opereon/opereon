@@ -1,20 +1,18 @@
-use super::*;
-
-mod config;
-mod dest;
-
-pub use self::config::SshConfig;
-pub use self::dest::{SshDest, SshAuth};
-
-
-use std::process::{Child, Stdio};
+use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::cell::Cell;
 
 use os_pipe::pipe;
 
+use super::*;
+
+pub use self::config::SshConfig;
+pub use self::dest::{SshAuth, SshDest};
+
+mod config;
+mod dest;
 
 #[derive(Debug)]
 pub enum SshError {
@@ -350,8 +348,9 @@ impl CommandExecutor for SshSessionRef {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     lazy_static! {
         static ref LOCK: Mutex<()> = Mutex::new(());

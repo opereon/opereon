@@ -1,19 +1,17 @@
 use super::*;
 
+use self::config::*;
+use self::exec::*;
+use self::model::*;
+pub use self::model::DiffMethod;
+use self::parallel::*;
+use self::sequence::*;
+
 mod config;
 mod model;
 mod exec;
 mod sequence;
 mod parallel;
-
-pub use self::model::DiffMethod;
-
-use self::config::*;
-use self::model::*;
-use self::exec::*;
-use self::sequence::*;
-use self::parallel::*;
-
 
 pub trait OperationImpl: Future<Item = Outcome, Error = RuntimeError> + Send + Sync + Debug {
     fn init(&mut self) -> Result<(), RuntimeError> {

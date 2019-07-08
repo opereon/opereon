@@ -1,6 +1,7 @@
-use super::*;
 use globset::{Glob, GlobBuilder};
 use serde::Serializer;
+
+use super::*;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelWatch {

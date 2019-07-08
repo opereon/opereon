@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize)]
 #[display(fmt = "{name}")]
 pub struct TaskExec {

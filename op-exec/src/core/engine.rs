@@ -1,9 +1,9 @@
-use super::*;
-
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use uuid::Uuid;
+
+use super::*;
 
 #[derive(Debug)]
 pub struct Engine {

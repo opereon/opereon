@@ -1,34 +1,28 @@
-extern crate structopt;
-
 #[macro_use]
 extern crate slog;
-
-use slog::Drain;
-use slog::FnValue;
-
-use structopt::StructOpt;
-use url::Url;
-
-use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
-use op_exec::{SshDest, SshAuth};
+extern crate structopt;
 
 use std::fs;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
 use actix::prelude::*;
+use chrono::{DateTime, FixedOffset, Utc};
+use futures::Future;
+use slog::Drain;
+use slog::FnValue;
+use structopt::StructOpt;
+use url::Url;
 use uuid::Uuid;
 
-use futures::Future;
+use display::DisplayFormat;
+use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
+use op_exec::{SshAuth, SshDest};
+use op_exec::OutcomeFuture;
+use options::*;
 
 mod display;
 mod options;
-
-use display::DisplayFormat;
-use options::*;
-
-use chrono::{Utc, DateTime, FixedOffset};
 
 pub static SHORT_VERSION: &'static str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &'static str = env!("OP_LONG_VERSION");

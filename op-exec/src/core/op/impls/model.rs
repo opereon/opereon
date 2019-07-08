@@ -1,9 +1,9 @@
-use super::*;
-
-use regex::Regex;
+use std::sync::Mutex;
 
 use kg_tree::diff::ModelDiff;
-use std::sync::Mutex;
+use regex::Regex;
+
+use super::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

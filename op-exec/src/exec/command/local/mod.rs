@@ -1,8 +1,8 @@
 use super::*;
 
-mod config;
-
 pub use self::config::LocalConfig;
+
+mod config;
 
 #[derive(Debug)]
 pub struct LocalExecutor {

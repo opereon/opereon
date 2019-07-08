@@ -1,7 +1,6 @@
-use super::*;
-
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use super::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type", content = "arg")]

@@ -1,8 +1,12 @@
-use super::*;
-
 use std::any::TypeId;
 use std::cell::{Cell, RefCell};
 
+use super::*;
+
+pub use self::host::HostDef;
+pub use self::proc::*;
+pub use self::scope::*;
+pub use self::user::UserDef;
 
 //FIXME (jc) collect error kinds, implement DiagsKind
 #[derive(Debug)]
@@ -50,12 +54,6 @@ mod host;
 mod user;
 mod proc;
 mod scope;
-
-pub use self::host::HostDef;
-pub use self::user::UserDef;
-pub use self::proc::*;
-pub use self::scope::*;
-
 
 pub trait ModelDef: Remappable + 'static {
     fn root(&self) -> &NodeRef;

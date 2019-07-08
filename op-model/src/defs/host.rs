@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug, Clone, Serialize)]
 pub struct HostDef {
     #[serde(skip)]

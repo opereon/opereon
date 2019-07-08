@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Host {
     hostname: String,

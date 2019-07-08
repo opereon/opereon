@@ -1,7 +1,6 @@
-use super::*;
-
 use url::Url;
 
+use super::*;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "method")]

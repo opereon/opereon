@@ -1,6 +1,6 @@
-use super::*;
-use git2::{Oid, Repository, DiffOptions, DiffFindOptions, ObjectType};
+use git2::{DiffFindOptions, DiffOptions, ObjectType, Oid, Repository};
 
+use super::*;
 
 #[derive(Debug)]
 pub struct ModelUpdate<'a> {

@@ -1,5 +1,3 @@
-use super::*;
-
 //FIXME (jc)
 #[derive(Debug, Clone)]
 pub enum ProtoError {

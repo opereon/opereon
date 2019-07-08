@@ -1,16 +1,15 @@
+use crate::exec::file::rsync::CompareResult;
+
 use super::*;
+
+pub use self::config::FileConfig;
+pub use self::rsync::FileCopyOperation;
+pub use self::rsync::RsyncConfig;
+use self::rsync::RsyncError;
+use self::rsync::RsyncExecutor;
 
 mod config;
 mod rsync;
-
-pub use self::config::FileConfig;
-pub use self::rsync::RsyncConfig;
-pub use self::rsync::FileCopyOperation;
-
-use self::rsync::RsyncExecutor;
-use self::rsync::RsyncError;
-use crate::exec::file::rsync::CompareResult;
-
 
 //FIXME (jc)
 #[derive(Debug, Clone)]

@@ -1,11 +1,10 @@
-use super::*;
-
 use std::collections::HashMap;
-
-use git2::{Repository, RepositoryInitOptions, IndexAddOption, Index, Oid, ObjectType, Signature, Tree, Commit};
-use std::sync::{Mutex, Arc, RwLock};
 use std::fmt::Formatter;
+use std::sync::{Arc, Mutex, RwLock};
 
+use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature, Tree};
+
+use super::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -317,9 +316,10 @@ impl ModelManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use git2::{DiffFindOptions, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid};
     use git2::build::CheckoutBuilder;
-    use git2::{ObjectType, Oid, DiffOptions, DiffFormat, DiffFindOptions, IndexAddOption, Index};
+
+    use super::*;
 
     #[test]
     fn checkout_to_dir() {

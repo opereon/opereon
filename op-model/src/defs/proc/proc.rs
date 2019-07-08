@@ -1,7 +1,6 @@
-use super::*;
-
 use std::str::FromStr;
 
+use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all="kebab-case")]

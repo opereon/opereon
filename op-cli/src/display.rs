@@ -1,9 +1,11 @@
+use std;
+
 use kg_tree::opath::NodeSet;
-use op_exec::Outcome;
 use serde_json;
 use serde_yaml;
-use std;
 use toml;
+
+use op_exec::Outcome;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum DisplayFormat {

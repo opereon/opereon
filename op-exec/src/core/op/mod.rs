@@ -1,26 +1,25 @@
-use super::*;
-
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{de, ser};
 use uuid::Uuid;
+
+use super::*;
+
+pub use self::context::Context;
+use self::impls::{create_operation_impl, OperationImplType};
+pub use self::impls::DiffMethod;
+pub use self::impls::OperationImpl;
+pub use self::outcome::Outcome;
+pub use self::progress::{Progress, Unit};
 
 mod context;
 mod impls;
 mod outcome;
 mod progress;
-
-pub use self::context::Context;
-pub use self::impls::DiffMethod;
-pub use self::outcome::Outcome;
-pub use self::progress::{Progress, Unit};
-pub use self::impls::OperationImpl;
-
-use self::impls::{create_operation_impl, OperationImplType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Operation {

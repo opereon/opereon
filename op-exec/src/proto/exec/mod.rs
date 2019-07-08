@@ -1,6 +1,12 @@
+use std::cell::RefCell;
+
 use super::*;
 
-use std::cell::RefCell;
+pub use self::args::*;
+pub use self::proc::*;
+pub use self::run::*;
+pub use self::step::*;
+pub use self::task::*;
 
 thread_local!(static EXEC_PATH: RefCell<PathBuf> = RefCell::new(PathBuf::new()));
 
@@ -10,8 +16,3 @@ mod run;
 mod step;
 mod task;
 
-pub use self::args::*;
-pub use self::proc::*;
-pub use self::run::*;
-pub use self::step::*;
-pub use self::task::*;

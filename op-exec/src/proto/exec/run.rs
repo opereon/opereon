@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Serialize, Deserialize)]
 struct AsPath {
     path: String

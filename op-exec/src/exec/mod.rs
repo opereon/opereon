@@ -1,18 +1,18 @@
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::{Arc, Mutex, MutexGuard};
+
 use super::*;
+
+pub use self::command::*;
+pub use self::config::*;
+pub use self::file::*;
+pub use self::file::FileCopyOperation;
+pub use self::template::*;
 
 mod config;
 mod command;
 mod file;
 mod template;
-
-pub use self::config::*;
-pub use self::command::*;
-pub use self::file::*;
-pub use self::template::*;
-pub use self::file::FileCopyOperation;
-
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::io::{Read, Write, Seek, SeekFrom};
 
 pub trait ReadWriteSeek: Read + Write + Seek + 'static { }
 

@@ -1,6 +1,5 @@
 use kg_template::parse::Config;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateConfig {
     kg: Config,

@@ -1,11 +1,11 @@
-use super::*;
-
-use display::DisplayFormat;
 use std::path::PathBuf;
+
 use structopt::clap::AppSettings;
 
+use display::DisplayFormat;
 use op_exec::{DiffMethod, ModelPath};
 
+use super::*;
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
     match s.find('=') {

@@ -1,14 +1,13 @@
-use super::*;
-
-use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
-use kg_tree::serial::{from_tree, to_tree};
-use regex::{Captures, Regex};
-
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
+use kg_tree::serial::{from_tree, to_tree};
+use regex::{Captures, Regex};
 use slog::Level;
+
+use super::*;
 
 pub fn resolve_env_vars(input: &str) -> Cow<str> {
     use std::env;

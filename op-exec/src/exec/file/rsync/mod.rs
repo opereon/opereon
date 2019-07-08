@@ -1,21 +1,23 @@
-use super::*;
+use std::path::PathBuf;
+use std::process::{Command, ExitStatus, Stdio};
+use std::str::Utf8Error;
+use std::thread::JoinHandle;
 
-mod copy;
-mod compare;
-mod config;
+use os_pipe::PipeWriter;
+use tokio::prelude::{Async, Future, Poll};
+
+use crate::{Host, RuntimeError};
+use crate::core::OperationImpl;
+use crate::exec::file::rsync::compare::DiffInfo;
+
+use super::*;
 
 pub use self::config::RsyncConfig;
 pub use self::copy::FileCopyOperation;
 
-use std::path::PathBuf;
-use std::process::{Command, ExitStatus, Stdio};
-use tokio::prelude::{Async, Future, Poll};
-use crate::core::OperationImpl;
-use crate::{Host, RuntimeError};
-use std::thread::JoinHandle;
-use os_pipe::PipeWriter;
-use std::str::Utf8Error;
-use crate::exec::file::rsync::compare::DiffInfo;
+mod copy;
+mod compare;
+mod config;
 
 pub type RsyncResult<T> = Result<T, RsyncError>;
 type FileSize = u64;

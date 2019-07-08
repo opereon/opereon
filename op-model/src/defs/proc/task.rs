@@ -1,7 +1,6 @@
-use super::*;
-
 use std::str::FromStr;
 
+use super::*;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskDef {

@@ -1,10 +1,9 @@
 use super::*;
 
-mod config;
-mod kg;
-
 pub use self::config::TemplateConfig;
 
+mod config;
+mod kg;
 
 pub trait TemplateExecutor {
     fn process_template(&mut self, engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, log: &OutputLog) -> Result<TaskResult, RuntimeError>;

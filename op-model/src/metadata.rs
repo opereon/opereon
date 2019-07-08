@@ -1,11 +1,10 @@
-use super::*;
-
-
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-use serde::{ser, de};
+use serde::{de, ser};
+
+use super::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sha1HashParseError {

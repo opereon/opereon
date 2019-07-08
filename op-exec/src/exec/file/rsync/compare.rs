@@ -1,8 +1,8 @@
-use super::*;
-
 use std::process::{Output, Stdio};
+
 use regex::Regex;
 
+use super::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModFlags {

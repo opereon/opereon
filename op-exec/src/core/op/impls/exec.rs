@@ -1,6 +1,5 @@
 use super::*;
 
-
 fn cleanup_resources(engine: &EngineRef, resource_id: Uuid) {
     engine.write().resource_manager_mut().remove(resource_id);
 }

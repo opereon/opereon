@@ -1,12 +1,12 @@
-use super::*;
-
+use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::cell::{RefCell, Ref};
 
+use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
+use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use toml;
-use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder, Candidate};
-use git2::{Repository, TreeWalkMode, ObjectType, TreeWalkResult};
+
+use super::*;
 
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
 
@@ -427,8 +427,9 @@ impl ConfigResolver {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use difference::Changeset;
+
+    use super::*;
 
     static CONFIG_STANDARD_TOML: &str = indoc!(r#"
     inherit_excludes = true

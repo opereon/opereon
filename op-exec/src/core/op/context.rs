@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "type", content = "arg")]

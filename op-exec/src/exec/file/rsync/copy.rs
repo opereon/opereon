@@ -1,12 +1,14 @@
-use super::*;
-
 use std::io::BufRead;
-use std::thread::JoinHandle;
 use std::process::Stdio;
+use std::thread::JoinHandle;
 use std::time::Duration;
+
 use regex::Regex;
-use crate::RuntimeError;
+
 use crate::exec::file::rsync::compare::State;
+use crate::RuntimeError;
+
+use super::*;
 
 type Loaded = u64;
 
@@ -741,7 +743,7 @@ fn check_file_info(file_info: &Vec<&str>) -> Result<(), ParseError> {
 mod tests {
     use super::*;
 
-    //    #[test]
+//    #[test]
     /*fn send_test() {
         let auth = Auth::new("wsikora", "/home/wsikora/Desktop/id_rsa");
 
