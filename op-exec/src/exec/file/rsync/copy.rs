@@ -4,82 +4,152 @@ use std::io::BufRead;
 use std::thread::JoinHandle;
 use std::process::Stdio;
 use std::time::Duration;
+use regex::Regex;
+use crate::RuntimeError;
+use crate::exec::file::rsync::compare::State;
+
+type Loaded = u64;
+
+#[inline(always)]
+fn check_progress_info(progress_info: &Vec<&str>) -> Result<(), ParseError> {
+    if progress_info.len() == 4 || progress_info.len() == 6 {
+        return Ok(());
+    }
+    Err(ParseError::Line(line!()))
+}
 
 
-fn parse_progress<R: BufRead>(mut out: R) -> Result<(), ParseError> {
+#[inline(always)]
+fn check_file_info(file_info: &Vec<&str>) -> Result<(), ParseError> {
+    if file_info.len() != 2 {
+        return Err(ParseError::Line(line!()))
+    }
+    Ok(())
+}
+
+fn read_until<R: BufRead + ?Sized>(r: &mut R, pred: impl Fn(u8) -> bool, buf: &mut Vec<u8>)
+                                   -> std::io::Result<usize> {
+    let mut read = 0;
+    loop {
+        let (done, used) = {
+            let available = match r.fill_buf() {
+                Ok(n) => n,
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(e)
+            };
+
+            let mut found = None;
+
+            for i in 0..available.len() {
+                if pred(available[i]) {
+                    found = Some(i);
+                    break
+                }
+            }
+
+            match found {
+                Some(i) => {
+                    buf.extend_from_slice(&available[..=i]);
+                    (true, i + 1)
+                }
+                None => {
+                    buf.extend_from_slice(available);
+                    (false, available.len())
+                }
+            }
+        };
+        r.consume(used);
+        read += used;
+        if done || used == 0 {
+            return Ok(read);
+        }
+    }
+}
+
+fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
     let mut file_size: u64 = 0;
     let mut file_name: String = String::new();
     let mut file_completed = true;
+    let mut file_idx = 0;
 
-    /*let lines = stdout.lines()
-        .skip(1); // skip first line: "sending incremental file list"
-
-    let line_endings_reg = Regex::new(r"\n\r|\r|\n").unwrap();
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
 
-    'outer: for res in lines {
-        match res {
-            Ok(line) => {
-                let lines = line_endings_reg.split(&line)
-                    .filter(|s| !s.is_empty());
+    let mut buf = Vec::new();
 
-                'inner: for line in lines {
-                    if !file_completed {
-                        let progress_info = progress_reg.split(line)
-                            .filter(|s| !s.is_empty())
-                            .collect::<Vec<&str>>();
+    let delimiter = |b| { b == b'\n' || b == b'\r' };
 
-                        check_progress_info(&progress_info)?;
-
-                        let loaded_bytes = progress_info[0].replace(",", "");
-                        let loaded_bytes = loaded_bytes.parse::<Loaded>();
-
-                        if loaded_bytes.is_err() {
-                            return Err(ParseError { line: line!() });
-                        }
-                        let loaded_bytes = loaded_bytes.unwrap();
-
-                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
-
-                        if progress_info.len() == 6 {
-                            sent_files.lock().unwrap().push(file_name.clone());
-                            rsync.trigger_on_file_complete(file_name.clone());
-
-                            file_completed = true;
-                        }
-                        continue 'inner;
-                    }
-
-                    let file_info = file_reg.split(line)
-                        .filter(|s| !s.is_empty())
-                        .collect::<Vec<&str>>();
-
-                    check_file_info(&file_info)?;
-
-                    let res = file_info[1].parse::<FileSize>();
-                    if res.is_err() {
-                        return Err(ParseError { line: line!() });
-                    }
-
-                    file_name = file_info[0].to_string();
-                    file_size = res.unwrap();
+    // skip first line: "sending incremental file list"
+    read_until(&mut out, delimiter, &mut buf)?;
+    buf.clear();
 
 
-                    if file_name.ends_with("/") { // no need to notify about directories processing
-                        file_completed = true;
-                        continue 'inner;
-                    }
-                    file_completed = false;
-                    rsync.trigger_on_file_begin(file_name.clone(), file_size);
-                }
-            }
-            Err(err) => {
-                eprintln!("err = {:?}", err);
-                return Err(ParseError { line: line!() });
-            }
+    while read_until(&mut out, delimiter, &mut buf)? != 0 {
+        let line = std::str::from_utf8(buf.as_slice())?;
+        // skip parsing when line is empty
+        if line == "\n" || line == "\r" || line.is_empty(){
+            buf.clear();
+            continue
         }
-    }*/
+        // skip \n or \r at the end of line
+        let line = &line[..line.len()-1];
+
+        if !file_completed && !line.starts_with("[") {
+            let progress_info = progress_reg.split(&line)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>();
+
+            check_progress_info(&progress_info)?;
+
+            let loaded_bytes = progress_info[0].replace(",", "");
+            let loaded_bytes = loaded_bytes.parse::<Loaded>();
+
+            if loaded_bytes.is_err() {
+                Err(ParseError::Line(line!()))?;
+            }
+            let loaded_bytes = loaded_bytes.unwrap() as f64;
+
+            operation.write().update_progress_step_value(file_idx, loaded_bytes);
+
+//            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+
+            if progress_info.len() == 6 {
+//                            eprintln!("file_completed: {:?}", file_name);
+                operation.write().update_progress_step_value_done(file_idx);
+                file_idx +=1;
+                file_completed = true;
+            }
+            buf.clear();
+            continue;
+        }
+
+        let file_info = file_reg.split(&line)
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>();
+
+        check_file_info(&file_info)?;
+
+        let res = file_info[1].parse::<FileSize>();
+        if res.is_err() {
+            Err(ParseError::Line(line!()))?;
+        }
+
+        file_name = file_info[0].to_string();
+        file_size = res.unwrap();
+
+
+        if file_name.ends_with("/") || file_name.ends_with("/.") {
+            // directory - no progress value
+            operation.write().update_progress_step_value_done(file_idx);
+
+            file_completed = true;
+            file_idx +=1;
+            buf.clear();
+            continue;
+        }
+        file_completed = false;
+        buf.clear()
+    }
     Ok(())
 }
 
@@ -122,7 +192,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
             .arg("--recursive")
             .arg("--links") // copy symlinks as symlinks
             .arg("--times") // preserve modification times
-            .arg("--out-format=[%f][%l]")
+            .arg("--out-format=[%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
             .env("TERM", "xterm-256color")
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout_writer))
@@ -147,6 +217,207 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
 
     Ok(TaskResult::new(Outcome::Empty, status.code(), None))
 }
+
+#[derive(Debug)]
+pub struct FileCopyOperation {
+    operation: OperationRef,
+    engine: EngineRef,
+    bin_id: Uuid,
+    curr_dir: PathBuf,
+    src_path: PathBuf,
+    dst_path: PathBuf,
+    chown: Option<String>,
+    chmod: Option<String>,
+    host: Host,
+    status: Arc<Mutex<Option<Result<ExitStatus, RuntimeError>>>>,
+    running: bool
+}
+
+impl FileCopyOperation {
+    pub fn new(operation: OperationRef,
+               engine: EngineRef,
+               bin_id: Uuid,
+               curr_dir: &Path,
+               src_path: &Path,
+               dst_path: &Path,
+               chown: &Option<String>,
+               chmod: &Option<String>,
+               host: &Host) -> FileCopyOperation {
+        FileCopyOperation {
+            operation,
+            engine,
+            bin_id,
+            curr_dir: curr_dir.to_owned(),
+            src_path: src_path.to_owned(),
+            dst_path: dst_path.to_owned(),
+            chown: chown.as_ref().map(|s|s.to_string()),
+            chmod: chmod.as_ref().map(|s|s.to_string()),
+            host: host.clone(),
+            status: Arc::new(Mutex::new(None)),
+            running: false
+        }
+    }
+
+    fn prepare_params(&self) -> Result<RsyncParams, CommandError>{
+        let ssh_session = self.engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
+        let mut params = RsyncParams::new(&self.curr_dir, &self.src_path, &self.dst_path);
+        params
+            //.dst_hostname(self.host.ssh_dest().hostname())
+            .remote_shell(ssh_session.read().remote_shell_call());
+        if let Some(chown) = &self.chown {
+            params.chown(chown.to_owned());
+        }
+        if let Some(chmod) = &self.chmod {
+            params.chmod(chmod.to_owned());
+        }
+        Ok(params)
+    }
+
+    fn spawn_std_watchers(&self) -> Result<(PipeWriter, PipeWriter), CommandError>{
+        use std::io::BufRead;
+        let (stdout, stdout_writer) = pipe()?;
+        let (stderr, stderr_writer) = pipe()?;
+
+        let operation = self.operation.clone();
+
+        let run_stdout = move || {
+            let mut buf = BufReader::new(stdout);
+
+            if let Err(err) = parse_progress(&mut buf, operation){
+                println!("Error parsing rsync progress: {:?}", err)
+            };
+            Ok(())
+        };
+
+        let run_stderr = move || {
+            let buf = BufReader::new(stderr);
+
+            for line in buf.lines() {
+                match line {
+                    Ok(line) => println!("err: {}", line),
+                    Err(err) => return Err(err),
+                }
+            }
+            Ok(())
+        };
+
+        let hout: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stdout);
+        let herr: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stderr);
+        Ok((stdout_writer, stderr_writer))
+    }
+
+    fn start_copying(&mut self) -> Result<(), RuntimeError>{
+        let params = self.prepare_params()?;
+        let config = self.engine.read().config().exec().file().rsync().clone();
+        let (stdout, stderr) = self.spawn_std_watchers()?;
+
+        let status = self.status.clone();
+        let operation = self.operation.clone();
+
+        std::thread::spawn(move || {
+            let execute_cmd = move || -> Result<ExitStatus, RuntimeError> {
+                let mut command = params.to_cmd(&config);
+                command.arg("--progress")
+                        .arg("--super") // fail on permission denied
+                        .arg("--recursive")
+                        .arg("--links") // copy symlinks as symlinks
+                        .arg("--times") // preserve modification times
+                        .arg("--out-format=[%f][%l]")
+                        .env("TERM", "xterm-256color")
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::from(stdout))
+                        .stderr(Stdio::from(stderr));
+
+//                eprintln!("command = {:?}", command);
+
+                let mut child = command.spawn()?;
+                    Ok(child.wait()?)
+            };
+
+            match execute_cmd() {
+                Ok(stat) => {
+                    *status.lock().unwrap() = Some(Ok(stat))
+                }
+                Err(err) => {
+                    *status.lock().unwrap() = Some(Err(err))
+                }
+            }
+            operation.write().notify()
+        });
+        Ok(())
+    }
+
+    fn calculate_progress(&mut self) -> Result<(), RuntimeError> {
+        let mut executor = create_file_executor(&self.host, &self.engine)?;
+
+        let result = executor.file_compare(&self.engine,
+                                           &self.curr_dir,
+                                           &self.src_path,
+                                           &self.dst_path,
+                                           self.chown.as_ref().map(|s| s.as_ref()),
+                                           self.chmod.as_ref().map(|s| s.as_ref()),
+                                           false)?;
+
+        let mut progresses = vec![];
+
+        for diff in result.diffs() {
+            match diff.state() {
+                State::Missing | State::Modified(_) => {
+                    let file_max = diff.file_size() as f64;
+                    progresses.push(Progress::with_file_name(0., file_max, Unit::Bytes, diff.file_path().to_string_lossy().into()))
+                },
+                _ => {}
+            }
+        }
+
+        let total_progress = Progress::from_steps(progresses);
+
+        self.operation.write().set_progress(total_progress);
+
+        Ok(())
+    }
+
+    pub fn status(&self) -> MutexGuard<Option<Result<ExitStatus, RuntimeError>>>{
+        self.status.lock().unwrap()
+    }
+}
+
+impl Future for FileCopyOperation {
+    type Item = Outcome;
+    type Error = RuntimeError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if !self.running {
+            self.start_copying()?;
+
+            self.running = true;
+            return Ok(Async::NotReady)
+        }
+
+        match *self.status() {
+            Some(Ok(ref status)) =>{
+                if status.success() {
+                    Ok(Async::Ready(Outcome::Empty))
+                } else {
+                    Err(RuntimeError::Custom)
+                }
+            }
+            Some(Err(ref err)) => {
+                Err(RuntimeError::Custom)
+            }
+            None => Ok(Async::NotReady)
+        }
+    }
+}
+
+impl OperationImpl for FileCopyOperation {
+    fn init(&mut self) -> Result<(), RuntimeError> {
+        // FIXME blocking call - implement as future
+        self.calculate_progress()?;
+        Ok(())
+    }
+}
+
 
 
 /*

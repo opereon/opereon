@@ -207,7 +207,7 @@ impl ModelManager {
     /// Commit current model
     pub fn commit(&mut self, message: &str) -> IoResult<ModelRef> {
         // TODO ws error handling
-        let mut repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
 
         let oid = Self::update_index(&mut index)?;
@@ -280,7 +280,7 @@ impl ModelManager {
     /// Returns current model - model represented by content of the git index
     pub fn current(&mut self) -> IoResult<ModelRef> {
         // TODO ws error handling
-        let mut repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
 
         let oid = Self::update_index(&mut index)?;

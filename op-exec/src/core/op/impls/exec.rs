@@ -55,7 +55,7 @@ impl Future for ProcExecOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress_value(p.value());
+            self.operation.write().update_progress(p);
         }
         if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
             cleanup_resources(&self.engine, self.operation.read().id());
@@ -121,7 +121,7 @@ impl Future for StepExecOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress_value(p.value());
+            self.operation.write().update_progress(p);
         }
         if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
             cleanup_resources(&self.engine, self.operation.read().id());
@@ -171,7 +171,7 @@ impl Future for TaskExecOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(ref mut op) = self.proc_op {
             if let Async::Ready(Some(p)) = op.progress_mut().poll()? {
-                self.operation.write().update_progress_value(p.value());
+                self.operation.write().update_progress(p);
             }
             if let Async::Ready(outcome) = op.outcome_mut().poll()? {
                 Ok(Async::Ready(outcome))
@@ -328,14 +328,17 @@ impl Future for TaskExecOperation {
                         let dst_path: PathBuf = scope.get_var_value_or_default("dst_path", &src_path);
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
-                        let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
-                        executor.file_compare(&self.engine,
-                                              base_path,
-                                              &src_path,
-                                              &dst_path,
-                                              chown.as_ref().map(|s| s.as_ref()),
-                                              chmod.as_ref().map(|s| s.as_ref()),
-                                              &output)?
+                        let op: OperationRef = Context::FileCopyExec {
+                            bin_id: self.bin_id,
+                            curr_dir: base_path.to_path_buf(),
+                            src_path,
+                            dst_path,
+                            chown,
+                            chmod,
+                            host: step_exec.host().clone()
+                        }.into();
+                        self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
+                        return self.poll();
                     }
                     TaskKind::FileCompare => {
                         let src_path: PathBuf = scope.get_var_value("src_path")?;
@@ -344,13 +347,12 @@ impl Future for TaskExecOperation {
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
                         let mut executor = create_file_executor(step_exec.host(), &self.engine)?;
-                        executor.file_copy(&self.engine,
+                        executor.file_compare(&self.engine,
                                            base_path,
                                            &src_path,
                                            &dst_path,
                                            chown.as_ref().map(|s| s.as_ref()),
-                                           chmod.as_ref().map(|s| s.as_ref()),
-                                           &output)?
+                                           chmod.as_ref().map(|s| s.as_ref()), true)?.into_task_result()
                     }
                 };
 

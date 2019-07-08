@@ -251,6 +251,7 @@ fn prepare_script<W: Write>(
     Ok(())
 }
 
+// TODO reuse in copy.rs
 
 fn execute(
     mut child: Child,

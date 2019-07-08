@@ -9,6 +9,7 @@ pub use self::config::*;
 pub use self::command::*;
 pub use self::file::*;
 pub use self::template::*;
+pub use self::file::FileCopyOperation;
 
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::io::{Read, Write, Seek, SeekFrom};

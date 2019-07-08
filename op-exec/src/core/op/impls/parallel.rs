@@ -36,7 +36,8 @@ impl Future for ParallelOperation {
         for (i, s) in self.steps.iter_mut().enumerate() {
             if self.outcomes[i].is_none() {
                 if let Async::Ready(Some(p)) = s.progress.poll()? {
-                    self.operation.write().update_progress_step_value(i, p.value());
+                    self.operation.write().update_progress( p);
+//                    self.operation.write().update_progress_step(i, p);
                 }
                 if let Async::Ready(outcome) = s.outcome.poll()? {
                     self.outcomes[i] = Some(outcome);

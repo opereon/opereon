@@ -5,16 +5,27 @@ mod compare;
 mod config;
 
 pub use self::config::RsyncConfig;
+pub use self::copy::FileCopyOperation;
 
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, ExitStatus, Stdio};
+use tokio::prelude::{Async, Future, Poll};
+use crate::core::OperationImpl;
+use crate::{Host, RuntimeError};
+use std::thread::JoinHandle;
+use os_pipe::PipeWriter;
+use std::str::Utf8Error;
+use crate::exec::file::rsync::compare::DiffInfo;
 
 pub type RsyncResult<T> = Result<T, RsyncError>;
+type FileSize = u64;
 
 #[derive(Debug)]
-pub struct ParseError {
-    line: u32
+pub enum ParseError {
+    Line(u32),
 }
+
+
 
 #[derive(Debug)]
 pub enum RsyncError {
@@ -22,8 +33,14 @@ pub enum RsyncError {
     RsyncProcessTerminated,
     ParseError(ParseError),
     SshError(SshError),
+    Utf8Error(Utf8Error),
 }
 
+impl From<Utf8Error> for RsyncError {
+    fn from(err: Utf8Error) -> Self {
+        RsyncError::Utf8Error(err)
+    }
+}
 impl From<ParseError> for RsyncError {
     fn from(err: ParseError) -> Self {
         RsyncError::ParseError(err)
@@ -183,6 +200,46 @@ impl RsyncExecutor {
     }
 }
 
+#[derive(Debug)]
+pub struct CompareResult {
+    diffs: Vec<DiffInfo>,
+    status: Option<i32>,
+    signal: Option<i32>,
+}
+
+impl CompareResult {
+    pub fn new (diffs: Vec<DiffInfo>, status: Option<i32>, signal: Option<i32>) -> Self {
+        Self {
+            diffs,
+            status,
+            signal
+        }
+    }
+    pub fn is_success(&self) -> bool {
+        if let Some(status) = self.status {
+            status == 0
+        } else {
+            false
+        }
+    }
+
+    pub fn diffs(&self) -> &Vec<DiffInfo> {
+        &self.diffs
+    }
+
+    pub fn status(&self) -> Option<i32> {
+        self.status
+    }
+
+    pub fn signal(&self) -> Option<i32> {
+        self.signal
+    }
+
+    pub fn into_task_result(self) -> TaskResult {
+        TaskResult::new(Outcome::Empty, self.status, self.signal)
+    }
+}
+
 impl FileExecutor for RsyncExecutor {
     fn file_compare(&mut self,
                     engine: &EngineRef,
@@ -191,7 +248,7 @@ impl FileExecutor for RsyncExecutor {
                     dst_path: &Path,
                     chown: Option<&str>,
                     chmod: Option<&str>,
-                    log: &OutputLog) -> Result<TaskResult, FileError> {
+                    checksum: bool) -> Result<CompareResult, FileError> {
         let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
@@ -204,9 +261,9 @@ impl FileExecutor for RsyncExecutor {
             params.chmod(chmod);
         }
 
-        let diffs = self::rsync::compare::rsync_compare(self.config(), &params)?;
+        let diffs = self::rsync::compare::rsync_compare(self.config(), &params, checksum)?;
         let mut result = 0;
-        for diff in diffs {
+        for diff in &diffs {
             if diff.state().is_modified_chown() {
                 println!("{}: incorrect owner/group", diff.file_path().display());
                 result = std::cmp::max(result, 1);
@@ -221,7 +278,7 @@ impl FileExecutor for RsyncExecutor {
             }
         }
 
-        Ok(TaskResult::new(Outcome::Empty, Some(result), None))
+        Ok(CompareResult::new(diffs, Some(result), None))
     }
 
     fn file_copy(&mut self,

@@ -1,6 +1,7 @@
 use super::*;
 
 use std::process::{Output, Stdio};
+use regex::Regex;
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -26,12 +27,12 @@ impl ModFlags {
             } else if b == b'?' {
                 Ok(None)
             } else {
-                Err(ParseError { line: line!() }) //FIXME (jc)
+                Err(ParseError::Line(line!())) //FIXME (jc)
             }
         }
 
         if s.len() != 9 {
-            Err(ParseError { line: line!() }) //FIXME (jc)
+            Err(ParseError::Line(line!())) //FIXME (jc)
         } else {
             Ok(ModFlags {
                 checksum: parse_flag(s[0], b'c')?,
@@ -163,7 +164,7 @@ impl FileType {
             b'L' => Ok(FileType::Symlink),
             b'D' => Ok(FileType::Device),
             b'S' => Ok(FileType::Special),
-            _ => Err(ParseError { line: line!() }),
+            _ => Err(ParseError::Line(line!())),
         }
     }
 }
@@ -174,20 +175,29 @@ pub struct DiffInfo {
     state: State,
     file_type: Option<FileType>,
     file_path: PathBuf,
+    /// Size of file in destination location
+    file_size: FileSize
 }
 
 impl DiffInfo {
-    pub fn parse(details: &[u8], file_path: &str) -> Result<DiffInfo, ParseError> {
+    pub fn parse(details: &[u8], file_path: &str, file_size: FileSize) -> Result<DiffInfo, ParseError> {
         let (file_type, state) = {
             if details == b"*deleting  " {
                 (None, State::Extraneous)
             } else {
                 let file_type = FileType::parse(details[1])?;
                 let mod_flags = &details[2..];
-                let state = if mod_flags == b"+++++++++" {
-                    State::Missing
-                } else {
-                    State::Modified(ModFlags::parse(mod_flags)?)
+
+                let state = match mod_flags {
+                    b"+++++++++" => {
+                        State::Missing
+                    }
+                    b"         " => {
+                        State::Identical
+                    }
+                    _ => {
+                        State::Modified(ModFlags::parse(mod_flags)?)
+                    }
                 };
                 (Some(file_type), state)
             }
@@ -197,6 +207,7 @@ impl DiffInfo {
             file_path: file_path.into(),
             file_type,
             state,
+            file_size
         })
     }
 
@@ -208,13 +219,17 @@ impl DiffInfo {
         self.file_type
     }
 
+    pub fn file_size(&self) -> FileSize {
+        self.file_size
+    }
+
     pub fn state(&self) -> &State {
         &self.state
     }
 }
 
 
-pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<Vec<DiffInfo>> {
+pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams, checksum: bool) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = params.to_cmd(config);
 
     rsync_cmd
@@ -222,14 +237,17 @@ pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<
         .arg("--recursive")
         .arg("--dry-run") // perform a trial run with no changes made
         .arg("--super") // assume super-user rights. Necessary for owner checking
-        .arg("--checksum") // skip based on checksum, not mod-time & size.
         .arg("--archive") // equals -rlptgoD (no -H,-A,-X)
         .arg("--delete") // delete extraneous files from dest dirs
         .arg("-ii") // output unchanged files
-        .arg("--out-format=###%i %f")
+        .arg("--out-format=###%i [%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    if checksum {
+        rsync_cmd.arg("--checksum"); // skip based on checksum, not mod-time & size.
+    }
 
     let output = rsync_cmd.output()?;
 
@@ -265,8 +283,22 @@ fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
         }
     });
 
-    for (details, file_path) in items {
-        let diff = DiffInfo::parse(details, file_path)?;
+    let file_reg = Regex::new(r"[\[\]]").unwrap();
+
+    for (details, rest) in items {
+
+        let file_info = file_reg.split(rest)
+            .filter(|s|!s.is_empty())
+            .collect::<Vec<&str>>();
+
+        if file_info.len() != 2 {
+            return Err(ParseError::Line(line!())) // FIXME ws
+        }
+
+        let file_path = file_info[0];
+        let file_size = file_info[1].parse::<FileSize>().map_err(|e|ParseError::Line(line!()))?;// FIXME ws
+
+        let diff = DiffInfo::parse(details, file_path, file_size)?;
         diffs.push(diff);
     }
 
@@ -338,7 +370,7 @@ total size is 2,099  speedup is 1.33 (DRY RUN)
         let mut p = RsyncParams::new( "./","../op-model/test-data/model2/", "../op-model/test-data/model1/");
         p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.opereon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
 
-        let diffs = rsync_compare(&config, &p).unwrap();
+        let diffs = rsync_compare(&config, &p, true).unwrap();
         println!("{}", diffs.len());
         for d in diffs {
             println!("{:?}", d);

@@ -18,6 +18,7 @@ pub use self::context::Context;
 pub use self::impls::DiffMethod;
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
+pub use self::impls::OperationImpl;
 
 use self::impls::{create_operation_impl, OperationImplType};
 
@@ -71,28 +72,43 @@ impl Operation {
         &self.context
     }
 
-    pub(super) fn update_progress_value(&mut self, value: f64) {
-        if self.progress.set_value(value) {
-            self.progress_task.notify();
-        }
+    pub (crate) fn update_progress(&mut self, progress: Progress) {
+        self.progress = progress;
+        self.progress_task.notify();
     }
 
-    pub(super) fn update_progress_value_done(&mut self) {
-        if self.progress.set_value_done() {
-            self.progress_task.notify();
-        }
+    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
+        self.progress.set_step(step, progress);
+        self.progress_task.notify();
     }
 
-    pub(super) fn update_progress_step_value(&mut self, step: usize, value: f64) {
+//    pub(crate) fn update_progress_value(&mut self, value: f64) {
+//        if self.progress.set_value(value) {
+//            self.progress_task.notify();
+//        }
+//    }
+//
+//    pub(crate) fn update_progress_value_done(&mut self) {
+//        if self.progress.set_value_done() {
+//            self.progress_task.notify();
+//        }
+//    }
+//
+    pub(crate) fn update_progress_step_value(&mut self, step: usize, value: f64) {
         if self.progress.set_step_value(step, value) {
             self.progress_task.notify();
         }
     }
 
-    pub(super) fn update_progress_step_value_done(&mut self, step: usize) {
+    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
         if self.progress.set_step_value_done(step) {
             self.progress_task.notify();
         }
+    }
+
+    pub(crate) fn set_progress(&mut self, progress: Progress) {
+        self.progress = progress;
+        self.progress_task.notify()
     }
 
     pub fn is_blocked(&self) -> bool {
@@ -110,6 +126,10 @@ impl Operation {
     pub fn cancel(&mut self) {
         self.cancelled = true;
         self.outcome_task.notify();
+    }
+
+    pub fn notify(&mut self) {
+        self.task.notify();
     }
 }
 
@@ -237,7 +257,7 @@ impl Future for OperationTask {
                 Ok(Async::Ready(outcome)) => {
                     let mut o = self.operation.write();
                     o.outcome = Some(Ok(outcome));
-                    o.update_progress_value_done();
+//                    o.update_progress_value_done();
                 }
                 Err(err) => {
                     self.operation.write().outcome = Some(Err(err));
@@ -266,6 +286,10 @@ impl OutcomeFuture {
 
     pub fn into_exec(self) -> OperationExec {
         OperationExec::new(self)
+    }
+
+    pub fn progress(&self) -> ProgressStream {
+        ProgressStream::new(self.operation.clone())
     }
 }
 
