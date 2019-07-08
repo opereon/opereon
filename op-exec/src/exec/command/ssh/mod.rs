@@ -229,7 +229,7 @@ impl SshSession {
         if !self.opened.get() {
             return Err(SshError::SshClosed);
         }
-        
+
         let mut usr_cmd = if let Some(user) = run_as {
             let mut cmd = CommandBuilder::new(self.config().runas_cmd());
             cmd.arg("-u").arg(user).arg(self.config().shell_cmd());

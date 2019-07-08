@@ -1,6 +1,6 @@
 [package]
 name = "op-cli"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
 workspace = ".."
 edition = "2018"
@@ -8,25 +8,25 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-kg-diag = "0.1.0"
-kg-tree = "0.1.1"
-kg-utils = "0.2.3"
-op-exec = { path = "../op-exec" }
-structopt = "0.2.15"
-futures = "0.1.27"
-serde = "1.0.91"
-serde_derive = "1.0.91"
-serde_json = "1.0.39"
+kg-diag = "0.1.1"
+kg-tree = "0.1.3"
+kg-utils = "0.2.4"
+op-exec = { version = "0.1.1", path = "../op-exec" }
+structopt = "0.2.18"
+futures = "0.1.28"
+serde = "1.0.94"
+serde_derive = "1.0.94"
+serde_json = "1.0.40"
 serde_yaml = "0.8.9"
 toml = "0.5.1"
 uuid = { version = "0.7.4", features = ["serde"] }
-actix = "0.8.2"
+actix = "0.8.3"
 actix_derive = "0.4.0"
 slog = "2.4.1"
 slog-term = "2.4.0"
 slog-async = "2.3.0"
 url = "1.7.2"
-chrono = "0.4.6"
+chrono = "0.4.7"
 
 [dev-dependencies]
 
