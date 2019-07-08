@@ -81,7 +81,7 @@ impl FuncCallable for LoadFileFunc {
         Ok(())
     }
 
-    fn clone(&self) -> Box<FuncCallable> {
+    fn clone(&self) -> Box<dyn FuncCallable> {
         Box::new(std::clone::Clone::clone(self))
     }
 }
@@ -450,7 +450,7 @@ impl ModelLookup {
         }
     }
 
-    fn put(&mut self, def: &ModelDef) {
+    fn put(&mut self, def: &dyn ModelDef) {
         self.node_map.insert(def.node().data_ptr(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
         self.path_map.insert(def.node().path(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
     }
@@ -460,12 +460,12 @@ impl std::fmt::Debug for ModelLookup {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use std::raw::TraitObject;
 
-        struct ModelDefDebug(&'static ModelDef);
+        struct ModelDefDebug(&'static dyn ModelDef);
 
         impl std::fmt::Debug for ModelDefDebug {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 let type_id = self.0.type_id();
-                let ptr = unsafe { std::mem::transmute::<&ModelDef, TraitObject>(self.0).data };
+                let ptr = unsafe { std::mem::transmute::<&dyn ModelDef, TraitObject>(self.0).data };
                 if type_id == TypeId::of::<Model>() {
                     write!(f, "Model<{:p}>", ptr)
                 } else if type_id == TypeId::of::<HostDef>() {

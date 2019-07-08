@@ -11,6 +11,6 @@ pub trait TemplateExecutor {
 }
 
 
-pub fn create_template_executor(_host: &Host, engine: &EngineRef) -> Result<Box<TemplateExecutor>, RuntimeError> {
+pub fn create_template_executor(_host: &Host, engine: &EngineRef) -> Result<Box<dyn TemplateExecutor>, RuntimeError> {
     Ok(Box::new(self::kg::TemplateResolver::new(engine.clone())))
 }

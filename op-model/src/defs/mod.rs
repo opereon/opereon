@@ -68,10 +68,10 @@ pub trait ModelDef: Remappable + 'static {
     }
 }
 
-impl ModelDef {
+impl dyn ModelDef {
     pub(super) fn downcast_ref<T: ModelDef>(&self) -> Option<&T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const ModelDef as *const T)) }
+            unsafe { Some(&*(self as *const dyn ModelDef as *const T)) }
         } else {
             None
         }
@@ -95,7 +95,7 @@ pub(crate) trait AsScoped: 'static {
 }
 
 
-fn get_expr<T: Primitive>(def: &ModelDef, expr: &str) -> T {
+fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> T {
     let expr = Opath::parse(expr).unwrap();
     match expr.apply(def.root(), def.node()).into_one() {
         Some(n) => T::get(&n),

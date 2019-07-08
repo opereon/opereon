@@ -25,7 +25,7 @@ pub trait OperationImpl: Future<Item = Outcome, Error = RuntimeError> + Send + S
     }
 }
 
-pub type OperationImplType = OperationImpl<Item = Outcome, Error = RuntimeError>;
+pub type OperationImplType = dyn OperationImpl<Item = Outcome, Error = RuntimeError>;
 
 pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Result<Box<OperationImplType>, RuntimeError> {
     let mut op_impl: Box<OperationImplType> = match *operation.read().context() {

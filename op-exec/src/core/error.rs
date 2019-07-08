@@ -14,11 +14,11 @@ pub enum RuntimeError {
 }
 
 impl Diag for RuntimeError {
-    fn cause(&self) -> Option<&Diag> {
+    fn cause(&self) -> Option<&dyn Diag> {
         unimplemented!()
     }
 
-    fn cause_mut(&mut self) -> Option<&mut Diag> {
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         unimplemented!()
     }
 }

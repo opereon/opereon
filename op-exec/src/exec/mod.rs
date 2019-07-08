@@ -20,14 +20,14 @@ impl<T: Read + Write + Seek + 'static> ReadWriteSeek for T { }
 
 
 #[derive(Clone)]
-pub struct OutputLog(Arc<Mutex<Box<ReadWriteSeek>>>);
+pub struct OutputLog(Arc<Mutex<Box<dyn ReadWriteSeek>>>);
 
 impl OutputLog {
     pub fn new<B: ReadWriteSeek>(inner: B) -> OutputLog {
         OutputLog(Arc::new(Mutex::new(Box::new(inner))))
     }
 
-    fn lock(&self) -> MutexGuard<Box<ReadWriteSeek>> {
+    fn lock(&self) -> MutexGuard<Box<dyn ReadWriteSeek>> {
         self.0.lock().unwrap()
     }
 

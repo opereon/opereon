@@ -12,10 +12,10 @@ pub trait Resource: std::fmt::Debug + 'static {
     }
 }
 
-impl Resource {
+impl dyn Resource {
     pub fn downcast_ref<T: Resource>(&self) -> Option<&T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const Resource as *const T)) }
+            unsafe { Some(&*(self as *const dyn Resource as *const T)) }
         } else {
             None
         }
@@ -23,7 +23,7 @@ impl Resource {
 
     pub fn downcast_mut<T: Resource>(&mut self) -> Option<&mut T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&mut *(self as *mut Resource as *mut T)) }
+            unsafe { Some(&mut *(self as *mut dyn Resource as *mut T)) }
         } else {
             None
         }
@@ -31,7 +31,7 @@ impl Resource {
 }
 
 
-pub struct ResourceRef(Arc<Mutex<Box<Resource>>>);
+pub struct ResourceRef(Arc<Mutex<Box<dyn Resource>>>);
 
 impl ResourceRef {
     pub fn lock<R: Resource>(&self) -> Lock<R> {
@@ -45,7 +45,7 @@ impl ResourceRef {
 }
 
 pub struct Lock<'a, R: Resource> {
-    guard: MutexGuard<'a, Box<Resource>>,
+    guard: MutexGuard<'a, Box<dyn Resource>>,
     value: *mut R,
 }
 
@@ -71,7 +71,7 @@ impl<'a, R: Resource> DerefMut for Lock<'a, R> {
 
 #[derive(Debug)]
 pub struct ResourceManager {
-    resources: HashMap<Uuid, Arc<Mutex<Box<Resource>>>>,
+    resources: HashMap<Uuid, Arc<Mutex<Box<dyn Resource>>>>,
 }
 
 impl ResourceManager {
@@ -85,8 +85,8 @@ impl ResourceManager {
         ResourceRef(self.resources.get(&id).expect("resource not found").clone())
     }
 
-    pub fn put(&mut self, id: Uuid, resource: Box<Resource>) {
-        self.resources.insert(id, Arc::new(Mutex::new(resource as Box<Resource>)));
+    pub fn put(&mut self, id: Uuid, resource: Box<dyn Resource>) {
+        self.resources.insert(id, Arc::new(Mutex::new(resource as Box<dyn Resource>)));
     }
 
     pub fn remove(&mut self, id: Uuid) {

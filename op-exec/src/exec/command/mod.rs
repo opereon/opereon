@@ -114,7 +114,7 @@ pub trait CommandExecutor {
 }
 
 
-pub fn create_command_executor(host: &Host, engine: &EngineRef) -> Result<Box<CommandExecutor>, CommandError> {
+pub fn create_command_executor(host: &Host, engine: &EngineRef) -> Result<Box<dyn CommandExecutor>, CommandError> {
     let e = engine.write().ssh_session_cache_mut().get(host.ssh_dest())?;
     Ok(Box::new(e))
 }
