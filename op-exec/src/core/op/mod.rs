@@ -99,12 +99,12 @@ impl Operation {
             self.progress_task.notify();
         }
     }
-//
-//    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
-//        if self.progress.set_step_value_done(step) {
-//            self.progress_task.notify();
-//        }
-//    }
+
+    pub(crate) fn update_progress_step_value_done(&mut self, step: usize) {
+        if self.progress.set_step_value_done(step) {
+            self.progress_task.notify();
+        }
+    }
 
     pub(crate) fn set_progress(&mut self, progress: Progress) {
         self.progress = progress;

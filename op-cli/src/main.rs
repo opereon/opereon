@@ -66,20 +66,25 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");
 
-    let x = outcome_fut.progress()
+    let progress_fut = outcome_fut.progress()
         .for_each(|p| {
             println!("=========================================");
-//            eprintln!("Value: {}/{}", p.value(), p.max());
-//            for p in p.steps() {
-//                eprintln!("#####Sub value: {}/{}", p.value(), p.max());
-//            }
-
-            eprintln!("p = {:#?}", p);
-
+            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
+            for p in p.steps() {
+                if let Some(ref file_name) = p.file_name() {
+                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
+                } else {
+                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
+                }
+            }
+//            eprintln!("p = {:#?}", p);
             Ok(())
         });
 
-    Arbiter::spawn(x.map_err(|_err| ()));
+    Arbiter::spawn(progress_fut.map_err(|err| {
+        eprintln!("err = {:?}", err);
+    }
+    ));
 
     Arbiter::spawn(engine.clone().then(|_| {
         // Nothing to do when engine future complete

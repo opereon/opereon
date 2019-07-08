@@ -113,13 +113,9 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
 
 //            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
 
-//                        rsync.trigger_on_progress(loaded_bytes, file_size, file_name.clone());
-
             if progress_info.len() == 6 {
-//                            sent_files.lock().unwrap().push(file_name.clone());
-//                            rsync.trigger_on_file_complete(file_name.clone());
 //                            eprintln!("file_completed: {:?}", file_name);
-
+                operation.write().update_progress_step_value_done(file_idx);
                 file_idx +=1;
                 file_completed = true;
             }
@@ -142,7 +138,10 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
         file_size = res.unwrap();
 
 
-        if file_name.ends_with("/") || file_name.ends_with("/.") { // no need to notify about directories processing
+        if file_name.ends_with("/") || file_name.ends_with("/.") {
+            // directory - no progress value
+            operation.write().update_progress_step_value_done(file_idx);
+
             file_completed = true;
             file_idx +=1;
             buf.clear();
@@ -282,18 +281,8 @@ impl FileCopyOperation {
         let operation = self.operation.clone();
 
         let run_stdout = move || {
-//            let mut buf = BufReader::new(stdout);
             let mut buf = BufReader::new(stdout);
 
-//            for line in buf.lines() {
-//                match line {
-//                    Ok(line) => {
-//                        println!("out: {:?}", line);
-//                        operation.write().update_progress_value(1.0);
-//                    },
-//                    Err(err) => return Err(err),
-//                }
-//            }
             if let Err(err) = parse_progress(&mut buf, operation){
                 println!("Error parsing rsync progress: {:?}", err)
             };
@@ -375,7 +364,7 @@ impl FileCopyOperation {
             match diff.state() {
                 State::Missing | State::Modified(_) => {
                     let file_max = diff.file_size() as f64;
-                    progresses.push(Progress::new(0., file_max, Unit::Bytes))
+                    progresses.push(Progress::with_file_name(0., file_max, Unit::Bytes, diff.file_path().to_string_lossy().into()))
                 },
                 _ => {}
             }

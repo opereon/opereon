@@ -36,7 +36,8 @@ impl Future for SequenceOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if let Some(s) = self.current_step.take() {
             if let Async::Ready(Some(p)) = self.steps[s].progress.poll()? {
-                self.operation.write().update_progress_step(self.outcomes.len(), p)
+                self.operation.write().update_progress( p)
+//                self.operation.write().update_progress_step(self.outcomes.len(), p)
             }
             match self.steps[s].outcome.poll()? {
                 Async::NotReady => {
