@@ -4,9 +4,7 @@ use super::*;
 pub struct ParallelOperation {
     engine: EngineRef,
     operation: OperationRef,
-    count: usize,
-
-    steps_sync: Vec<OperationRef>
+    steps: Vec<OperationRef>
 }
 
 impl ParallelOperation {
@@ -14,9 +12,7 @@ impl ParallelOperation {
         Ok(ParallelOperation {
             engine,
             operation,
-            count: 0,
-
-            steps_sync: steps
+            steps
         })
     }
 }
@@ -29,7 +25,7 @@ impl OperationImpl for ParallelOperation {
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut running_ops = vec![];
 
-        for op in self.steps_sync.drain(..) {
+        for op in self.steps.drain(..) {
             let out = self.engine.start_operation(op);
             running_ops.push(out);
         }

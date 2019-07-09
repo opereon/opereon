@@ -26,7 +26,6 @@ impl ProcExecOperation {
         Ok(ProcExecOperation {
             operation,
             engine,
-
             bin_id,
             exec_path: exec_path.to_path_buf()
         })

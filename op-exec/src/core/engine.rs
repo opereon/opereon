@@ -197,7 +197,7 @@ impl EngineRef {
         self.start_operation(operation).receive()
     }
 
-    ///Start operation and return result receiver.
+    /// Start operation and immediately return result receiver.
     pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {
 //        self.write().operation_queue.push_back(operation.clone());
 

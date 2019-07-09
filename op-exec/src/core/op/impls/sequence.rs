@@ -4,9 +4,8 @@ use super::*;
 pub struct SequenceOperation {
     engine: EngineRef,
     operation: OperationRef,
-    current_step: Option<usize>,
 
-    steps_sync: Vec<OperationRef>,
+    steps: Vec<OperationRef>,
 }
 
 impl SequenceOperation {
@@ -14,8 +13,7 @@ impl SequenceOperation {
         Ok(SequenceOperation {
             engine,
             operation,
-            current_step: None,
-            steps_sync: steps
+            steps
         })
     }
 }
@@ -28,7 +26,7 @@ impl OperationImpl for SequenceOperation {
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut outcomes = vec![];
 
-        for op in self.steps_sync.drain(..) {
+        for op in self.steps.drain(..) {
             let out = self.engine.execute_operation(op)?;
             outcomes.push(out);
         }
