@@ -105,11 +105,8 @@ impl SshSession {
     }
 
     fn ssh_cmd(&self) -> CommandBuilder {
-        let url = self.dest.to_url();
-
         let mut cmd = CommandBuilder::new(self.config().ssh_cmd());
-        cmd.arg(url);
-        self.dest.auth().set_auth(&mut cmd);
+        self.dest.set_dest(&mut cmd);
 
         cmd.arg("-S").arg(self.socket_path.to_str().unwrap())
             .arg("-T")

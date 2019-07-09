@@ -97,6 +97,16 @@ impl SshDest {
         }
     }
 
+    pub fn set_dest(&self, cmd: &mut CommandBuilder) {
+        cmd.arg(format!("{username}@{hostname}",
+                        username = self.username,
+                        hostname = self.hostname));
+        if self.port != 22 {
+            cmd.arg("-p").arg(self.port.to_string());
+        }
+        self.auth.set_auth(cmd);
+    }
+
     pub (crate) fn to_id_string(&self) -> String {
         format!("{username}-{hostname}-{port}",
                     username = self.username,
