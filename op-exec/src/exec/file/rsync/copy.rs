@@ -68,7 +68,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, pred: impl Fn(u8) -> bool, buf: &m
     }
 }
 
-fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
+fn parse_progress<R: BufRead>(mut out: R, engine: EngineRef, mut progress: Progress) -> Result<(), RsyncError> {
     let mut file_name = String::new();
     let mut file_completed = true;
     let mut file_idx = 0;
@@ -110,14 +110,17 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
             }
             let loaded_bytes = loaded_bytes.unwrap() as f64;
 
-            operation.write().update_progress_step_value(file_idx, loaded_bytes);
+            progress.set_step_value(file_idx, loaded_bytes);
+            engine.write().notify_progress(progress.clone());
 
 //            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
             eprintln!("File: {} : {}", file_name, loaded_bytes );
 
             if progress_info.len() == 6 {
 //                            eprintln!("file_completed: {:?}", file_name);
-                operation.write().update_progress_step_value_done(file_idx);
+//                engine.write().update_progress_step_value_done(file_idx);
+                progress.set_step_value_done(file_idx);
+                engine.write().notify_progress(progress.clone());
                 file_idx +=1;
                 file_completed = true;
             }
@@ -141,7 +144,9 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
 
         if file_name.ends_with("/") || file_name.ends_with("/.") {
             // directory - no progress value
-            operation.write().update_progress_step_value_done(file_idx);
+//            engine.write().update_progress_step_value_done(file_idx);
+            progress.set_step_value_done(file_idx);
+            engine.write().notify_progress(progress.clone());
 
             file_completed = true;
             file_idx +=1;
@@ -230,7 +235,9 @@ pub struct FileCopyOperation {
     chmod: Option<String>,
     host: Host,
     status: Arc<Mutex<Option<Result<ExitStatus, RuntimeError>>>>,
-    running: bool
+    running: bool,
+
+    progress: Progress,
 }
 
 impl FileCopyOperation {
@@ -254,7 +261,9 @@ impl FileCopyOperation {
             chmod: chmod.as_ref().map(|s|s.to_string()),
             host: host.clone(),
             status: Arc::new(Mutex::new(None)),
-            running: false
+            running: false,
+
+            progress: Progress::default()
         }
     }
 
@@ -277,12 +286,14 @@ impl FileCopyOperation {
         let (stdout, stdout_writer) = pipe()?;
         let (stderr, stderr_writer) = pipe()?;
 
-        let operation = self.operation.clone();
+        let engine = self.engine.clone();
+
+        let initial_progress = self.progress.clone();
 
         let run_stdout = move || {
             let mut buf = BufReader::new(stdout);
 
-            if let Err(err) = parse_progress(&mut buf, operation){
+            if let Err(err) = parse_progress(&mut buf, engine, initial_progress){
                 println!("Error parsing rsync progress: {:?}", err)
             };
             Ok(())
@@ -371,7 +382,7 @@ impl FileCopyOperation {
 
         let total_progress = Progress::from_steps(progresses);
 
-        self.operation.write().set_progress(total_progress);
+        self.progress = total_progress;
 
         Ok(())
     }
@@ -441,6 +452,7 @@ impl OperationImpl for FileCopyOperation {
         if res.success() {
             Ok(Outcome::Empty)
         } else {
+            eprintln!("Rsync command error = {:?}", res);
             // FIXME ws error handling
             Err(RuntimeError::Custom)
         }

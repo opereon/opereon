@@ -72,7 +72,7 @@ impl OperationImpl for ParallelOperation {
 
         let mut outcomes = Vec::with_capacity(running_ops.len());
         for rec in running_ops {
-            // fail
+            // fail on first error
             outcomes.push(rec.receive()?)
         }
         Ok(Outcome::Many(outcomes))

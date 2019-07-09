@@ -16,7 +16,7 @@ use url::Url;
 use uuid::Uuid;
 
 use display::DisplayFormat;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
+use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath, ProgressReceiver};
 use op_exec::{SshAuth, SshDest};
 use op_exec::OutcomeFuture;
 use options::*;
@@ -51,13 +51,33 @@ fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
 
+fn print_progress(receiver: ProgressReceiver) {
+
+    std::thread::spawn(move ||{
+        while let Some(p) = receiver.receive() {
+            println!("=========================================");
+            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
+            for p in p.steps() {
+                if let Some(ref file_name) = p.file_name() {
+                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
+                } else {
+                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
+                }
+            }
+        }
+//            eprintln!("p = {:#?}", p);
+    });
+}
+
 /// start engine and execute provided operation
 fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
     let logger = init_file_logger(&config);
 
     let mut engine = check(EngineRef::start(current_dir, config, logger.clone()));
+    print_progress(engine.write().progress_receiver());
 
     let result = engine.execute_operation(operation.into());
+
 
     match result {
         Ok(outcome) => {

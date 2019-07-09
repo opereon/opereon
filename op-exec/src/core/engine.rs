@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use super::*;
 use threadpool::ThreadPool;
-use std::sync::mpsc::sync_channel;
+use std::sync::mpsc::{sync_channel, Sender};
 use std::str::FromStr;
 use std::sync::mpsc::Receiver;
 
@@ -23,6 +23,8 @@ pub struct Engine {
     stopped: bool,
 
 
+    progress_receiver: Mutex<Option<Receiver<Progress>>>,
+    progress_sender: Mutex<Option<Sender<Progress>>>,
     pool: Mutex<ThreadPool>,
     operation_queue: VecDeque<OperationRef>,
     logger: slog::Logger,
@@ -49,7 +51,8 @@ impl Engine {
             task: AtomicTask::new(),
             stopped: false,
 
-
+            progress_receiver: Mutex::new(None),
+            progress_sender: Mutex::new(None),
             pool: Mutex::new(pool),
             operation_queue: VecDeque::new(),
             logger,
@@ -58,6 +61,23 @@ impl Engine {
 
     pub fn config(&self) -> &ConfigRef {
         &self.config
+    }
+
+    pub fn progress_receiver(&mut self) -> ProgressReceiver {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        *self.progress_sender.lock().unwrap() = Some(sender);
+        receiver.into()
+    }
+
+    pub fn notify_progress(&self, progress: Progress){
+        let mut receiver_exists = false;
+        if let Some(ref s) = *self.progress_sender.lock().unwrap() {
+            receiver_exists = s.send(progress).is_ok()
+        }
+
+        if !receiver_exists {
+            *self.progress_sender.lock().unwrap() = None;
+        }
     }
 
     pub fn model_manager(&self) -> &ModelManager {
@@ -273,6 +293,20 @@ impl OperationResultReceiver {
 
 impl From<Receiver<Result<Outcome, RuntimeError>>> for OperationResultReceiver {
     fn from(receiver: Receiver<Result<Outcome, RuntimeError>>) -> Self {
+        Self(receiver)
+    }
+}
+
+pub struct ProgressReceiver(Receiver<Progress>);
+
+impl ProgressReceiver {
+    pub fn receive(&self) -> Option<Progress>{
+        self.0.recv().ok()
+    }
+}
+
+impl From<Receiver<Progress>> for ProgressReceiver {
+    fn from(receiver: Receiver<Progress>) -> Self {
         Self(receiver)
     }
 }
