@@ -159,10 +159,6 @@ impl Progress {
     pub fn file_name(&self) -> Option<&String> {
         self.file_name.as_ref()
     }
-
-    pub (super) fn counter(&self) -> u32 {
-        self.counter
-    }
 }
 
 impl Default for Progress {

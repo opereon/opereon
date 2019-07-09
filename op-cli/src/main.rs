@@ -6,9 +6,7 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use actix::prelude::*;
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::Future;
 use slog::Drain;
 use slog::FnValue;
 use structopt::StructOpt;
@@ -18,7 +16,6 @@ use uuid::Uuid;
 use display::DisplayFormat;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath, ProgressReceiver};
 use op_exec::{SshAuth, SshDest};
-use op_exec::OutcomeFuture;
 use options::*;
 
 mod display;
@@ -88,50 +85,6 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         }
     }
     engine.stop()
-
-//    let outcome_fut: OutcomeFuture = engine
-//        .enqueue_operation(operation.into(), false)
-//        .expect("Cannot enqueue operation");
-//
-//    let progress_fut = outcome_fut.progress()
-//        .for_each(|p| {
-//            println!("=========================================");
-//            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-//            for p in p.steps() {
-//                if let Some(ref file_name) = p.file_name() {
-//                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-//                } else {
-//                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-//                }
-//            }
-////            eprintln!("p = {:#?}", p);
-//            Ok(())
-//        });
-//
-//    Arbiter::spawn(progress_fut.map_err(|err| {
-//        eprintln!("err = {:?}", err);
-//    }
-//    ));
-//
-//    Arbiter::spawn(engine.clone().then(|_| {
-//        // Nothing to do when engine future complete
-//        System::current().stop();
-//        futures::future::ok(())
-//    }));
-//
-//    let outcome_fut = outcome_fut
-//        .and_then(move |outcome| {
-//            display::display_outcome(&outcome, disp_format);
-//            futures::future::ok(())
-//        })
-//        .map_err(move |err| {
-//            error!(logger, "Operation execution error = {:?}", err);
-//        })
-//        .then(move |_| {
-//            engine.stop();
-//            futures::future::ok(())
-//        });
-//    Arbiter::spawn(outcome_fut);
 }
 
 fn init_file_logger(config: &ConfigRef) -> slog::Logger {
@@ -304,9 +257,6 @@ fn main() {
             ExecContext::ModelInit
         }
     };
-    local_run(model_dir_path, config, cmd, disp_format);
 
-//    actix::System::run(move || {
-//        local_run(model_dir_path, config, cmd, disp_format);
-//    }).unwrap();
+    local_run(model_dir_path, config, cmd, disp_format);
 }

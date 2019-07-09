@@ -4,7 +4,6 @@ use std::str::Utf8Error;
 
 
 use os_pipe::PipeWriter;
-use tokio::prelude::{Async, Future, Poll};
 
 use crate::{Host};
 use crate::core::OperationImpl;

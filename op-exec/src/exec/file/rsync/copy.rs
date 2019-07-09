@@ -316,47 +316,6 @@ impl FileCopyOperation {
         Ok((stdout_writer, stderr_writer))
     }
 
-    fn start_copying(&mut self) -> Result<(), RuntimeError>{
-        let params = self.prepare_params()?;
-        let config = self.engine.read().config().exec().file().rsync().clone();
-        let (stdout, stderr) = self.spawn_std_watchers()?;
-
-        let status = self.status.clone();
-        let operation = self.operation.clone();
-
-        std::thread::spawn(move || {
-            let execute_cmd = move || -> Result<ExitStatus, RuntimeError> {
-                let mut command = params.to_cmd(&config);
-                command.arg("--progress")
-                        .arg("--super") // fail on permission denied
-                        .arg("--recursive")
-                        .arg("--links") // copy symlinks as symlinks
-                        .arg("--times") // preserve modification times
-                        .arg("--out-format=[%f][%l]")
-                        .env("TERM", "xterm-256color")
-                        .stdin(Stdio::null())
-                        .stdout(Stdio::from(stdout))
-                        .stderr(Stdio::from(stderr));
-
-//                eprintln!("command = {:?}", command);
-
-                let mut child = command.spawn()?;
-                    Ok(child.wait()?)
-            };
-
-            match execute_cmd() {
-                Ok(stat) => {
-                    *status.lock().unwrap() = Some(Ok(stat))
-                }
-                Err(err) => {
-                    *status.lock().unwrap() = Some(Err(err))
-                }
-            }
-            operation.write().notify()
-        });
-        Ok(())
-    }
-
     fn calculate_progress(&mut self) -> Result<(), RuntimeError> {
         let mut executor = create_file_executor(&self.host, &self.engine)?;
 
@@ -389,34 +348,6 @@ impl FileCopyOperation {
 
     pub fn status(&self) -> MutexGuard<Option<Result<ExitStatus, RuntimeError>>>{
         self.status.lock().unwrap()
-    }
-}
-
-impl Future for FileCopyOperation {
-    type Item = Outcome;
-    type Error = RuntimeError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if !self.running {
-            self.start_copying()?;
-
-            self.running = true;
-            return Ok(Async::NotReady)
-        }
-
-        match *self.status() {
-            Some(Ok(ref status)) =>{
-                if status.success() {
-                    Ok(Async::Ready(Outcome::Empty))
-                } else {
-                    Err(RuntimeError::Custom)
-                }
-            }
-            Some(Err(ref _err)) => {
-                Err(RuntimeError::Custom)
-            }
-            None => Ok(Async::NotReady)
-        }
     }
 }
 
