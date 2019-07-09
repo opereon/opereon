@@ -78,7 +78,7 @@ impl OperationImpl for SequenceOperation {
         let mut outcomes = vec![];
 
         for op in self.steps_sync.drain(..) {
-            let out = self.engine.run_operation(op)?;
+            let out = self.engine.execute_operation(op)?;
             outcomes.push(out);
         }
 

@@ -55,50 +55,63 @@ fn make_path_absolute(path: &Path) -> PathBuf {
 fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
     let logger = init_file_logger(&config);
 
-    let engine = check(EngineRef::start(current_dir, config, logger.clone()));
-    let outcome_fut: OutcomeFuture = engine
-        .enqueue_operation(operation.into(), false)
-        .expect("Cannot enqueue operation");
+    let mut engine = check(EngineRef::start(current_dir, config, logger.clone()));
 
-    let progress_fut = outcome_fut.progress()
-        .for_each(|p| {
-            println!("=========================================");
-            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-            for p in p.steps() {
-                if let Some(ref file_name) = p.file_name() {
-                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-                } else {
-                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-                }
-            }
-//            eprintln!("p = {:#?}", p);
-            Ok(())
-        });
+    let result = engine.execute_operation(operation.into());
 
-    Arbiter::spawn(progress_fut.map_err(|err| {
-        eprintln!("err = {:?}", err);
+    match result {
+        Ok(outcome) => {
+            display::display_outcome(&outcome, disp_format)
+        }
+        Err(err) => {
+            eprintln!("Error executing operation = {:?}", err);
+        }
     }
-    ));
+    engine.stop()
 
-    Arbiter::spawn(engine.clone().then(|_| {
-        // Nothing to do when engine future complete
-        System::current().stop();
-        futures::future::ok(())
-    }));
-
-    let outcome_fut = outcome_fut
-        .and_then(move |outcome| {
-            display::display_outcome(&outcome, disp_format);
-            futures::future::ok(())
-        })
-        .map_err(move |err| {
-            error!(logger, "Operation execution error = {:?}", err);
-        })
-        .then(move |_| {
-            engine.stop();
-            futures::future::ok(())
-        });
-    Arbiter::spawn(outcome_fut);
+//    let outcome_fut: OutcomeFuture = engine
+//        .enqueue_operation(operation.into(), false)
+//        .expect("Cannot enqueue operation");
+//
+//    let progress_fut = outcome_fut.progress()
+//        .for_each(|p| {
+//            println!("=========================================");
+//            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
+//            for p in p.steps() {
+//                if let Some(ref file_name) = p.file_name() {
+//                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
+//                } else {
+//                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
+//                }
+//            }
+////            eprintln!("p = {:#?}", p);
+//            Ok(())
+//        });
+//
+//    Arbiter::spawn(progress_fut.map_err(|err| {
+//        eprintln!("err = {:?}", err);
+//    }
+//    ));
+//
+//    Arbiter::spawn(engine.clone().then(|_| {
+//        // Nothing to do when engine future complete
+//        System::current().stop();
+//        futures::future::ok(())
+//    }));
+//
+//    let outcome_fut = outcome_fut
+//        .and_then(move |outcome| {
+//            display::display_outcome(&outcome, disp_format);
+//            futures::future::ok(())
+//        })
+//        .map_err(move |err| {
+//            error!(logger, "Operation execution error = {:?}", err);
+//        })
+//        .then(move |_| {
+//            engine.stop();
+//            futures::future::ok(())
+//        });
+//    Arbiter::spawn(outcome_fut);
 }
 
 fn init_file_logger(config: &ConfigRef) -> slog::Logger {
@@ -271,8 +284,9 @@ fn main() {
             ExecContext::ModelInit
         }
     };
+    local_run(model_dir_path, config, cmd, disp_format);
 
-    actix::System::run(move || {
-        local_run(model_dir_path, config, cmd, disp_format);
-    }).unwrap();
+//    actix::System::run(move || {
+//        local_run(model_dir_path, config, cmd, disp_format);
+//    }).unwrap();
 }

@@ -23,7 +23,7 @@ pub trait OperationImpl: Future<Item = Outcome, Error = RuntimeError> + Send + S
     }
 
     /// Executes operation synchronously
-    fn execute(&mut self) -> Result<Outcome, RuntimeError> {Ok(Outcome::Empty)}
+    fn execute(&mut self) -> Result<Outcome, RuntimeError>;
 }
 
 pub type OperationImplType = dyn OperationImpl<Item = Outcome, Error = RuntimeError>;

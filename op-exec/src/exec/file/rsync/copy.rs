@@ -69,7 +69,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, pred: impl Fn(u8) -> bool, buf: &m
 }
 
 fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
-    let mut file_name: String;
+    let mut file_name = String::new();
     let mut file_completed = true;
     let mut file_idx = 0;
 
@@ -113,6 +113,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
             operation.write().update_progress_step_value(file_idx, loaded_bytes);
 
 //            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+            eprintln!("File: {} : {}", file_name, loaded_bytes );
 
             if progress_info.len() == 6 {
 //                            eprintln!("file_completed: {:?}", file_name);
@@ -410,9 +411,40 @@ impl Future for FileCopyOperation {
 
 impl OperationImpl for FileCopyOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
-        // FIXME blocking call - implement as future
-        self.calculate_progress()?;
         Ok(())
+    }
+
+    fn execute(&mut self) -> Result<Outcome, RuntimeError> {
+        self.calculate_progress()?;
+
+        let params = self.prepare_params()?;
+        let config = self.engine.read().config().exec().file().rsync().clone();
+        let (stdout, stderr) = self.spawn_std_watchers()?;
+
+        let mut command = params.to_cmd(&config);
+        command.arg("--progress")
+            .arg("--super") // fail on permission denied
+            .arg("--recursive")
+            .arg("--links") // copy symlinks as symlinks
+            .arg("--times") // preserve modification times
+            .arg("--out-format=[%f][%l]")
+            .env("TERM", "xterm-256color")
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr));
+
+//                eprintln!("command = {:?}", command);
+
+        let mut child = command.spawn()?;
+        let res = child.wait()?;
+
+        if res.success() {
+            Ok(Outcome::Empty)
+        } else {
+            // FIXME ws error handling
+            Err(RuntimeError::Custom)
+        }
+
     }
 }
 

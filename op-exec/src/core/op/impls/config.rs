@@ -25,5 +25,10 @@ impl Future for ConfigGetOperation {
     }
 }
 
-impl OperationImpl for ConfigGetOperation { }
+impl OperationImpl for ConfigGetOperation {
+    fn execute(&mut self) -> Result<Outcome, RuntimeError>{
+        let config = to_tree(self.engine.read().config().deref()).unwrap();
+        Ok(Outcome::NodeSet(config.into()))
+    }
+}
 

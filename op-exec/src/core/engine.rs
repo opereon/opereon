@@ -7,6 +7,7 @@ use super::*;
 use threadpool::ThreadPool;
 use std::sync::mpsc::sync_channel;
 use std::str::FromStr;
+use std::sync::mpsc::Receiver;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -113,7 +114,9 @@ impl Engine {
         self.task.notify();
 
         // TODO save queue etc...
-        info!(self.logger, "Stopping engine.");
+        info!(self.logger, "Stopping engine...");
+        self.pool.lock().unwrap().join();
+
     }
 }
 
@@ -229,8 +232,13 @@ impl EngineRef {
         operation.write().cancel();
     }
 
-    pub fn run_operation(&mut self, operation: OperationRef) -> Result<Outcome, RuntimeError> {
+    /// Start operation and wait for result.
+    pub fn execute_operation(&mut self, operation: OperationRef) -> Result<Outcome, RuntimeError> {
+        self.start_operation(operation).receive()
+    }
 
+    ///Start operation and return result receiver.
+    pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {
 //        self.write().operation_queue.push_back(operation.clone());
 
         let pool = self.read().pool.lock().unwrap().clone();
@@ -238,21 +246,34 @@ impl EngineRef {
         let engine = self.clone();
 
         pool.execute(move ||{
-            let e = engine;
-            let o = operation;
-            match create_operation_impl(&o, &e) {
+            let send_res = match create_operation_impl(&operation, &engine) {
                 Ok(mut op_impl) => {
-                    sender.send(op_impl.execute()).unwrap();
+                    sender.send(op_impl.execute())
                 },
                 Err(err) => {
-                    sender.send(Err(err)).unwrap();
+                    sender.send(Err(err))
                 },
+            };
+            if let Err(_err) = send_res {
+                // receiver dropped
+                info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
             }
         });
+        receiver.into()
+    }
+}
 
-        let res = receiver.recv().expect("Operation result sender dropped!");
+pub struct OperationResultReceiver(Receiver<Result<Outcome, RuntimeError>>);
 
-        res
+impl OperationResultReceiver {
+    pub fn receive(self) -> Result<Outcome, RuntimeError>{
+        self.0.recv().expect("Operation result sender dropped!")
+    }
+}
+
+impl From<Receiver<Result<Outcome, RuntimeError>>> for OperationResultReceiver {
+    fn from(receiver: Receiver<Result<Outcome, RuntimeError>>) -> Self {
+        Self(receiver)
     }
 }
 
