@@ -344,10 +344,6 @@ impl FileCopyOperation {
 }
 
 impl OperationImpl for FileCopyOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         self.calculate_progress()?;
 

@@ -14,20 +14,19 @@ mod sequence;
 mod parallel;
 
 pub trait OperationImpl: Send + Sync + Debug {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn on_cancel(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
 
     /// Executes operation synchronously
     fn execute(&mut self) -> Result<Outcome, RuntimeError>;
+
+    fn reexecute(&mut self, nested_op: OperationRef) -> Result<Outcome, RuntimeError> { unimplemented!() }
 }
 
+// FIXME ws do not return Result
 pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Result<Box<dyn OperationImpl>, RuntimeError> {
-    let mut op_impl: Box<dyn OperationImpl> = match *operation.read().context() {
+    let op_impl: Box<dyn OperationImpl> = match *operation.read().context() {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
         Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(operation.clone(), engine.clone(), path)),
         Context::ModelQuery { ref model, ref expr } => Box::new(ModelQueryOperation::new(operation.clone(), engine.clone(), model.clone(), expr.clone())),
@@ -36,7 +35,7 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::ModelUpdate { ref prev_model, ref next_model, dry_run } => Box::new(ModelUpdateOperation::new(operation.clone(), engine.clone(), prev_model.clone(), next_model.clone(), dry_run)),
         Context::ModelCheck { ref model, ref filter, dry_run } => Box::new(ModelCheckOperation::new(operation.clone(), engine.clone(), model.clone(), filter.clone(), dry_run)),
         Context::ModelProbe { ref ssh_dest, ref model, ref filter, ref args } => Box::new(ModelProbeOperation::new(operation.clone(), engine.clone(), ssh_dest.clone(), model.clone(), filter.clone(), args)),
-        Context::ProcExec { bin_id, ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path)?),
+        Context::ProcExec { bin_id, ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path)),
         Context::StepExec { bin_id, ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index)?),
         Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
@@ -44,8 +43,6 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
         Context::FileCopyExec { bin_id, ref curr_dir, ref src_path, ref dst_path, ref chown, ref chmod, ref host} => Box::new(FileCopyOperation::new(operation.clone(), engine.clone(), bin_id, curr_dir, src_path, dst_path, chown, chmod, host)),
     };
-
-    op_impl.init()?;
 
     Ok(op_impl)
 }

@@ -43,10 +43,6 @@ impl ModelInitOperation {
 }
 
 impl OperationImpl for ModelInitOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut e = self.engine.write();
         e.model_manager_mut().init_model().unwrap();
@@ -72,10 +68,6 @@ impl ModelCommitOperation {
 }
 
 impl OperationImpl for ModelCommitOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut e = self.engine.write();
         let _m = e.model_manager_mut().commit(&self.message)?;
@@ -105,10 +97,6 @@ impl ModelQueryOperation {
 }
 
 impl OperationImpl for ModelQueryOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut e = self.engine.write();
         let m = e.model_manager_mut().resolve(&self.model_path)?;
@@ -151,10 +139,6 @@ impl ModelTestOperation {
 }
 
 impl OperationImpl for ModelTestOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut e = self.engine.write();
         let m = e.model_manager_mut().resolve(&self.model_path)?;
@@ -186,10 +170,6 @@ impl ModelDiffOperation {
 }
 
 impl OperationImpl for ModelDiffOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut e = self.engine.write();
         let m1 = e.model_manager_mut().resolve(&self.source)?;
@@ -225,10 +205,6 @@ impl ModelUpdateOperation {
 }
 
 impl OperationImpl for ModelUpdateOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut proc_ops = Vec::new();
         {
@@ -304,10 +280,6 @@ impl ModelCheckOperation {
 }
 
 impl OperationImpl for ModelCheckOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let filter_re = if let Some(ref filter) = self.filter {
             match Regex::new(filter) {
@@ -381,10 +353,6 @@ impl ModelProbeOperation {
 }
 
 impl OperationImpl for ModelProbeOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let filter_re = if let Some(ref filter) = self.filter {
             match Regex::new(filter) {

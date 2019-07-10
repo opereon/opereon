@@ -22,22 +22,18 @@ unsafe impl Send for ProcExecOperation {}
 
 
 impl ProcExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path) -> Result<ProcExecOperation, RuntimeError> {
-        Ok(ProcExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path) -> ProcExecOperation {
+        ProcExecOperation {
             operation,
             engine,
             bin_id,
             exec_path: exec_path.to_path_buf()
-        })
+        }
     }
 }
 
 
 impl OperationImpl for ProcExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let exec_path = &self.exec_path;
         let exec = self.engine.write().exec_manager_mut().get(exec_path)?;
@@ -88,10 +84,6 @@ impl StepExecOperation {
 }
 
 impl OperationImpl for StepExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let exec_path = &self.exec_path;
         let step_index = self.step_index;
@@ -147,10 +139,6 @@ impl TaskExecOperation {
 }
 
 impl OperationImpl for TaskExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let result = {
             use std::fs::OpenOptions;

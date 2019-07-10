@@ -18,10 +18,6 @@ impl ParallelOperation {
 }
 
 impl OperationImpl for ParallelOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut running_ops = vec![];
 

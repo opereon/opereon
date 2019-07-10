@@ -71,12 +71,10 @@ impl Engine {
 
     pub fn schedule_operation(&mut self, op: OperationRef) {
         let uuid = op.read().id();
-        eprintln!("add operation: = {:?}", op.read().label());
         self.operation_queue.insert(uuid, op);
     }
 
     pub fn remove_operation(&mut self, op: &OperationRef) {
-        eprintln!("remove operation: = {:?}", op.read().label());
         self.operation_queue.remove(&op.read().id());
     }
 
@@ -206,6 +204,10 @@ impl EngineRef {
     pub fn execute_operation(&mut self, operation: OperationRef) -> Result<Outcome, RuntimeError> {
         self.start_operation(operation).receive()
     }
+
+//    /// Start nested operation, wait for result and rerun parent operation.
+//    pub fn enqueue_nested_operation(&mut self, operation: OperationRef, parent: OperationRef) -> Result<(), RuntimeError> {
+//    }
 
     /// Start operation and immediately return result receiver.
     pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {

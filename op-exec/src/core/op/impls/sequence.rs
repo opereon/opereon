@@ -19,10 +19,6 @@ impl SequenceOperation {
 }
 
 impl OperationImpl for SequenceOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
-        Ok(())
-    }
-
     fn execute(&mut self) -> Result<Outcome, RuntimeError> {
         let mut outcomes = vec![];
 

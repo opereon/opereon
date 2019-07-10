@@ -28,6 +28,7 @@ pub struct Operation {
     label: String,
     context: Context,
 
+//    result: Option<Result<Outcome, RuntimeError>>,
     #[serde(skip)]
     cancelled: bool,
 }
