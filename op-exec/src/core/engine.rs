@@ -19,7 +19,7 @@ pub struct Engine {
     progress_receiver: Mutex<Option<Receiver<Progress>>>,
     progress_sender: Mutex<Option<Sender<Progress>>>,
     pool: Mutex<ThreadPool>,
-    operation_queue: VecDeque<OperationRef>,
+    operation_queue: LinkedHashMap<Uuid, OperationRef>,
     logger: slog::Logger,
 }
 
@@ -43,7 +43,7 @@ impl Engine {
             progress_receiver: Mutex::new(None),
             progress_sender: Mutex::new(None),
             pool: Mutex::new(pool),
-            operation_queue: VecDeque::new(),
+            operation_queue: LinkedHashMap::new(),
             logger,
         }
     }
@@ -230,6 +230,8 @@ impl EngineRef {
                 info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
             }
         });
+
+//        let receiver = self.write().scheduler.schedule(create_operation_impl(&operation, &engine).unwrap());
         receiver.into()
     }
 }

@@ -15,5 +15,4 @@ mod model;
 mod exec;
 mod error;
 mod resource;
-mod scheduler;
 
