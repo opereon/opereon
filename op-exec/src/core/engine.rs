@@ -1,11 +1,9 @@
-use std::collections::VecDeque;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
 
 use super::*;
-use threadpool::ThreadPool;
 use std::sync::mpsc::{sync_channel, Sender};
-use std::str::FromStr;
 use std::sync::mpsc::Receiver;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 
 #[derive(Debug)]
 pub struct Engine {
@@ -18,7 +16,7 @@ pub struct Engine {
 
     progress_receiver: Mutex<Option<Receiver<Progress>>>,
     progress_sender: Mutex<Option<Sender<Progress>>>,
-    pool: Mutex<ThreadPool>,
+    pool: ThreadPool,
     operation_queue: LinkedHashMap<Uuid, OperationRef>,
     logger: slog::Logger,
 }
@@ -30,7 +28,9 @@ impl Engine {
         let resource_manager = ResourceManager::new();
         let ssh_session_cache = SshSessionCache::new(config.clone());
 
-        let pool = ThreadPool::with_name(String::from_str("Engine").unwrap(), 8);
+        let pool = ThreadPoolBuilder::new()
+            .thread_name(|idx| format!("Engine-Worker {}", idx))
+            .build().unwrap();
 
         Engine {
             config,
@@ -42,7 +42,7 @@ impl Engine {
 
             progress_receiver: Mutex::new(None),
             progress_sender: Mutex::new(None),
-            pool: Mutex::new(pool),
+            pool,
             operation_queue: LinkedHashMap::new(),
             logger,
         }
@@ -67,6 +67,17 @@ impl Engine {
         if !receiver_exists {
             *self.progress_sender.lock().unwrap() = None;
         }
+    }
+
+    pub fn schedule_operation(&mut self, op: OperationRef) {
+        let uuid = op.read().id();
+        eprintln!("add operation: = {:?}", op.read().label());
+        self.operation_queue.insert(uuid, op);
+    }
+
+    pub fn remove_operation(&mut self, op: &OperationRef) {
+        eprintln!("remove operation: = {:?}", op.read().label());
+        self.operation_queue.remove(&op.read().id());
     }
 
     pub fn model_manager(&self) -> &ModelManager {
@@ -106,7 +117,6 @@ impl Engine {
 
         // TODO save queue etc...
         info!(self.logger, "Stopping engine...");
-        self.pool.lock().unwrap().join();
 
     }
 }
@@ -201,7 +211,6 @@ impl EngineRef {
     pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {
 //        self.write().operation_queue.push_back(operation.clone());
 
-        let pool = self.read().pool.lock().unwrap().clone();
         let (sender, receiver) = sync_channel(1);
         let engine = self.clone();
 
@@ -216,22 +225,24 @@ impl EngineRef {
               )
             );
         }
-        pool.execute(move ||{
+        engine.write().schedule_operation(operation.clone());
+        self.read().pool.spawn(move ||{
             let send_res = match create_operation_impl(&operation, &engine) {
                 Ok(mut op_impl) => {
-                    sender.send(op_impl.execute())
+                    let res = op_impl.execute();
+                    sender.send(res)
                 },
                 Err(err) => {
                     sender.send(Err(err))
                 },
             };
+            engine.write().remove_operation(&operation);
             if let Err(_err) = send_res {
                 // receiver dropped
                 info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
             }
         });
 
-//        let receiver = self.write().scheduler.schedule(create_operation_impl(&operation, &engine).unwrap());
         receiver.into()
     }
 }
