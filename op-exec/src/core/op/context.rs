@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "type", content = "arg")]
 pub enum Context {

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{de, ser};
@@ -12,15 +12,19 @@ use super::*;
 pub use self::context::Context;
 pub use self::impls::{create_operation_impl};
 pub use self::impls::DiffMethod;
-pub use self::impls::OperationImpl;
+pub use self::impls::{OperationImpl, WakeUpStatus};
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
 use std::path::Path;
+use std::any::Any;
+use std::sync::mpsc::SyncSender;
 
 mod context;
 mod impls;
 mod outcome;
 mod progress;
+
+pub type OperationState = Arc<Mutex<Box<dyn Any>>>;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Operation {
@@ -28,7 +32,30 @@ pub struct Operation {
     label: String,
     context: Context,
 
-//    result: Option<Result<Outcome, RuntimeError>>,
+    /// Internal operation state.
+    /// Typically used by implementations between [`OperationImpl::wake_up`] calls.
+    /// Allows to maintain `state machine`.
+    ///
+    /// [`OperationImpl::wake_up`]: trait.OperationImpl.html
+    #[serde(skip)]
+    state: Option<OperationState>,
+
+    /// Result of this operation. Available when computation is finished.
+    /// Utilized ONLY when the operation is scheduled from inside of another operation.
+    #[serde(skip)]
+    result: Option<Result<Outcome, RuntimeError>>,
+
+    /// Flag indicating if operation is waiting for child operation completion.
+    /// `true` only after [`EngineRef::enqueue_nested_operation`].
+    ///
+    /// [`EngineRef::enqueue_nested_operation`]: struct.EngineRef.html
+    #[serde(skip)]
+    waiting: bool,
+
+    /// Operation result sender. Used to notify that operation is finished.
+    #[serde(skip)]
+    res_sender: Option<SyncSender<Result<Outcome, RuntimeError>>>,
+
     #[serde(skip)]
     cancelled: bool,
 }
@@ -39,6 +66,10 @@ impl Operation {
             id,
             label: label.into_owned(),
             context,
+            state: None,
+            result: None,
+            waiting: false,
+            res_sender: None,
             cancelled: false,
         }
     }
@@ -53,6 +84,38 @@ impl Operation {
 
     pub fn context(&self) -> &Context {
         &self.context
+    }
+
+    pub fn set_state(&mut self, state: OperationState) {
+        self.state = Some(state)
+    }
+
+    pub fn state_mut(&mut self) -> Option<&mut OperationState> {
+        self.state.as_mut()
+    }
+
+    pub fn set_result(&mut self, result: Result<Outcome, RuntimeError>) {
+        self.result = Some(result)
+    }
+
+    pub fn take_result(&mut self) -> Option<Result<Outcome, RuntimeError>> {
+        self.result.take()
+    }
+
+    pub fn set_waiting(&mut self, waiting: bool) {
+        self.waiting = waiting
+    }
+
+    pub fn is_waiting(&self) -> bool {
+        self.waiting
+    }
+
+    pub fn set_res_sender(&mut self, sender: SyncSender<Result<Outcome, RuntimeError>>) {
+        self.res_sender = Some(sender);
+    }
+
+    pub fn res_sender_mut(&mut self) -> &mut Option<SyncSender<Result<Outcome, RuntimeError>>> {
+        &mut self.res_sender
     }
 
 //    pub (crate) fn update_progress(&mut self, progress: Progress) {
@@ -116,10 +179,12 @@ impl OperationRef {
     }
 
     pub fn read(&self) -> RwLockReadGuard<Operation> {
+//        eprintln!("read operation = {:?}", self.0.read().unwrap().label());
         self.0.read().unwrap()
     }
 
     pub fn write(&self) -> RwLockWriteGuard<Operation> {
+//        eprintln!("read operation = {:?}", self.0.read().unwrap().label());
         self.0.write().unwrap()
     }
 }

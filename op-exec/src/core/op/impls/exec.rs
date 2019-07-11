@@ -55,7 +55,12 @@ impl OperationImpl for ProcExecOperation {
         };
 
         let op: OperationRef = Context::Sequence(steps).into();
-        self.engine.execute_operation(op)
+        self.engine.enqueue_nested_operation(op, self.operation.clone());
+        Ok(Outcome::Empty)
+    }
+
+    fn wake_up(&mut self, finished_op: OperationRef) -> WakeUpStatus {
+        WakeUpStatus::Ready(finished_op.write().take_result().unwrap())
     }
 }
 

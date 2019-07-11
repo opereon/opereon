@@ -30,6 +30,7 @@ impl Engine {
 
         let pool = ThreadPoolBuilder::new()
             .thread_name(|idx| format!("Engine-Worker {}", idx))
+//            .num_threads(2)
             .build().unwrap();
 
         Engine {
@@ -201,33 +202,53 @@ impl EngineRef {
     }
 
     /// Start operation and wait for result.
+    /// DO NOT USE inside operation! It may cause deadlocks.
     pub fn execute_operation(&mut self, operation: OperationRef) -> Result<Outcome, RuntimeError> {
         self.start_operation(operation).receive()
     }
 
     /// Start nested operation, wait for result and rerun parent operation.
-    ///
-    pub fn enqueue_nested_operation(&mut self, operation: OperationRef, parent: OperationRef) -> Result<(), RuntimeError> {
-//        let engine = self.clone();
-//        engine.write().schedule_operation(operation.clone());
-//        self.read().pool.spawn(move ||{
-//            let mut op_impl = create_operation_impl(&operation, &engine);
-//            let res = op_impl.execute();
-//            engine.write().remove_operation(&operation);
-//            create_operation_impl(&parent, &engine);
-//            if let Err(_err) = send_res {
-//                // receiver dropped
-//                info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
-//            }
-//        });
+    /// This method should be called only from inside of operations.
+    pub fn enqueue_nested_operation(&mut self, operation: OperationRef, parent: OperationRef) {
+        eprintln!("enqueue = {:?} ----- parent {}", operation.read().label(), parent.read().label());
+        let engine = self.clone();
+        parent.write().set_waiting(true);
+        engine.write().schedule_operation(operation.clone());
+        self.read().pool.spawn(move ||{
+            // Execute child operation
+            let mut op_impl = create_operation_impl(&operation, &engine);
+            let res = op_impl.execute();
+            operation.write().set_result(res);
+            engine.write().remove_operation(&operation);
 
-        unimplemented!()
+            // handle parent
+            let mut parent_impl = create_operation_impl(&parent, &engine);
+            eprintln!("waking up = {:?} ==== child finished {}", parent.read().label(), operation.read().label());
+            match parent_impl.wake_up(operation.clone()) {
+                WakeUpStatus::Ready(res) => {
+                    // all children finished, send parent result
+                    let sender = parent.write().res_sender_mut().take().unwrap();
+                    parent.write().set_waiting(false);
+                    engine.write().remove_operation(&parent);
+                    eprintln!("Operation ready!= {:?}", parent.read().label());
+                    let send_res = sender.send(res);
+                    if let Err(_err) = send_res {
+                        // receiver dropped
+                        info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
+                    }
+                },
+                WakeUpStatus::NotReady => {
+                    eprintln!("Operation not ready... = {:?}", parent.read().label());
+                    // parent still waiting for children
+                },
+            };
+        });
     }
 
     /// Start operation and immediately return result receiver.
+    /// DO NOT USE inside operation! It may cause deadlocks.
     pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {
-//        self.write().operation_queue.push_back(operation.clone());
-
+        eprintln!(" Start operation = {:?}",operation.read().label());
         let (sender, receiver) = sync_channel(1);
         let engine = self.clone();
 
@@ -242,16 +263,28 @@ impl EngineRef {
               )
             );
         }
+        operation.write().set_res_sender(sender.clone());
         engine.write().schedule_operation(operation.clone());
-        self.read().pool.spawn(move ||{
+        self.read().pool.spawn(move || {
             let mut op_impl = create_operation_impl(&operation, &engine);
+            eprintln!("executing operation= {:?}", operation.read().label());
             let res = op_impl.execute();
-            engine.write().remove_operation(&operation);
-            let send_res = sender.send(res);
-            if let Err(_err) = send_res {
-                // receiver dropped
-                info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
+            eprintln!("executed operation= {:?}", operation.read().label());
+
+            eprintln!("operation.read().is_waiting() = {:?}", operation.read().is_waiting());
+            // Dont send result when operation is waiting for children.
+            // Result will be send after children completion
+            if !operation.read().is_waiting() || res.is_err(){
+
+                operation.write().res_sender_mut().take();
+                engine.write().remove_operation(&operation);
+                let send_res = sender.send(res);
+                if let Err(_err) = send_res {
+                    // receiver dropped
+                    info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
+                }
             }
+
         });
         receiver.into()
     }

@@ -13,6 +13,14 @@ mod exec;
 mod sequence;
 mod parallel;
 
+pub enum WakeUpStatus {
+    /// Operation is ready - all children operations finished.
+    Ready(Result<Outcome, RuntimeError>),
+
+    /// Operation is not ready - there are still unfinished children operations.
+    NotReady
+}
+
 pub trait OperationImpl: Send + Sync + Debug {
     fn on_cancel(&mut self) -> Result<(), RuntimeError> {
         Ok(())
@@ -21,14 +29,16 @@ pub trait OperationImpl: Send + Sync + Debug {
     /// Executes operation synchronously
     fn execute(&mut self) -> Result<Outcome, RuntimeError>;
 
-    /// Wake up (schedule again) operation after nested (child) operation finished.
+    /// Called when children operation is finished.
     /// This method is only called when operation internally calls `engine.enqueue_nested_operation()`.
-    fn wake_up(&mut self, nested_op: OperationRef) -> Result<Outcome, RuntimeError> { unimplemented!() }
+    fn wake_up(&mut self, finished_op: OperationRef) -> WakeUpStatus { unimplemented!() }
 }
 
 // FIXME ws do not return Result
 pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Box<dyn OperationImpl> {
-    let op_impl: Box<dyn OperationImpl> = match *operation.read().context() {
+    println!("create operation impl = {}", operation.read().label());
+    let ctx = operation.read().context().clone();
+    let op_impl: Box<dyn OperationImpl> = match ctx {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
         Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(operation.clone(), engine.clone(), path)),
         Context::ModelQuery { ref model, ref expr } => Box::new(ModelQueryOperation::new(operation.clone(), engine.clone(), model.clone(), expr.clone())),
