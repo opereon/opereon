@@ -21,11 +21,13 @@ pub trait OperationImpl: Send + Sync + Debug {
     /// Executes operation synchronously
     fn execute(&mut self) -> Result<Outcome, RuntimeError>;
 
-    fn reexecute(&mut self, nested_op: OperationRef) -> Result<Outcome, RuntimeError> { unimplemented!() }
+    /// Wake up (schedule again) operation after nested (child) operation finished.
+    /// This method is only called when operation internally calls `engine.enqueue_nested_operation()`.
+    fn wake_up(&mut self, nested_op: OperationRef) -> Result<Outcome, RuntimeError> { unimplemented!() }
 }
 
 // FIXME ws do not return Result
-pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Result<Box<dyn OperationImpl>, RuntimeError> {
+pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Box<dyn OperationImpl> {
     let op_impl: Box<dyn OperationImpl> = match *operation.read().context() {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
         Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(operation.clone(), engine.clone(), path)),
@@ -36,13 +38,13 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::ModelCheck { ref model, ref filter, dry_run } => Box::new(ModelCheckOperation::new(operation.clone(), engine.clone(), model.clone(), filter.clone(), dry_run)),
         Context::ModelProbe { ref ssh_dest, ref model, ref filter, ref args } => Box::new(ModelProbeOperation::new(operation.clone(), engine.clone(), ssh_dest.clone(), model.clone(), filter.clone(), args)),
         Context::ProcExec { bin_id, ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path)),
-        Context::StepExec { bin_id, ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index)?),
-        Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
-        Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
-        Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
+        Context::StepExec { bin_id, ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index)),
+        Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)),
+        Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())),
+        Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())),
         Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
         Context::FileCopyExec { bin_id, ref curr_dir, ref src_path, ref dst_path, ref chown, ref chmod, ref host} => Box::new(FileCopyOperation::new(operation.clone(), engine.clone(), bin_id, curr_dir, src_path, dst_path, chown, chmod, host)),
     };
 
-    Ok(op_impl)
+    op_impl
 }

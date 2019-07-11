@@ -8,12 +8,12 @@ pub struct ParallelOperation {
 }
 
 impl ParallelOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> Result<ParallelOperation, RuntimeError> {
-        Ok(ParallelOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> ParallelOperation {
+        ParallelOperation {
             engine,
             operation,
             steps
-        })
+        }
     }
 }
 

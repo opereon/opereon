@@ -9,12 +9,12 @@ pub struct SequenceOperation {
 }
 
 impl SequenceOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> Result<SequenceOperation, RuntimeError> {
-        Ok(SequenceOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> SequenceOperation {
+        SequenceOperation {
             engine,
             operation,
             steps
-        })
+        }
     }
 }
 

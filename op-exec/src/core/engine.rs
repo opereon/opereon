@@ -205,9 +205,24 @@ impl EngineRef {
         self.start_operation(operation).receive()
     }
 
-//    /// Start nested operation, wait for result and rerun parent operation.
-//    pub fn enqueue_nested_operation(&mut self, operation: OperationRef, parent: OperationRef) -> Result<(), RuntimeError> {
-//    }
+    /// Start nested operation, wait for result and rerun parent operation.
+    ///
+    pub fn enqueue_nested_operation(&mut self, operation: OperationRef, parent: OperationRef) -> Result<(), RuntimeError> {
+//        let engine = self.clone();
+//        engine.write().schedule_operation(operation.clone());
+//        self.read().pool.spawn(move ||{
+//            let mut op_impl = create_operation_impl(&operation, &engine);
+//            let res = op_impl.execute();
+//            engine.write().remove_operation(&operation);
+//            create_operation_impl(&parent, &engine);
+//            if let Err(_err) = send_res {
+//                // receiver dropped
+//                info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
+//            }
+//        });
+
+        unimplemented!()
+    }
 
     /// Start operation and immediately return result receiver.
     pub fn start_operation(&mut self, operation: OperationRef) -> OperationResultReceiver {
@@ -229,22 +244,15 @@ impl EngineRef {
         }
         engine.write().schedule_operation(operation.clone());
         self.read().pool.spawn(move ||{
-            let send_res = match create_operation_impl(&operation, &engine) {
-                Ok(mut op_impl) => {
-                    let res = op_impl.execute();
-                    sender.send(res)
-                },
-                Err(err) => {
-                    sender.send(Err(err))
-                },
-            };
+            let mut op_impl = create_operation_impl(&operation, &engine);
+            let res = op_impl.execute();
             engine.write().remove_operation(&operation);
+            let send_res = sender.send(res);
             if let Err(_err) = send_res {
                 // receiver dropped
                 info!(engine.read().logger, "Operation result skipped: {}", operation.read().label())
             }
         });
-
         receiver.into()
     }
 }

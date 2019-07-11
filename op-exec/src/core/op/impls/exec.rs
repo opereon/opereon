@@ -71,15 +71,15 @@ pub struct StepExecOperation {
 }
 
 impl StepExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
-        Ok(StepExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize) -> StepExecOperation {
+        StepExecOperation {
             operation,
             engine,
 
             step_index,
             bin_id,
             exec_path: exec_path.to_path_buf()
-        })
+        }
     }
 }
 
@@ -126,15 +126,15 @@ pub struct TaskExecOperation {
 }
 
 impl TaskExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize, task_index: usize) -> Result<TaskExecOperation, RuntimeError> {
-        Ok(TaskExecOperation {
+    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize, task_index: usize) -> TaskExecOperation {
+        TaskExecOperation {
             operation,
             engine,
             bin_id,
             exec_path: exec_path.to_path_buf(),
             step_index,
             task_index,
-        })
+        }
     }
 }
 
