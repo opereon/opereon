@@ -17,11 +17,8 @@ struct SequenceState {
 
 impl SequenceOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> SequenceOperation {
-        println!("1");
-//        panic!();
         let o = operation.clone();
         let mut op = operation.write();
-        println!("2");
 
         if op.state.is_none() {
             let state = SequenceState {

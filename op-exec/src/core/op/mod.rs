@@ -114,8 +114,11 @@ impl Operation {
         self.res_sender = Some(sender);
     }
 
-    pub fn res_sender_mut(&mut self) -> &mut Option<SyncSender<Result<Outcome, RuntimeError>>> {
-        &mut self.res_sender
+    pub fn res_sender_mut(&mut self) -> Option<&mut SyncSender<Result<Outcome, RuntimeError>>> {
+        self.res_sender.as_mut()
+    }
+    pub fn take_res_sender(&mut self) -> SyncSender<Result<Outcome, RuntimeError>> {
+        self.res_sender.take().unwrap()
     }
 
 //    pub (crate) fn update_progress(&mut self, progress: Progress) {

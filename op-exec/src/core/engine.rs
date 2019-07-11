@@ -218,6 +218,13 @@ impl EngineRef {
             // Execute child operation
             let mut op_impl = create_operation_impl(&operation, &engine);
             let res = op_impl.execute();
+
+            /// this implementation have no sense
+            if operation.read().is_waiting(){
+                operation.write().set_res_sender(parent.write().res_sender_mut().unwrap().clone());
+                return;
+            }
+
             operation.write().set_result(res);
             engine.write().remove_operation(&operation);
 
@@ -227,7 +234,7 @@ impl EngineRef {
             match parent_impl.wake_up(operation.clone()) {
                 WakeUpStatus::Ready(res) => {
                     // all children finished, send parent result
-                    let sender = parent.write().res_sender_mut().take().unwrap();
+                    let sender = parent.write().take_res_sender();
                     parent.write().set_waiting(false);
                     engine.write().remove_operation(&parent);
                     eprintln!("Operation ready!= {:?}", parent.read().label());
