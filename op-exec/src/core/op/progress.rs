@@ -103,6 +103,9 @@ impl Progress {
     }
 
     pub fn set_value_done(&mut self) -> bool {
+        for s in &mut self.steps {
+            s.set_value_done();
+        }
         if self.value != self.max {
             self.value = self.max;
             self.counter += 1;

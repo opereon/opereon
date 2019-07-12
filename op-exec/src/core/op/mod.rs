@@ -88,12 +88,12 @@ impl Operation {
 //        }
 //    }
 //
-//    pub(crate) fn update_progress_value_done(&mut self) {
-//        if self.progress.set_value_done() {
-//            self.progress_task.notify();
-//        }
-//    }
-//
+    pub(crate) fn update_progress_value_done(&mut self) {
+        if self.progress.set_value_done() {
+            self.progress_task.notify();
+        }
+    }
+
     pub(crate) fn update_progress_step_value(&mut self, step: usize, value: f64) {
         if self.progress.set_step_value(step, value) {
             self.progress_task.notify();
@@ -253,7 +253,6 @@ impl Future for OperationTask {
                 Ok(Async::Ready(outcome)) => {
                     let mut o = self.operation.write();
                     o.outcome = Some(Ok(outcome));
-//                    o.update_progress_value_done();
                 }
                 Err(err) => {
                     self.operation.write().outcome = Some(Err(err));
