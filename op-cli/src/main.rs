@@ -6,7 +6,6 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use actix::prelude::*;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use slog::Drain;
@@ -20,6 +19,8 @@ use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
 use op_exec::{SshAuth, SshDest};
 use op_exec::OutcomeFuture;
 use options::*;
+use tokio::runtime::Runtime;
+use futures::stream::Stream;
 
 mod display;
 mod options;
@@ -53,6 +54,8 @@ fn make_path_absolute(path: &Path) -> PathBuf {
 
 /// start engine and execute provided operation
 fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
+    let mut rt = Runtime::new().unwrap();
+
     let logger = init_file_logger(&config);
 
     let engine = check(EngineRef::start(current_dir, config, logger.clone()));
@@ -75,14 +78,12 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
             Ok(())
         });
 
-    Arbiter::spawn(progress_fut.map_err(|err| {
+    rt.spawn(progress_fut.map_err(|err| {
         eprintln!("err = {:?}", err);
-    }
-    ));
+    }));
 
-    Arbiter::spawn(engine.clone().then(|_| {
+    rt.spawn(engine.clone().then(|_| {
         // Nothing to do when engine future complete
-        System::current().stop();
         futures::future::ok(())
     }));
 
@@ -96,9 +97,10 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         })
         .then(move |_| {
             engine.stop();
-            futures::future::ok(())
+            futures::future::ok::<(),()>(())
         });
-    Arbiter::spawn(outcome_fut);
+    rt.spawn(outcome_fut);
+    rt.shutdown_on_idle().wait().unwrap();
 }
 
 fn init_file_logger(config: &ConfigRef) -> slog::Logger {
@@ -272,7 +274,5 @@ fn main() {
         }
     };
 
-    actix::System::run(move || {
-        local_run(model_dir_path, config, cmd, disp_format);
-    }).unwrap();
+    local_run(model_dir_path, config, cmd, disp_format);
 }
