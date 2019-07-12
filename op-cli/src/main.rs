@@ -12,7 +12,6 @@ use slog::Drain;
 use slog::FnValue;
 use structopt::StructOpt;
 use url::Url;
-use uuid::Uuid;
 
 use display::DisplayFormat;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
@@ -225,7 +224,6 @@ fn main() {
             make_path_absolute(&mut path);
 
             ExecContext::ProcExec {
-                bin_id: Uuid::nil(),
                 exec_path: path,
             }
         }

@@ -18,7 +18,7 @@ unsafe impl Send for ProcExecOperation {}
 
 
 impl ProcExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path) -> Result<ProcExecOperation, RuntimeError> {
+    pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path) -> Result<ProcExecOperation, RuntimeError> {
         let exec = engine.write().exec_manager_mut().get(exec_path)?;
         let steps = {
             let exec = exec.lock();
@@ -28,7 +28,6 @@ impl ProcExecOperation {
             let mut steps = Vec::with_capacity(exec.run().steps().len());
             for i in 0..exec.run().steps().len() {
                 let op: OperationRef = Context::StepExec {
-                    bin_id,
                     exec_path: exec_path.to_path_buf(),
                     step_index: i,
                 }.into();
@@ -80,7 +79,7 @@ pub struct StepExecOperation {
 }
 
 impl StepExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
+    pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
         let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
 
         let tasks = {
@@ -92,7 +91,6 @@ impl StepExecOperation {
 
             for i in 0..step_exec.tasks().len() {
                 let op: OperationRef = Context::TaskExec {
-                    bin_id,
                     exec_path: exec_path.to_owned(),
                     step_index,
                     task_index: i,
@@ -142,7 +140,6 @@ impl OperationImpl for StepExecOperation {
 pub struct TaskExecOperation {
     operation: OperationRef,
     engine: EngineRef,
-    bin_id: Uuid,
     exec_path: PathBuf,
     step_index: usize,
     task_index: usize,
@@ -150,11 +147,10 @@ pub struct TaskExecOperation {
 }
 
 impl TaskExecOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, bin_id: Uuid, exec_path: &Path, step_index: usize, task_index: usize) -> Result<TaskExecOperation, RuntimeError> {
+    pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path, step_index: usize, task_index: usize) -> Result<TaskExecOperation, RuntimeError> {
         Ok(TaskExecOperation {
             operation,
             engine,
-            bin_id,
             exec_path: exec_path.to_path_buf(),
             step_index,
             task_index,
@@ -237,7 +233,7 @@ impl Future for TaskExecOperation {
                         e.prepare(&curr_model, p, exec_dir)?;
                         e.store()?;
 
-                        let op: OperationRef = Context::ProcExec { bin_id: self.bin_id, exec_path: e.path().to_path_buf() }.into();
+                        let op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
                         self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                         return self.poll();
                     }
@@ -273,7 +269,7 @@ impl Future for TaskExecOperation {
                             e.prepare(&curr_model, p, exec_dir)?;
                             e.store()?;
 
-                            let op: OperationRef = Context::ProcExec { bin_id: self.bin_id, exec_path: e.path().to_path_buf() }.into();
+                            let op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
                             self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                             return self.poll();
                         } else {
@@ -328,7 +324,6 @@ impl Future for TaskExecOperation {
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
                         let op: OperationRef = Context::FileCopyExec {
-                            bin_id: self.bin_id,
                             curr_dir: base_path.to_path_buf(),
                             src_path,
                             dst_path,

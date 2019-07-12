@@ -221,7 +221,6 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
 pub struct FileCopyOperation {
     operation: OperationRef,
     engine: EngineRef,
-    bin_id: Uuid,
     curr_dir: PathBuf,
     src_path: PathBuf,
     dst_path: PathBuf,
@@ -235,7 +234,6 @@ pub struct FileCopyOperation {
 impl FileCopyOperation {
     pub fn new(operation: OperationRef,
                engine: EngineRef,
-               bin_id: Uuid,
                curr_dir: &Path,
                src_path: &Path,
                dst_path: &Path,
@@ -245,7 +243,6 @@ impl FileCopyOperation {
         FileCopyOperation {
             operation,
             engine,
-            bin_id,
             curr_dir: curr_dir.to_owned(),
             src_path: src_path.to_owned(),
             dst_path: dst_path.to_owned(),

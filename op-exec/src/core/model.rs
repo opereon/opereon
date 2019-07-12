@@ -43,63 +43,6 @@ impl std::str::FromStr for ModelPath {
     }
 }
 
-/*
-#[derive(Debug)]
-struct Bin {
-    id: Uuid,
-    model: ModelRef,
-}
-
-impl Bin {
-    fn new(id: Uuid, model: ModelRef) -> Bin {
-        Bin {
-            id,
-            model,
-        }
-    }
-}
-
-
-#[derive(Debug)]
-struct Bins(Vec<Bin>);
-
-impl Bins {
-    fn get(&mut self, bin_id: Uuid) -> ModelRef {
-        for b in self.0.iter_mut().skip(1) {
-            if b.id == bin_id {
-                if b.id.is_nil() {
-                    b.model.reset();
-                }
-                return b.model.clone();
-            } else if b.id.is_nil() || b.model.ref_count() == 1 {
-                b.id = bin_id;
-                b.model.reset();
-                return b.model.clone();
-            }
-        }
-        let m = self.0.first().unwrap().model.deep_copy();
-        self.0.push(Bin::new(bin_id, m.clone()));
-        m
-    }
-
-    fn any(&self) -> &ModelRef {
-        &self.0.first().unwrap().model
-    }
-}
-
-impl From<Bin> for Bins {
-    fn from(bin: Bin) -> Self {
-        Bins(vec![bin])
-    }
-}
-
-impl From<ModelRef> for Bins {
-    fn from(model: ModelRef) -> Self {
-        Bins(vec![Bin::new(Uuid::nil(), model)])
-    }
-}
-*/
-
 #[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,

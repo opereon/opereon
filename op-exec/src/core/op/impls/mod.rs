@@ -35,13 +35,13 @@ pub fn create_operation_impl(operation: &OperationRef, engine: &EngineRef) -> Re
         Context::ModelUpdate { ref prev_model, ref next_model, dry_run } => Box::new(ModelUpdateOperation::new(operation.clone(), engine.clone(), prev_model.clone(), next_model.clone(), dry_run)),
         Context::ModelCheck { ref model, ref filter, dry_run } => Box::new(ModelCheckOperation::new(operation.clone(), engine.clone(), model.clone(), filter.clone(), dry_run)),
         Context::ModelProbe { ref ssh_dest, ref model, ref filter, ref args } => Box::new(ModelProbeOperation::new(operation.clone(), engine.clone(), ssh_dest.clone(), model.clone(), filter.clone(), args)),
-        Context::ProcExec { bin_id, ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path)?),
-        Context::StepExec { bin_id, ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index)?),
-        Context::TaskExec { bin_id, ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), bin_id, exec_path, step_index, task_index)?),
+        Context::ProcExec { ref exec_path } => Box::new(ProcExecOperation::new(operation.clone(), engine.clone(), exec_path)?),
+        Context::StepExec { ref exec_path, step_index } => Box::new(StepExecOperation::new(operation.clone(), engine.clone(), exec_path, step_index)?),
+        Context::TaskExec { ref exec_path, step_index, task_index } => Box::new(TaskExecOperation::new(operation.clone(), engine.clone(), exec_path, step_index, task_index)?),
         Context::Sequence(ref steps) => Box::new(SequenceOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::Parallel(ref steps) => Box::new(ParallelOperation::new(operation.clone(), engine.clone(), steps.clone())?),
         Context::ModelInit => { Box::new(ModelInitOperation::new(operation.clone(), engine.clone()))}
-        Context::FileCopyExec { bin_id, ref curr_dir, ref src_path, ref dst_path, ref chown, ref chmod, ref host} => Box::new(FileCopyOperation::new(operation.clone(), engine.clone(), bin_id, curr_dir, src_path, dst_path, chown, chmod, host)),
+        Context::FileCopyExec { ref curr_dir, ref src_path, ref dst_path, ref chown, ref chmod, ref host} => Box::new(FileCopyOperation::new(operation.clone(), engine.clone(), curr_dir, src_path, dst_path, chown, chmod, host)),
     };
 
     op_impl.init()?;

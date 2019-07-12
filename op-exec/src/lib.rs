@@ -30,7 +30,6 @@ use kg_tree::opath::*;
 use kg_tree::serial::from_tree;
 use kg_utils::collections::{LinkedHashMap, LruCache};
 use os_pipe::pipe;
-use uuid::Uuid;
 
 use op_model::*;
 

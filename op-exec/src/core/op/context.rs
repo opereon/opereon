@@ -36,22 +36,18 @@ pub enum Context {
         args: Vec<(String, String)>,
     },
     ProcExec {
-        bin_id: Uuid,
         exec_path: PathBuf,
     },
     StepExec {
-        bin_id: Uuid,
         exec_path: PathBuf,
         step_index: usize,
     },
     TaskExec {
-        bin_id: Uuid,
         exec_path: PathBuf,
         step_index: usize,
         task_index: usize,
     },
     FileCopyExec {
-        bin_id: Uuid,
         curr_dir: PathBuf,
         src_path: PathBuf,
         dst_path: PathBuf,
