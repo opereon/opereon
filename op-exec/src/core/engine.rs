@@ -113,7 +113,6 @@ impl EngineRef {
     }
     pub fn start(current_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> IoResult<EngineRef> {
         let engine = EngineRef::new(current_dir, config, logger.clone());
-        engine.init_model_manager()?;
         engine.init_ssh_session_cache()?;
         Ok(engine)
     }
@@ -128,10 +127,6 @@ impl EngineRef {
 
     pub fn stop(&self) {
         self.write().stop();
-    }
-
-    pub fn init_model_manager(&self) -> IoResult<()> {
-        self.write().model_manager.init()
     }
 
     pub fn init_ssh_session_cache(&self) -> IoResult<()> {

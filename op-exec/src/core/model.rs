@@ -5,7 +5,7 @@
 use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature};
 
 use super::*;
-use crate::{ConfigRef, ModelConfig};
+use crate::{ConfigRef};
 use kg_utils::collections::LruCache;
 use std::path::{PathBuf, Path};
 use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
@@ -106,6 +106,7 @@ pub struct ModelManager {
     model_cache: LruCache<Sha1Hash, ModelRef>,
     /// Path do model dir.
     model_dir: PathBuf,
+    initialized: bool,
     logger: slog::Logger,
 }
 
@@ -116,16 +117,9 @@ impl ModelManager {
             config,
             model_cache,
             model_dir,
+            initialized: false,
             logger,
         }
-    }
-
-    fn config(&self) -> &ModelConfig {
-        self.config.model()
-    }
-
-    fn model_dir(&self) -> &Path {
-        &self.model_dir
     }
 
     /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
@@ -157,17 +151,23 @@ impl ModelManager {
         return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
+    /// Initialize model manager.
+    /// This method can be called multiple times.
     pub fn init(&mut self) -> IoResult<()> {
-        debug!(self.logger, "Initializing model manager");
-        
+        if self.initialized {
+            return Ok(())
+        }
 
+        debug!(self.logger, "Initializing model manager");
         let model_dir = Self::search_manifest(&self.model_dir)?;
         info!(self.logger, "Model dir found {}", model_dir.display());
         self.model_dir = model_dir;
+        self.initialized = true;
 
         Ok(())
     }
 
+    /// Creates new model. Initializes git repository, manifest file etc.
     pub fn init_model(&mut self) -> IoResult<()> {
 
         let current_dir = fs::current_dir()?;
@@ -179,37 +179,9 @@ impl ModelManager {
         Ok(())
     }
 
-    fn init_git_repo<P: AsRef<Path>>(path: P) -> IoResult<()> {
-        use std::fmt::Write;
-        let mut opts = RepositoryInitOptions::new();
-        opts.no_reinit(true);
-        // TODO error handling
-        let _repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
-
-        // ignore ./op directory
-        let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
-        let mut content = fs::read_string(&excludes)?;
-        writeln!(&mut content, "# Opereon tmp directory")?;
-        writeln!(&mut content, ".op/")?;
-        fs::write(excludes, content)?;
-        Ok(())
-    }
-
-    fn init_manifest<P: AsRef<Path>>(path: P) -> IoResult<()> {
-        use std::fmt::Write;
-
-        // ignore ./op directory
-        let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
-        let mut content = String::new();
-        writeln!(&mut content, "[info]")?;
-        writeln!(&mut content, "authors = [\"\"]")?;
-        writeln!(&mut content, "description = \"Opereon model\"")?;
-        fs::write(manifest_path, content)?;
-        Ok(())
-    }
-
     /// Commit current model
     pub fn commit(&mut self, message: &str) -> IoResult<ModelRef> {
+        self.init()?;
         // TODO ws error handling
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
@@ -233,6 +205,7 @@ impl ModelManager {
     }
 
     pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
+        self.init()?;
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
         }
@@ -248,6 +221,7 @@ impl ModelManager {
     }
 
     pub fn resolve(&mut self, model_path: &ModelPath) -> IoResult<ModelRef> {
+        self.init()?;
         match *model_path {
             ModelPath::Current => self.current(),
             ModelPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
@@ -255,33 +229,8 @@ impl ModelManager {
         }
     }
 
-    fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let obj = repo.revparse_single(spec).expect("Cannot find revision!");
-        Ok(obj.id().into())
-    }
-
-    pub fn list(&self) -> std::io::Result<Vec<Metadata>> {
-        use std::fs::{read_dir, read_to_string};
-
-        let mut list = Vec::new();
-
-        let model_dir = self.config().data_dir();
-        for e in read_dir(model_dir)? {
-            let e = e?;
-            if e.path().is_dir() {
-                let s = read_to_string(e.path().join("_model.yaml"))?;
-                let meta: Metadata = serde_yaml::from_str(&s).unwrap(); //FIXME
-                list.push(meta);
-            }
-        }
-
-        list.sort_by(|a, b| a.timestamp().cmp(&b.timestamp()));
-        Ok(list)
-    }
-
-    /// Returns current model - model represented by content of the git index
+    /// Returns current model - model represented by content of the git index.
+    /// This method loads model on each call.
     pub fn current(&mut self) -> IoResult<ModelRef> {
         // TODO ws error handling
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
@@ -313,9 +262,50 @@ impl ModelManager {
         Ok(commit)
     }
 
+
+    fn init_git_repo<P: AsRef<Path>>(path: P) -> IoResult<()> {
+        use std::fmt::Write;
+        let mut opts = RepositoryInitOptions::new();
+        opts.no_reinit(true);
+        // TODO error handling
+        let _repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
+
+        // ignore ./op directory
+        let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
+        let mut content = fs::read_string(&excludes)?;
+        writeln!(&mut content, "# Opereon tmp directory")?;
+        writeln!(&mut content, ".op/")?;
+        fs::write(excludes, content)?;
+        Ok(())
+    }
+
+    fn init_manifest<P: AsRef<Path>>(path: P) -> IoResult<()> {
+        use std::fmt::Write;
+
+        // ignore ./op directory
+        let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
+        let mut content = String::new();
+        writeln!(&mut content, "[info]")?;
+        writeln!(&mut content, "authors = [\"\"]")?;
+        writeln!(&mut content, "description = \"Opereon model\"")?;
+        fs::write(manifest_path, content)?;
+        Ok(())
+    }
+
+    fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
+        // TODO ws error handling
+        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
+        let obj = repo.revparse_single(spec).expect("Cannot find revision!");
+        Ok(obj.id().into())
+    }
+
     fn cache_model(&mut self, m: ModelRef) {
         let id = m.lock().metadata().id();
         self.model_cache.insert(id, m);
+    }
+
+    fn model_dir(&self) -> &Path {
+        &self.model_dir
     }
 }
 
