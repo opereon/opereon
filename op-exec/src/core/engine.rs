@@ -100,7 +100,7 @@ impl Engine {
         self.task.notify();
 
         // TODO save queue etc...
-        info!(self.logger, "Stopping engine.");
+        info!(self.logger, "Stopping engine."; o!("test" => "value"));
     }
 }
 
