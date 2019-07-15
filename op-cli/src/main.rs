@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate slog;
 extern crate structopt;
 
@@ -69,8 +68,6 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
            })
           ),
     );
-    info0!(logger, "Hello! val {named}", named =1111);
-    info0!(logger, "Hello! val"; "kkk"=> "vvvv");
     logger
 }
 /// start engine and execute provided operation

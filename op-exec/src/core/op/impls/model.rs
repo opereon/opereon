@@ -7,6 +7,7 @@ use super::*;
 use kg_tree::opath::Opath;
 use op_model::ModelUpdate;
 use std::path::Path;
+use slog::Logger;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -236,10 +237,17 @@ pub struct ModelUpdateOperation {
     next_model: ModelPath,
     dry_run: bool,
     proc_op: Option<OperationExec>,
+    logger: Logger,
 }
 
 impl ModelUpdateOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, prev_model: ModelPath, next_model: ModelPath, dry_run: bool) -> ModelUpdateOperation {
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "old_model" => prev_model.clone(),
+            "new_model" => next_model.clone()
+        ));
         ModelUpdateOperation {
             operation,
             engine,
@@ -247,6 +255,7 @@ impl ModelUpdateOperation {
             next_model,
             dry_run,
             proc_op: None,
+            logger
         }
     }
 }
@@ -286,7 +295,7 @@ impl Future for ModelUpdateOperation {
                         let (model_changes, file_changes) = update.check_updater(p);
 
                         if model_changes.is_empty() && file_changes.is_empty() {
-                            println!("Update \"{}\": skipped - no changes", id);
+                            info!(self.logger, "Update \"{proc_id}\": skipped - no changes", proc_id = id; "verbosity"=>0);
                             continue
                         }
 
@@ -306,7 +315,8 @@ impl Future for ModelUpdateOperation {
 
                         let op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
                         proc_ops.push(op);
-                        println!("Update \"{}\": prepared in {}", id, e.path().display());
+
+                        info!(self.logger, "Update \"{proc_id}\": prepared in {path}", proc_id = id, path = e.path().display(); "verbosity"=>1);
                     }
                 }
             }
@@ -333,10 +343,17 @@ pub struct ModelCheckOperation {
     filter: Option<String>,
     dry_run: bool,
     proc_op: Option<OperationExec>,
+    logger: Logger,
 }
 
 impl ModelCheckOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath, filter: Option<String>, dry_run: bool) -> ModelCheckOperation {
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "model" => model_path.clone(),
+            "filter" => filter.clone()
+        ));
         ModelCheckOperation {
             operation,
             engine,
@@ -344,6 +361,7 @@ impl ModelCheckOperation {
             dry_run,
             filter,
             proc_op: None,
+            logger
         }
     }
 }
@@ -367,7 +385,7 @@ impl Future for ModelCheckOperation {
                 match Regex::new(filter) {
                     Ok(re) => Some(re),
                     Err(err) => {
-                        eprintln!("Error while parsing regular expression {:?}: {}", filter, err);
+                        error!(self.logger, "Error while parsing regular expression {filter}: {err}", filter=filter, err=format!("{}", err); "verbosity"=>0);
                         None
                     }
                 }
@@ -395,9 +413,9 @@ impl Future for ModelCheckOperation {
                             let proc_op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
                             proc_ops.push(proc_op);
 
-                            println!("Check \"{}\": prepared in {}", id, e.path().display());
+                            info!(self.logger, "Check \"{proc_id}\": prepared in {path}", proc_id = id, path=e.path().display(); "verbosity"=>1);
                         } else {
-                            println!("Check \"{}\": skipped", id);
+                            info!(self.logger, "Check \"{proc_id}\": skipped", proc_id = id; "verbosity"=>1);
                         }
                     }
                 }
@@ -429,10 +447,18 @@ pub struct ModelProbeOperation {
     model_path: ModelPath,
     filter: Option<String>,
     proc_op: Option<OperationExec>,
+    logger: Logger,
 }
 
 impl ModelProbeOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, ssh_dest: SshDest, model_path: ModelPath, filter: Option<String>, _args: &[(String, String)]) -> ModelProbeOperation {
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "model" => model_path.clone(),
+            "filter" => filter.clone(),
+            "ssh_dest" => format!("{:?}", ssh_dest)
+        ));
         ModelProbeOperation {
             operation,
             engine,
@@ -440,6 +466,7 @@ impl ModelProbeOperation {
             model_path,
             filter,
             proc_op: None,
+            logger,
         }
     }
 }
@@ -463,7 +490,7 @@ impl Future for ModelProbeOperation {
                 match Regex::new(filter) {
                     Ok(re) => Some(re),
                     Err(err) => {
-                        eprintln!("Error while parsing regular expression {:?}: {}", filter, err);
+                        error!(self.logger, "Error while parsing regular expression {filter}: {err}", filter=filter, err=format!("{}", err); "verbosity"=>0);
                         None
                     }
                 }
@@ -494,10 +521,9 @@ impl Future for ModelProbeOperation {
 
                             let proc_op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
                             proc_ops.push(proc_op);
-
-                            println!("Probe \"{}\": prepared in {}", id, e.path().display());
+                            info!(self.logger, "Probe \"{proc_id}\": prepared in {path}", proc_id = id, path=e.path().display(); "verbosity"=>1);
                         } else {
-                            println!("Probe \"{}\": skipped", id);
+                            info!(self.logger, "Probe \"{proc_id}\": skipped", proc_id = id; "verbosity"=>1);
                         }
                     }
                 }

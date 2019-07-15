@@ -1,4 +1,5 @@
 use super::*;
+use slog::Logger;
 
 fn cleanup_resources(engine: &EngineRef, resource_id: Uuid) {
     engine.write().resource_manager_mut().remove(resource_id);
@@ -10,6 +11,7 @@ pub struct ProcExecOperation {
     operation: OperationRef,
     engine: EngineRef,
     op: OperationExec,
+    logger: Logger,
 }
 
 unsafe impl Sync for ProcExecOperation {}
@@ -19,11 +21,17 @@ unsafe impl Send for ProcExecOperation {}
 
 impl ProcExecOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path) -> Result<ProcExecOperation, RuntimeError> {
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "exec_path" => format!("{}", exec_path.display()),
+        ));
         let exec = engine.write().exec_manager_mut().get(exec_path)?;
         let steps = {
             let exec = exec.lock();
 
-            println!("{}: executing in {}", exec.name(), exec_path.display());
+            info!(logger, "Executing exec: [{name}] in [{path}]", name=exec.name(), path=exec_path.display(); "verbosity"=>1);
+//            println!("{}: executing in {}", exec.name(), exec_path.display());
 
             let mut steps = Vec::with_capacity(exec.run().steps().len());
             for i in 0..exec.run().steps().len() {
@@ -43,6 +51,7 @@ impl ProcExecOperation {
             operation,
             engine,
             op,
+            logger
         })
     }
 }
@@ -76,16 +85,24 @@ pub struct StepExecOperation {
     operation: OperationRef,
     engine: EngineRef,
     op: OperationExec,
+    logger: Logger,
 }
 
 impl StepExecOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path, step_index: usize) -> Result<StepExecOperation, RuntimeError> {
         let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
 
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "exec_path" => format!("{}", exec_path.display()),
+        ));
+
         let tasks = {
             let proc_exec = proc_exec.lock();
             let ref step_exec = proc_exec.run().steps()[step_index];
-            println!("{}: executing step in {}", step_exec.host(), step_exec.path().display());
+
+            info!(logger, "Executing step on [{host}] in [{path}]", host=format!("{}",step_exec.host()), path=step_exec.path().display(); "verbosity"=>1);
 
             let mut tasks = Vec::with_capacity(step_exec.tasks().len());
 
@@ -108,6 +125,7 @@ impl StepExecOperation {
             operation,
             engine,
             op,
+            logger,
         })
     }
 }
@@ -144,10 +162,19 @@ pub struct TaskExecOperation {
     step_index: usize,
     task_index: usize,
     proc_op: Option<OperationExec>,
+    logger: Logger,
 }
 
 impl TaskExecOperation {
     pub fn new(operation: OperationRef, engine: EngineRef, exec_path: &Path, step_index: usize, task_index: usize) -> Result<TaskExecOperation, RuntimeError> {
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "exec_path" => format!("{}", exec_path.display()),
+            "step_index" => step_index,
+            "task_index" => task_index,
+        ));
+
         Ok(TaskExecOperation {
             operation,
             engine,
@@ -155,6 +182,7 @@ impl TaskExecOperation {
             step_index,
             task_index,
             proc_op: None,
+            logger,
         })
     }
 }
@@ -209,7 +237,7 @@ impl Future for TaskExecOperation {
                     .append(true)
                     .open(step_exec.path().join("output.log"))?);
 
-                println!("{}: {}: executing...", step_exec.host(), task_exec);
+                info!(self.logger, "Executing task [{exec_name}] on host [{host}] ...", host=format!("{}", step_exec.host()), exec_name=task_exec.name(); "verbosity"=>1);
 
                 let scope = task.scope();
                 let base_path = proc.dir();
@@ -349,16 +377,20 @@ impl Future for TaskExecOperation {
                                            chmod.as_ref().map(|s| s.as_ref()), true)?.into_task_result()
                     }
                 };
+                info!(self.logger, "Task [{task_name}] finished on [{host}]. Result : [{result}]",
+                      task_name = task_exec.name(),
+                      host = format!("{}", step_exec.host()),
+                      result = format!("{}", result);
+                      "verbosity" => 0
+                );
+//                print!("{}: {}: result: {}", step_exec.host(), task_exec, result);
 
-                print!("{}: {}: result: {}", step_exec.host(), task_exec, result);
                 if let Some(out) = task.output() {
                     if let Outcome::NodeSet(ref ns) = *result.outcome() {
                         out.apply(task.root(), task.node(), proc.scope_mut(), ns.lock().clone());
                         //print!(" => ${}", out.var());
                     }
                 }
-                println!();
-
                 result
             };
 
