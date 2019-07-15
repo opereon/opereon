@@ -81,24 +81,24 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");
 
-//    let progress_fut = outcome_fut.progress()
-//        .for_each(|p| {
-//            println!("=========================================");
-//            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-//            for p in p.steps() {
-//                if let Some(ref file_name) = p.file_name() {
-//                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-//                } else {
-//                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-//                }
-//            }
-////            eprintln!("p = {:#?}", p);
-//            Ok(())
-//        });
-//
-//    rt.spawn(progress_fut.map_err(|err| {
-//        eprintln!("err = {:?}", err);
-//    }));
+    let progress_fut = outcome_fut.progress()
+        .for_each(|p| {
+            println!("=========================================");
+            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
+            for p in p.steps() {
+                if let Some(ref file_name) = p.file_name() {
+                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
+                } else {
+                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
+                }
+            }
+//            eprintln!("p = {:#?}", p);
+            Ok(())
+        });
+
+    rt.spawn(progress_fut.map_err(|err| {
+        eprintln!("err = {:?}", err);
+    }));
 
     rt.spawn(engine.clone().then(|_| {
         // Nothing to do when engine future complete

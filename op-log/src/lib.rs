@@ -1,13 +1,13 @@
-#[macro_use]
 extern crate slog;
+extern crate colored;
 
 use std::fs::OpenOptions;
-use slog::{Drain, Record, OwnedKVList, Serializer, Never};
-use slog::FnValue;
+use slog::{Drain, Record, OwnedKVList, Never};
 use slog::*;
 use slog_kvfilter::KVFilter;
 use std::collections::{HashSet, HashMap};
 use std::path::Path;
+use crate::colored::Colorize;
 
 const VERBOSITY_KEY: &str = "verbosity";
 
@@ -28,6 +28,9 @@ pub fn build_file_drain<P: AsRef<Path>>(log_path: P, level: Level) -> impl Drain
     drain.fuse()
 }
 
+/// Creates drain printing to stdout.
+/// Only messages with `verbosity` key will be printed.
+///
 pub fn build_cli_drain(verbosity: u8) -> impl Drain<Ok=(), Err=Never> {
     let mut verbosity_vals: HashSet<String> = HashSet::new();
 
@@ -49,7 +52,7 @@ pub fn build_cli_drain(verbosity: u8) -> impl Drain<Ok=(), Err=Never> {
 pub struct CliDrain;
 
 /// Drain for printing log messages directly to the user.
-/// Currently just prints message to stdout.
+/// Currently just prints colored message to stdout.
 impl Drain for CliDrain {
     type Ok = ();
     type Err = ();
@@ -57,9 +60,31 @@ impl Drain for CliDrain {
     fn log(
         &self,
         record: &Record,
-        values: &OwnedKVList,
+        _values: &OwnedKVList,
     ) -> std::result::Result<Self::Ok, Self::Err> {
-        println!("{}", record.msg());
+
+        let prefix = match record.level() {
+            Level::Critical => {
+                "Critical:".red()
+            },
+            Level::Error => {
+                "Error:".bright_red()
+            },
+            Level::Warning => {
+                "Warn:".yellow()
+            },
+            Level::Info => {
+                "Info:".blue()
+            },
+            Level::Debug => {
+                "Debug:".cyan()
+            }
+            Level::Trace => {
+                "Trace:".white()
+            }
+        };
+
+        println!("{} {}", prefix, record.msg());
 
 //        record
 //            .kv()
@@ -79,7 +104,7 @@ mod tests {
 
     #[test]
     fn cli_drain_test() {
-        let drain = build_cli_drain(0);
+        let drain = build_cli_drain(2);
 
         let log = slog::Logger::root(
             drain.fuse(),
@@ -90,11 +115,17 @@ mod tests {
           ),
         );
 
-        info!(log, "verbosity is {verbosity}", verbosity = 0);
-        info!(log, "verbosity is "; "verbosity" => 0);
-        info!(log, "verbosity is {verbosity}", verbosity = 1);
-        info!(log, "verbosity is {verbosity}", verbosity = 2);
-        warn!(log, "WARN verbosity is {verbosity}", verbosity = 0);
+
+        crit!(log, "CRIT! verbosity is {verbosity}", verbosity = 0);
+        error!(log, "ERR! verbosity is "; "verbosity" => 0);
+        warn!(log, "WARN! verbosity is {verbosity}", verbosity = 0);
+        info!(log, "INFO! verbosity is {verbosity}", verbosity = 1);
+        debug!(log, "DEBUG! verbosity is {verbosity}", verbosity = 0);
+        trace!(log, "TRACE! verbosity is {verbosity}", verbosity = 2);
+
+        info!(log, "INFO! info message! - KV syntax"; "verbosity" => 1);
+
+
         info!(log, "verbosity not specified!");
         warn!(log, "verbosity is {foo} {bar}", bar=3, foo = 2; "a" => "b");
         debug!(log, "formatted {num_entries} entries of {}", "something", num_entries = 2; "log-key" => true);

@@ -197,7 +197,7 @@ impl EngineRef {
             let op = operation.read();
             debug!(engine.logger, "New Operation scheduled";
             o!(
-                "context"=> format!("{:?}", op.context()),
+//                "context"=> format!("{:?}", op.context()),
                 "id"=> format!("{}", op.id()),
                  "label"=> format!("{}", op.label()),
               )

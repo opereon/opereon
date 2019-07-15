@@ -266,6 +266,7 @@ impl FileExecutor for RsyncExecutor {
 
         let diffs = self::rsync::compare::rsync_compare(self.config(), &params, checksum)?;
         let mut result = 0;
+        // FIXME ws to be removed?
         for diff in &diffs {
             if diff.state().is_modified_chown() {
                 println!("{}: incorrect owner/group", diff.file_path().display());
