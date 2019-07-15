@@ -1,15 +1,13 @@
-#[macro_use]
 extern crate slog;
 extern crate structopt;
 
-use std::fs;
-use std::fs::OpenOptions;
+#[macro_use]
+extern crate op_log;
+
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
-use slog::Drain;
-use slog::FnValue;
 use structopt::StructOpt;
 use url::Url;
 
@@ -20,6 +18,10 @@ use op_exec::OutcomeFuture;
 use options::*;
 use tokio::runtime::Runtime;
 use futures::stream::Stream;
+use op_log::{build_file_drain, build_cli_drain};
+use slog::Duplicate;
+use crate::slog::Drain;
+use slog::FnValue;
 
 mod display;
 mod options;
@@ -51,11 +53,28 @@ fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
 
+fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
+
+    let file_drain = build_file_drain(config.log().log_path().to_path_buf(), (*config.log().level()).into());
+    let cli_drain = build_cli_drain(verbosity);
+
+    let drain = Duplicate::new(file_drain, cli_drain);
+
+    let logger = slog::Logger::root(
+        drain.fuse(),
+        o!("module" =>
+           FnValue(move |info| {
+                info.module()
+           })
+          ),
+    );
+    logger
+}
 /// start engine and execute provided operation
-fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat) {
+fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat, verbose: u8) {
     let mut rt = Runtime::new().unwrap();
 
-    let logger = init_file_logger(&config);
+    let logger = init_logger(&config, verbose);
 
     let engine = check(EngineRef::start(current_dir, config, logger.clone()));
     let outcome_fut: OutcomeFuture = engine
@@ -102,32 +121,6 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
     rt.shutdown_on_idle().wait().unwrap();
 }
 
-fn init_file_logger(config: &ConfigRef) -> slog::Logger {
-    let log_path = config.log().log_path();
-    if let Some(log_dir) = log_path.parent() {
-        fs::create_dir_all(log_dir).expect("Cannot create log dir");
-    }
-
-    let mut open_opts = OpenOptions::new();
-
-    open_opts.create(true).append(true);
-
-    let log_file = open_opts.open(log_path).expect("Cannot open log file");
-
-    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
-    let drain = slog_term::FullFormat::new(decorator).build();
-    let drain = slog::LevelFilter::new(drain, (*config.log().level()).into());
-
-    let logger = slog::Logger::root(
-        drain.fuse(),
-        o!("module" =>
-           FnValue(move |info| {
-                info.module()
-           })
-          ),
-    );
-    logger
-}
 
 fn main() {
     let ts_local: DateTime<FixedOffset> = DateTime::parse_from_rfc3339(TIMESTAMP).unwrap();
@@ -141,7 +134,7 @@ fn main() {
         config_file_path,
         model_dir_path,
         command,
-        verbose: _,
+        verbose,
     } = Opts::from_clap(&matches);
 
     let model_dir_path = PathBuf::from(model_dir_path).canonicalize().expect("Cannot find model directory");
@@ -272,5 +265,5 @@ fn main() {
         }
     };
 
-    local_run(model_dir_path, config, cmd, disp_format);
+    local_run(model_dir_path, config, cmd, disp_format, verbose);
 }

@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use uuid::Uuid;
 
 use super::*;
+use slog::Logger;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -102,6 +103,10 @@ impl Engine {
         // TODO save queue etc...
         info!(self.logger, "Stopping engine.");
     }
+
+    pub fn logger(&self) -> &Logger {
+        &self.logger
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -192,7 +197,7 @@ impl EngineRef {
             let op = operation.read();
             debug!(engine.logger, "New Operation scheduled";
             o!(
-                "context"=> format!("{:?}", op.context()),
+//                "context"=> format!("{:?}", op.context()),
                 "id"=> format!("{}", op.id()),
                  "label"=> format!("{}", op.label()),
               )

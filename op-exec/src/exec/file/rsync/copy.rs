@@ -9,6 +9,7 @@ use crate::exec::file::rsync::compare::State;
 use crate::RuntimeError;
 
 use super::*;
+use slog::Logger;
 
 type Loaded = u64;
 
@@ -228,7 +229,8 @@ pub struct FileCopyOperation {
     chmod: Option<String>,
     host: Host,
     status: Arc<Mutex<Option<Result<ExitStatus, RuntimeError>>>>,
-    running: bool
+    running: bool,
+    logger: Logger,
 }
 
 impl FileCopyOperation {
@@ -240,6 +242,16 @@ impl FileCopyOperation {
                chown: &Option<String>,
                chmod: &Option<String>,
                host: &Host) -> FileCopyOperation {
+
+        let label = operation.read().label().to_string();
+        let logger = engine.read().logger().new(o!(
+            "label"=> label,
+            "curr_dir" => format!("{}", curr_dir.display()),
+            "src_path" => format!("{}", src_path.display()),
+            "dst_path" => format!("{}", dst_path.display()),
+            "host" => format!("{}", host),
+        ));
+
         FileCopyOperation {
             operation,
             engine,
@@ -250,7 +262,8 @@ impl FileCopyOperation {
             chmod: chmod.as_ref().map(|s|s.to_string()),
             host: host.clone(),
             status: Arc::new(Mutex::new(None)),
-            running: false
+            running: false,
+            logger
         }
     }
 

@@ -10,6 +10,7 @@ use kg_utils::collections::LruCache;
 use std::path::{PathBuf, Path};
 use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
 use kg_io::IoResult;
+use slog::{Record, Serializer, Key, Result as SlogResult};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -26,7 +27,7 @@ impl std::fmt::Display for ModelPath {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             ModelPath::Current => write!(f, "@"),
-            ModelPath::Revision(ref id) => write!(f, "id:{}", id),
+            ModelPath::Revision(ref id) => write!(f, "id: {}", id),
             ModelPath::Path(ref path) => write!(f, "{}", path.display()),
         }
     }
@@ -40,6 +41,12 @@ impl std::str::FromStr for ModelPath {
             "@" | "@current" => ModelPath::Current,
             _ => ModelPath::Revision(s.to_string()),
         })
+    }
+}
+
+impl slog::Value for ModelPath {
+    fn serialize(&self, _record: &Record, key: Key, serializer: &mut dyn Serializer) -> SlogResult {
+        serializer.emit_str(key, &format!("{}", &self))
     }
 }
 
