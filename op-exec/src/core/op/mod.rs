@@ -295,11 +295,13 @@ impl Future for OutcomeFuture {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.operation.read().outcome_task.register();
 
-        match self.operation.write().outcome.take() {
+        let res = match self.operation.write().outcome.take() {
             None => Ok(Async::NotReady),
             Some(Ok(outcome)) => Ok(Async::Ready(outcome)),
             Some(Err(err)) => Err(err),
-        }
+        };
+        self.operation.write().update_progress_value_done();
+        res
     }
 }
 
@@ -336,6 +338,8 @@ impl Stream for ProgressStream {
             if self.progress.counter() != progress.counter() {
                 if progress.is_done() {
                     self.done = true;
+                    //FIXME ws show last progress value
+                    return Ok(Async::Ready(None))
                 }
                 self.progress = progress.clone();
                 Ok(Async::Ready(Some(progress.clone())))

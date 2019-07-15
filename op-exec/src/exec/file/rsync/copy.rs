@@ -404,7 +404,6 @@ impl Future for FileCopyOperation {
 
         match *self.status() {
             Some(Ok(ref status)) => {
-                self.operation.write().update_progress_value_done();
                 if status.success() {
                     Ok(Async::Ready(Outcome::Empty))
                 } else {
@@ -412,7 +411,6 @@ impl Future for FileCopyOperation {
                 }
             }
             Some(Err(ref _err)) => {
-                self.operation.write().update_progress_value_done();
                 Err(RuntimeError::Custom)
             }
             None => Ok(Async::NotReady)
