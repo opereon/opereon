@@ -2,7 +2,7 @@
 
 
 
-use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature};
+use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature, ErrorCode};
 
 use super::*;
 use crate::{ConfigRef};
@@ -125,6 +125,7 @@ impl ModelManager {
         // TODO error handling
         Self::init_git_repo(&current_dir)?;
         Self::init_manifest(&current_dir)?;
+        Self::init_operc(&current_dir)?;
 
         Ok(())
     }
@@ -141,14 +142,23 @@ impl ModelManager {
         let tree = repo.find_tree(oid).expect("Cannot get tree!");
         let signature = Signature::now("opereon", "example@email.com").unwrap();
 
-        let _commit = repo.commit(Some("HEAD"),
-        &signature,
-        &signature,
-        message,
-        &tree,
-        &[&parent]).expect("Cannot commit model!");
+        if let Some(parent) = parent  {
+            let _commit = repo.commit(Some("HEAD"),
+                                      &signature,
+                                      &signature,
+                                      message,
+                                      &tree,
+                                      &[&parent]).expect("Cannot commit model!");
+        } else {
+            let _commit = repo.commit(Some("HEAD"),
+                                      &signature,
+                                      &signature,
+                                      message,
+                                      &tree,
+                                      &[]).expect("Cannot commit model!");
+        };
 
-        repo.checkout_index(None, None).unwrap();
+        repo.checkout_index(None, None).expect("Cannot checkout index");
 
         self.get(oid.into())
 
@@ -205,11 +215,30 @@ impl ModelManager {
         Ok(oid)
     }
 
-    fn find_last_commit(repo: &Repository) -> IoResult<Commit> {
+    /// Returns last commit or `None` if repository have no commits.
+    fn find_last_commit(repo: &Repository) -> IoResult<Option<Commit>> {
         // TODO error handling
-        let obj = repo.head().unwrap().resolve().unwrap().peel(ObjectType::Commit).unwrap();
+        let obj = match repo.head() {
+            Ok(head) => head,
+            Err(err) => {
+                match err.code() {
+                    ErrorCode::UnbornBranch => {
+                        return Ok(None)
+                    },
+                    _=> {
+                        eprintln!("err = {:?}", err);
+                        panic!("Error searching last commit")
+                    }
+                }
+            },
+        };
+
+
+
+
+        let obj = obj.resolve().unwrap().peel(ObjectType::Commit).unwrap();
         let commit = obj.peel_to_commit().unwrap();
-        Ok(commit)
+        Ok(Some(commit))
     }
 
 
@@ -241,6 +270,19 @@ impl ModelManager {
         fs::write(manifest_path, content)?;
         Ok(())
     }
+
+    fn init_operc<P: AsRef<Path>>(path: P) -> IoResult<()> {
+        use std::fmt::Write;
+
+        // ignore ./op directory
+        let manifest_path = path.as_ref().join(PathBuf::from(".operc"));
+        let mut content = String::new();
+        writeln!(&mut content, "[[exclude]]")?;
+        writeln!(&mut content, "path = \".op\"")?;
+        fs::write(manifest_path, content)?;
+        Ok(())
+    }
+
 
     fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
         // TODO ws error handling
