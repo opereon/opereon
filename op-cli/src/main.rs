@@ -16,7 +16,7 @@ use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
 use op_exec::{SshAuth, SshDest};
 use op_exec::OutcomeFuture;
 use options::*;
-use tokio::runtime::Runtime;
+use tokio::runtime;
 use futures::stream::Stream;
 use op_log::{build_file_drain, build_cli_drain};
 use slog::Duplicate;
@@ -72,7 +72,9 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
 }
 /// start engine and execute provided operation
 fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat, verbose: u8) {
-    let mut rt = Runtime::new().unwrap();
+    let mut rt = runtime::Builder::new()
+        .build()
+        .unwrap();
 
     let logger = init_logger(&config, verbose);
 
@@ -96,14 +98,14 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
             Ok(())
         });
 
-    rt.spawn(progress_fut.map_err(|err| {
+    let progress_fut = progress_fut.map_err(|err| {
         eprintln!("err = {:?}", err);
-    }));
+    });
 
-    rt.spawn(engine.clone().then(|_| {
+    let engine_fut = engine.clone().then(|_| {
         // Nothing to do when engine future complete
         futures::future::ok(())
-    }));
+    });
 
     let outcome_fut = outcome_fut
         .and_then(move |outcome| {
@@ -117,8 +119,8 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
             engine.stop();
             futures::future::ok::<(),()>(())
         });
-    rt.spawn(outcome_fut);
-    rt.shutdown_on_idle().wait().unwrap();
+
+    rt.block_on(outcome_fut.join3(engine_fut, progress_fut).then(|_| futures::future::ok::<(),()>(()))).unwrap();
 }
 
 
@@ -263,9 +265,9 @@ fn main() {
         Command::Init => {
             ExecContext::ModelInit
         }
-        Command::Remote { expr, command } => {
+        Command::Remote { expr, command, model } => {
             let command = command.join(" ");
-            ExecContext::RemoteExec {expr, command}
+            ExecContext::RemoteExec {expr, command, model_path: model}
         }
     };
 

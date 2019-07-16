@@ -84,11 +84,11 @@ pub trait ScopedModelDef: ModelDef {
     fn scope_mut(&self) -> &ScopeMut;
 }
 
-pub (super) trait ParsedModelDef: Sized {
+pub trait ParsedModelDef: Sized {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError>;
 }
 
-pub(crate) trait AsScoped: 'static {
+pub trait AsScoped: 'static {
     fn as_scoped(&self) -> &Scoped;
 }
 
@@ -103,7 +103,7 @@ fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> T {
 
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Scoped {
+pub struct Scoped {
     #[serde(skip)]
     root: NodeRef,
     #[serde(skip)]

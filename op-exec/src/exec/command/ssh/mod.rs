@@ -10,7 +10,9 @@ use super::*;
 
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
+pub use self::operations::{RemoteCommandOperation};
 
+mod operations;
 mod config;
 mod dest;
 
@@ -210,6 +212,16 @@ impl SshSession {
             .stderr(stderr);
 
         Ok(ssh_cmd.spawn()?)
+    }
+
+    fn run_command_async(&mut self,
+                         cmd: &str,
+                         args: &[String],
+                         stdout: Stdio,
+                         stderr: Stdio,
+                         log: &OutputLog,
+    ) {
+
     }
 
     fn run_script(&mut self,
