@@ -55,6 +55,10 @@ pub enum Context {
         chmod: Option<String>,
         host: Host,
     },
+    RemoteExec {
+        expr: String,
+        command: String,
+    },
     Sequence(Vec<OperationRef>),
     Parallel(Vec<OperationRef>),
 }
@@ -75,6 +79,7 @@ impl Context {
             Context::StepExec {..} => "step-exec",
             Context::TaskExec {..} => "task-exec",
             Context::FileCopyExec {..} => "file-copy-exec",
+            Context::RemoteExec {..} => "remote-exec",
             Context::Sequence(..) => "sequence",
             Context::Parallel(..) => "parallel",
         }

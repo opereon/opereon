@@ -28,7 +28,7 @@ fn parse_ssh_url(s: &str) -> Result<Url, String> {
     name = "op",
     author = "",
     about = "OPEREON - System configuration automation.\nCopyright (c) Kodegenix Sp z o.o. (http://www.kodegenix.pl).",
-    raw(setting = "AppSettings::InferSubcommands")
+    raw(setting = "AppSettings::InferSubcommands", setting = "structopt::clap::AppSettings::ColoredHelp")
 )]
 pub struct Opts {
     /// Path(s) to the config file
@@ -60,7 +60,7 @@ pub struct Opts {
 #[derive(Debug, StructOpt)]
 pub enum Command {
     /// Prints config to the output
-    #[structopt(name = "config", author = "")]
+    #[structopt(name = "config", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Config {
         /// Output format
         #[structopt(
@@ -75,14 +75,14 @@ pub enum Command {
         format: DisplayFormat,
     },
     /// Commit current model
-    #[structopt(name = "commit", author = "")]
+    #[structopt(name = "commit", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Commit {
         /// Optional path to read model from. By default current directory model is used.
         #[structopt(name = "MESSAGE", default_value = "Model update")]
         message: String,
     },
     /// Query model
-    #[structopt(name = "query", author = "")]
+    #[structopt(name = "query", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Query {
         /// Output format
         #[structopt(
@@ -103,7 +103,7 @@ pub enum Command {
         expr: String,
     },
     /// Test model
-    #[structopt(name = "test", author = "")]
+    #[structopt(name = "test", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Test {
         /// Output format
         #[structopt(
@@ -121,7 +121,7 @@ pub enum Command {
         model: ModelPath,
     },
     /// Compare two model versions
-    #[structopt(name = "diff", author = "")]
+    #[structopt(name = "diff", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Diff {
         /// Output format
         #[structopt(
@@ -150,7 +150,7 @@ pub enum Command {
         source: ModelPath,
     },
     /// Update model to a new version
-    #[structopt(name = "update", author = "")]
+    #[structopt(name = "update", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Update {
         /// Output format
         #[structopt(
@@ -174,7 +174,7 @@ pub enum Command {
         source: ModelPath,
     },
     /// Run checks from a model
-    #[structopt(name = "check", author = "")]
+    #[structopt(name = "check", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Check {
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
@@ -187,7 +187,7 @@ pub enum Command {
         dry_run: bool,
     },
     /// Run probe from a model
-    #[structopt(name = "probe", author = "")]
+    #[structopt(name = "probe", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Probe {
         /// SSH connection url to remote host being probed, for example ssh://root@example.org:22
         #[structopt(name = "URL", parse(try_from_str = "parse_ssh_url"))]
@@ -208,14 +208,27 @@ pub enum Command {
         #[structopt(name = "MODEL", default_value = "@")]
         model: ModelPath,
     },
+    /// Execute shell command on remote host(s)
+    #[structopt(name = "remote", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+    Remote {
+        /// Query expression. Determines target hosts. Defaults to all hosts
+        #[structopt(name = "OPATH", short = "h", long = "hosts", default_value = "$$hosts")]
+        expr: String,
+
+        /// Command to execute on remote hosts
+        #[structopt(name = "COMMAND",
+            raw(raw = "true")
+        )]
+        command: Vec<String>,
+    },
     /// Execute prepared work package
-    #[structopt(name = "exec", author = "")]
+    #[structopt(name = "exec", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Exec {
         /// Work path, defaults to current working directory
         #[structopt(name = "PATH", default_value = ".", parse(from_os_str))]
         path: PathBuf,
     },
     /// Initialize empty opereon model
-    #[structopt(name = "init", author = "")]
+    #[structopt(name = "init", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Init,
 }

@@ -263,6 +263,10 @@ fn main() {
         Command::Init => {
             ExecContext::ModelInit
         }
+        Command::Remote { expr, command } => {
+            let command = command.join(" ");
+            ExecContext::RemoteExec {expr, command}
+        }
     };
 
     local_run(model_dir_path, config, cmd, disp_format, verbose);
