@@ -215,27 +215,28 @@ impl SshSession {
         Ok(ssh_cmd.spawn()?)
     }
 
-    fn run_command_async(&mut self,
-                         cmd: &str,
-                         args: &[String],
-    ) -> Result<tokio_process::Child, SshError>{
-        if !self.opened.get() {
-            return Err(SshError::SshClosed);
-        }
-
-        let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
-
-        let mut ssh_cmd = self.ssh_cmd()
-            .arg("-o").arg("BatchMode=yes")
-            .arg("-t")
-            .arg(usr_cmd)
-            .build();
-
-        ssh_cmd.stdout(Stdio::piped());
-        ssh_cmd.stderr(Stdio::piped());
-
-        Ok(ssh_cmd.spawn_async()?)
-    }
+    // this code may be used during migration to non-blocking api
+//    fn run_command_async(&mut self,
+//                         cmd: &str,
+//                         args: &[String],
+//    ) -> Result<tokio_process::Child, SshError>{
+//        if !self.opened.get() {
+//            return Err(SshError::SshClosed);
+//        }
+//
+//        let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
+//
+//        let mut ssh_cmd = self.ssh_cmd()
+//            .arg("-o").arg("BatchMode=yes")
+//            .arg("-t")
+//            .arg(usr_cmd)
+//            .build();
+//
+//        ssh_cmd.stdout(Stdio::piped());
+//        ssh_cmd.stderr(Stdio::piped());
+//
+//        Ok(ssh_cmd.spawn_async()?)
+//    }
 
     fn run_script(&mut self,
         script: SourceRef,

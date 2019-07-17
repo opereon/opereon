@@ -1,19 +1,21 @@
-use crate::{OperationRef, EngineRef, OperationImpl, RuntimeError, Outcome, ModelPath, Host, AsScoped, create_command_executor, SourceRef};
-use slog::Logger;
-use tokio::prelude::{Future, Poll, Async};
+use crate::{
+    AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef,
+    Outcome, RuntimeError, SourceRef,
+};
 use kg_tree::opath::Opath;
-use op_model::{HostDef, ScopedModelDef, ModelDef, ParsedModelDef, Run};
-use std::sync::{Arc, Mutex};
-use tokio_process::{Child};
-use tokio::prelude::*;
-use std::io::BufReader;
+use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
 use serde::export::fmt::Debug;
+use slog::Logger;
+use std::io::BufReader;
+use std::sync::{Arc, Mutex};
+use tokio::prelude::*;
+use tokio::prelude::{Async, Future, Poll};
+use tokio_process::Child;
 
-type ChildFuture = Box<dyn Future<Item = String, Error=RuntimeError> +Send>;
+type ChildFuture = Box<dyn Future<Item = String, Error = RuntimeError> + Send>;
 
 /// Operation executing command on hosts specified by `expr`.
 pub struct RemoteCommandOperation {
-    operation: OperationRef,
     engine: EngineRef,
     command: String,
     expr: String,
@@ -26,14 +28,19 @@ pub struct RemoteCommandOperation {
 }
 
 impl Debug for RemoteCommandOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, _f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         unimplemented!()
     }
 }
 
-
 impl RemoteCommandOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, expr: String, command: String, model_path: ModelPath) -> RemoteCommandOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        expr: String,
+        command: String,
+        model_path: ModelPath,
+    ) -> RemoteCommandOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -42,7 +49,6 @@ impl RemoteCommandOperation {
             "model" => model_path.clone(),
         ));
         RemoteCommandOperation {
-            operation,
             engine,
             command,
             expr,
@@ -81,7 +87,6 @@ impl RemoteCommandOperation {
 
     /// Creates future collecting child output.
     fn get_child_future(mut child: Child, host: &Host) -> ChildFuture {
-
         // consume child stdout and stderr
         let stdout = child.stdout().take().expect("Cannot get child stdout");
         let stderr = child.stderr().take().expect("Cannot get child stderr");
@@ -89,30 +94,29 @@ impl RemoteCommandOperation {
         let h = Arc::new(host.hostname().to_string());
 
         // for now skip child exit status
-        let child_fut = child.map_err(|err| RuntimeError::Custom)
-            .map(|_exit_status|());
+        let child_fut = child
+            .map_err(|_err| RuntimeError::Custom)
+            .map(|_exit_status| ());
 
         // format stdout/stderr lines
         let hostname = h.clone();
         let stdout_fut = tokio::io::lines(BufReader::new(stdout))
-            .map(move |line| {
-                format!("[{}] out: {}", hostname, line)
-            });
+            .map(move |line| format!("[{}] out: {}", hostname, line));
         let hostname = h.clone();
         let stderr_fut = tokio::io::lines(BufReader::new(stderr))
-            .map(move |line| {
-                format!("[{}] err: {}", hostname, line)
-            });
+            .map(move |line| format!("[{}] err: {}", hostname, line));
 
         // stdout and stderr as single stream
-        let out_fut = stdout_fut.select(stderr_fut)
+        let out_fut = stdout_fut
+            .select(stderr_fut)
             .map_err(|err| RuntimeError::from(err))
             .collect()
-            .map(|res| res.join("\n"));// collect output as single string
+            .map(|res| res.join("\n")); // collect output as single string
 
         // map errors and resolve with collected output when child finishes
-        let fut = child_fut.join(out_fut)
-            .map_err(|err|RuntimeError::Custom)
+        let fut = child_fut
+            .join(out_fut)
+            .map_err(|_err| RuntimeError::Custom)
             .map(|(_, out)| out);
 
         Box::new(fut)
@@ -131,9 +135,20 @@ impl Future for RemoteCommandOperation {
 
             for host in &self.hosts {
                 // FIXME ssh_session_cache_mut().get(..) is blocking call, should be implemented as Future
-                match self.engine.write().ssh_session_cache_mut().get(host.ssh_dest()) {
-                    Ok(mut session) => {
-                        let child = session.read().run_script_async(SourceRef::Source(&self.command), &[], None, None, None)?;
+                match self
+                    .engine
+                    .write()
+                    .ssh_session_cache_mut()
+                    .get(host.ssh_dest())
+                {
+                    Ok(session) => {
+                        let child = session.read().run_script_async(
+                            SourceRef::Source(&self.command),
+                            &[],
+                            None,
+                            None,
+                            None,
+                        )?;
                         let fut = Self::get_child_future(child, &host);
                         futs.push((Some(fut), None));
                     }
@@ -141,7 +156,6 @@ impl Future for RemoteCommandOperation {
                         futs.push((None, Some(Err(RuntimeError::from(err)))));
                     }
                 }
-
             }
 
             *self.futures.lock().unwrap() = futs;
@@ -152,24 +166,20 @@ impl Future for RemoteCommandOperation {
             let mut finished = true;
             // Poll ChildFutures and collect results
             for (fut, result) in self.futures.lock().unwrap().iter_mut() {
-                if result.is_some() || fut.is_none(){
-                    continue
+                if result.is_some() || fut.is_none() {
+                    continue;
                 }
                 match fut.as_mut().unwrap().poll() {
-                    Ok(Async::Ready(output)) => {
-                        *result = Some(Ok(output))
-                    },
-                    Ok(Async::NotReady) => {
-                        finished = false
-                    },
-                    Err(err) => {
-                        *result = Some(Err(RuntimeError::from(err)))
-                    },
+                    Ok(Async::Ready(output)) => *result = Some(Ok(output)),
+                    Ok(Async::NotReady) => finished = false,
+                    Err(err) => *result = Some(Err(RuntimeError::from(err))),
                 }
             }
 
             if finished {
-                let res: Vec<(String, Result<String, RuntimeError>)> = self.hosts.iter()
+                let res: Vec<(String, Result<String, RuntimeError>)> = self
+                    .hosts
+                    .iter()
                     .zip(self.futures.lock().unwrap().iter_mut())
                     .map(|(host, (_, result))| {
                         (host.hostname().to_string(), result.take().unwrap())
@@ -181,10 +191,10 @@ impl Future for RemoteCommandOperation {
                     match out {
                         Ok(out) => {
                             info!(self.logger, "================Host [{host}]================\n{out}", host=h, out=out; "verbosity" => 0);
-                        },
+                        }
                         Err(err) => {
                             info!(self.logger, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=format!("{}", err); "verbosity" => 0);
-                        },
+                        }
                     }
                 }
                 Ok(Async::Ready(Outcome::Empty))

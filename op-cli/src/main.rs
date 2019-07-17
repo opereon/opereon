@@ -11,17 +11,17 @@ use futures::Future;
 use structopt::StructOpt;
 use url::Url;
 
+use crate::slog::Drain;
 use display::DisplayFormat;
+use futures::stream::Stream;
+use op_exec::OutcomeFuture;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
 use op_exec::{SshAuth, SshDest};
-use op_exec::OutcomeFuture;
+use op_log::{build_cli_drain, build_file_drain};
 use options::*;
-use tokio::runtime;
-use futures::stream::Stream;
-use op_log::{build_file_drain, build_cli_drain};
 use slog::Duplicate;
-use crate::slog::Drain;
 use slog::FnValue;
+use tokio::runtime;
 
 mod display;
 mod options;
@@ -54,8 +54,10 @@ fn make_path_absolute(path: &Path) -> PathBuf {
 }
 
 fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
-
-    let file_drain = build_file_drain(config.log().log_path().to_path_buf(), (*config.log().level()).into());
+    let file_drain = build_file_drain(
+        config.log().log_path().to_path_buf(),
+        (*config.log().level()).into(),
+    );
     let cli_drain = build_cli_drain(verbosity);
 
     let drain = Duplicate::new(file_drain, cli_drain);
@@ -63,18 +65,22 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
     let logger = slog::Logger::root(
         drain.fuse(),
         o!("module" =>
-           FnValue(move |info| {
-                info.module()
-           })
-          ),
+         FnValue(move |info| {
+              info.module()
+         })
+        ),
     );
     logger
 }
 /// start engine and execute provided operation
-fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, disp_format: DisplayFormat, verbose: u8) {
-    let mut rt = runtime::Builder::new()
-        .build()
-        .unwrap();
+fn local_run(
+    current_dir: PathBuf,
+    config: ConfigRef,
+    operation: ExecContext,
+    disp_format: DisplayFormat,
+    verbose: u8,
+) {
+    let mut rt = runtime::Builder::new().build().unwrap();
 
     let logger = init_logger(&config, verbose);
 
@@ -83,20 +89,19 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         .enqueue_operation(operation.into(), false)
         .expect("Cannot enqueue operation");
 
-    let progress_fut = outcome_fut.progress()
-        .for_each(|p| {
-            println!("=========================================");
-            eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-            for p in p.steps() {
-                if let Some(ref file_name) = p.file_name() {
-                    eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-                } else {
-                    eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-                }
+    let progress_fut = outcome_fut.progress().for_each(|p| {
+        println!("=========================================");
+        eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
+        for p in p.steps() {
+            if let Some(ref file_name) = p.file_name() {
+                eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
+            } else {
+                eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
             }
-//            eprintln!("p = {:#?}", p);
-            Ok(())
-        });
+        }
+        //            eprintln!("p = {:#?}", p);
+        Ok(())
+    });
 
     let progress_fut = progress_fut.map_err(|err| {
         eprintln!("err = {:?}", err);
@@ -117,12 +122,16 @@ fn local_run(current_dir: PathBuf, config: ConfigRef, operation: ExecContext, di
         })
         .then(move |_| {
             engine.stop();
-            futures::future::ok::<(),()>(())
+            futures::future::ok::<(), ()>(())
         });
 
-    rt.block_on(outcome_fut.join3(engine_fut, progress_fut).then(|_| futures::future::ok::<(),()>(()))).unwrap();
+    rt.block_on(
+        outcome_fut
+            .join3(engine_fut, progress_fut)
+            .then(|_| futures::future::ok::<(), ()>(())),
+    )
+    .unwrap();
 }
-
 
 fn main() {
     let ts_local: DateTime<FixedOffset> = DateTime::parse_from_rfc3339(TIMESTAMP).unwrap();
@@ -139,7 +148,9 @@ fn main() {
         verbose,
     } = Opts::from_clap(&matches);
 
-    let model_dir_path = PathBuf::from(model_dir_path).canonicalize().expect("Cannot find model directory");
+    let model_dir_path = PathBuf::from(model_dir_path)
+        .canonicalize()
+        .expect("Cannot find model directory");
 
     let config = match ConfigRef::read(&config_file_path) {
         Err(err) => {
@@ -218,9 +229,7 @@ fn main() {
         Command::Exec { mut path } => {
             make_path_absolute(&mut path);
 
-            ExecContext::ProcExec {
-                exec_path: path,
-            }
+            ExecContext::ProcExec { exec_path: path }
         }
         Command::Check {
             mut model,
@@ -262,12 +271,18 @@ fn main() {
                 args,
             }
         }
-        Command::Init => {
-            ExecContext::ModelInit
-        }
-        Command::Remote { expr, command, model } => {
+        Command::Init => ExecContext::ModelInit,
+        Command::Remote {
+            expr,
+            command,
+            model,
+        } => {
             let command = command.join(" ");
-            ExecContext::RemoteExec {expr, command, model_path: model}
+            ExecContext::RemoteExec {
+                expr,
+                command,
+                model_path: model,
+            }
         }
     };
 
