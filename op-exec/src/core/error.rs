@@ -82,6 +82,15 @@ impl From<kg_diag::BasicDiag> for RuntimeError {
     }
 }
 
+//FIXME (jc)
+impl From<SshError> for RuntimeError {
+    fn from(err: SshError) -> Self {
+        println!("ssh err {:?}", err);
+        RuntimeError::Custom
+    }
+}
+
+
 
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

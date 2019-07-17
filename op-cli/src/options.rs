@@ -211,15 +211,17 @@ pub enum Command {
     /// Execute shell command on remote host(s)
     #[structopt(name = "remote", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
     Remote {
-        /// Query expression. Determines target hosts. Defaults to all hosts
+        /// Query expression. Determines target hosts. Defaults to all hosts from current model
         #[structopt(name = "OPATH", short = "h", long = "hosts", default_value = "$$hosts")]
         expr: String,
-
         /// Command to execute on remote hosts
         #[structopt(name = "COMMAND",
             raw(raw = "true")
         )]
         command: Vec<String>,
+        /// Model path, defaults to current working directory
+        #[structopt(short = "m", long = "model", default_value = "@")]
+        model: ModelPath,
     },
     /// Execute prepared work package
     #[structopt(name = "exec", author = "", raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]

@@ -58,6 +58,7 @@ pub enum Context {
     RemoteExec {
         expr: String,
         command: String,
+        model_path: ModelPath,
     },
     Sequence(Vec<OperationRef>),
     Parallel(Vec<OperationRef>),
