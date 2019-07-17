@@ -423,6 +423,7 @@ mod tests {
     use super::*;
     use tokio::prelude::Stream;
     use tokio::prelude::future::*;
+    use crate::RuntimeError;
 
     lazy_static! {
         static ref LOCK: Mutex<()> = Mutex::new(());
@@ -526,26 +527,30 @@ mod tests {
     fn run_script_async_out_streams() {
         let mut session = ssh_session();
         session.open().unwrap();
-        let mut child :tokio_process::Child = session.run_script_async(SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"), &[], None, None, None).expect("error creating session");
+        let mut child: tokio_process::Child = session.run_script_async(SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"), &[], None, None, None).expect("error creating session");
         let stdout = child.stdout().take().expect("Cannot get child stdout");
         let stderr = child.stderr().take().expect("Cannot get child stderr");
 
         let child_fut = child.map_err(|err| panic!("child error"))
-            .map(|exit_status|println!("Exit status : {:?}", exit_status));
+            .map(|exit_status| println!("Exit status : {:?}", exit_status));
 
         let out_fut = tokio::io::lines(BufReader::new(stdout))
             .map_err(|err| panic!())
-            .for_each(|line| {
-                println!("out: {}",line);
-                Ok(())
+            .map(|line| {
+                Ok(format!("out: {}", line))
             });
         let err_fut = tokio::io::lines(BufReader::new(stderr))
             .map_err(|err| panic!())
-            .for_each(|line| {
-                println!("err: {}",line);
+            .map(|line| {
+                Ok(format!("err: {}", line))
+            });
+
+        let out_fut = out_fut.select(err_fut)
+            .for_each(|line:Result<String, RuntimeError>| {
+                eprintln!("{}", line.unwrap());
                 Ok(())
             });
-        tokio::run(out_fut.join(child_fut).join(err_fut).map(|_|()));
+        tokio::run(out_fut.join(child_fut).map(|_| ()));
     }
 
     #[test]
