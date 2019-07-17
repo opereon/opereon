@@ -1,6 +1,6 @@
 use crate::{
-    AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef,
-    Outcome, RuntimeError, SourceRef,
+    AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
+    SourceRef,
 };
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
@@ -121,6 +121,64 @@ impl RemoteCommandOperation {
 
         Box::new(fut)
     }
+
+    /// Initialize inner futures and make a first poll
+    fn start_polling(&mut self) -> Poll<Outcome, RuntimeError> {
+        self.hosts = self.resolve_hosts()?;
+        let mut futs = Vec::with_capacity(self.hosts.len());
+        info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
+        for host in &self.hosts {
+            // FIXME ssh_session_cache_mut().get(..) is blocking call, should be implemented as Future
+            match self
+                .engine
+                .write()
+                .ssh_session_cache_mut()
+                .get(host.ssh_dest())
+            {
+                Ok(session) => {
+                    let child = session.read().run_script_async(
+                        SourceRef::Source(&self.command),
+                        &[],
+                        None,
+                        None,
+                        None,
+                    )?;
+                    let fut = Self::get_child_future(child, &host);
+                    futs.push((Some(fut), None));
+                }
+                Err(err) => {
+                    futs.push((None, Some(Err(RuntimeError::from(err)))));
+                }
+            }
+        }
+        *self.futures.lock().unwrap() = futs;
+        self.started = true;
+        self.poll()
+    }
+
+    /// Consume inner futures results, log them and return `Async::Ready`
+    fn finish_polling(&mut self) -> Poll<Outcome, RuntimeError> {
+        let res: Vec<(String, Result<String, RuntimeError>)> = self
+            .hosts
+            .iter()
+            .zip(self.futures.lock().unwrap().iter_mut())
+            .map(|(host, (_, result))| {
+                (host.hostname().to_string(), result.take().unwrap())
+            })
+            .collect();
+        info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
+        for (h, out) in res.iter() {
+            match out {
+                Ok(out) => {
+                    info!(self.logger, "================Host [{host}]================\n{out}", host=h, out=out; "verbosity" => 0);
+                }
+                Err(err) => {
+                    info!(self.logger, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=format!("{}", err); "verbosity" => 0);
+                }
+            }
+        }
+        Ok(Async::Ready(Outcome::Empty))
+    }
 }
 
 impl Future for RemoteCommandOperation {
@@ -129,39 +187,7 @@ impl Future for RemoteCommandOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if !self.started {
-            self.hosts = self.resolve_hosts()?;
-            let mut futs = Vec::with_capacity(self.hosts.len());
-            info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
-
-            for host in &self.hosts {
-                // FIXME ssh_session_cache_mut().get(..) is blocking call, should be implemented as Future
-                match self
-                    .engine
-                    .write()
-                    .ssh_session_cache_mut()
-                    .get(host.ssh_dest())
-                {
-                    Ok(session) => {
-                        let child = session.read().run_script_async(
-                            SourceRef::Source(&self.command),
-                            &[],
-                            None,
-                            None,
-                            None,
-                        )?;
-                        let fut = Self::get_child_future(child, &host);
-                        futs.push((Some(fut), None));
-                    }
-                    Err(err) => {
-                        futs.push((None, Some(Err(RuntimeError::from(err)))));
-                    }
-                }
-            }
-
-            *self.futures.lock().unwrap() = futs;
-
-            self.started = true;
-            self.poll()
+            self.start_polling()
         } else {
             let mut finished = true;
             // Poll ChildFutures and collect results
@@ -177,27 +203,7 @@ impl Future for RemoteCommandOperation {
             }
 
             if finished {
-                let res: Vec<(String, Result<String, RuntimeError>)> = self
-                    .hosts
-                    .iter()
-                    .zip(self.futures.lock().unwrap().iter_mut())
-                    .map(|(host, (_, result))| {
-                        (host.hostname().to_string(), result.take().unwrap())
-                    })
-                    .collect();
-
-                info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
-                for (h, out) in res.iter() {
-                    match out {
-                        Ok(out) => {
-                            info!(self.logger, "================Host [{host}]================\n{out}", host=h, out=out; "verbosity" => 0);
-                        }
-                        Err(err) => {
-                            info!(self.logger, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=format!("{}", err); "verbosity" => 0);
-                        }
-                    }
-                }
-                Ok(Async::Ready(Outcome::Empty))
+                self.finish_polling()
             } else {
                 Ok(Async::NotReady)
             }
