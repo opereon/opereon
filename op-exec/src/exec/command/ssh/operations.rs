@@ -1,9 +1,10 @@
-use crate::{OperationRef, EngineRef, OperationImpl, RuntimeError, Outcome, ModelPath, Host, AsScoped, create_command_executor};
+use crate::{OperationRef, EngineRef, OperationImpl, RuntimeError, Outcome, ModelPath, Host, AsScoped, create_command_executor, SourceRef};
 use slog::Logger;
 use tokio::prelude::{Future, Poll, Async};
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ScopedModelDef, ModelDef, ParsedModelDef, Run};
 use std::sync::{Arc, Mutex};
+use tokio_process::WaitWithOutput;
 
 /// Operation executing command on hosts specified by `expr`.
 #[derive(Debug)]
@@ -13,8 +14,9 @@ pub struct RemoteCommandOperation {
     command: String,
     expr: String,
     model_path: ModelPath,
+
     hosts: Vec<Host>,
-    results: Arc<Mutex<Vec<Result<String, RuntimeError>>>>,
+    futures: Arc<Mutex<Vec<(Option<WaitWithOutput>, Option<Result<String, RuntimeError>>)>>>,
     started: bool,
     logger: Logger,
 }
@@ -35,7 +37,7 @@ impl RemoteCommandOperation {
             expr,
             model_path,
             hosts: vec![],
-            results: Arc::new(Mutex::new(vec![])),
+            futures: Arc::new(Mutex::new(vec![])),
             started: false,
             logger,
         }
@@ -64,51 +66,6 @@ impl RemoteCommandOperation {
         }
         Ok(hosts)
     }
-
-    fn start_execution(&mut self) -> Result<(), RuntimeError> {
-        self.hosts = self.resolve_hosts()?;
-
-        let mut hosts = self.hosts.clone();
-        let e = self.engine.clone();
-
-        std::thread::spawn(move || {
-            let mut handles = Vec::with_capacity(hosts.len());
-
-            for host in hosts.drain(..) {
-                let engine = e.clone();
-                let jh = std::thread::spawn(move || {
-                    let inner = move || -> Result<String, RuntimeError>{
-                        let e = engine.write().ssh_session_cache_mut().get(host.ssh_dest())?;
-
-                    };
-
-
-
-                });
-
-                handles.push(jh);
-            }
-
-        });
-
-
-
-//        let mut executor = create_command_executor(step_exec.host(), &self.engine)?;
-//        executor.exec_command(&self.engine,
-//                              &self.command,
-//                              &[],
-//                              out_format,
-//                              &output)?
-
-
-
-
-        self.started = true;
-
-        info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
-
-        Ok(())
-    }
 }
 
 impl Future for RemoteCommandOperation {
@@ -117,10 +74,69 @@ impl Future for RemoteCommandOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         if !self.started {
-            self.start_execution()?;
-            Ok(Async::NotReady)
+            self.hosts = self.resolve_hosts()?;
+            let mut futs = Vec::with_capacity(self.hosts.len());
+            info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
+
+            for host in &self.hosts {
+
+                match self.engine.write().ssh_session_cache_mut().get(host.ssh_dest()) {
+                    Ok(mut session) => {
+                        let child = session.read().run_script_async(SourceRef::Source(&self.command), &[], None, None, None)?;
+                        futs.push((Some(child.wait_with_output()), None));
+                    }
+                    Err(err) => {
+                        futs.push((None, Some(Err(RuntimeError::from(err)))));
+                    }
+                }
+
+            }
+
+            *self.futures.lock().unwrap() = futs;
+
+            self.started = true;
+            self.poll()
         } else {
-            Ok(Async::Ready(Outcome::Empty))
+            let mut finished = true;
+            for (fut, result) in self.futures.lock().unwrap().iter_mut() {
+                if result.is_some() || fut.is_none(){
+                    continue
+                }
+                match fut.as_mut().unwrap().poll() {
+                    Ok(Async::Ready(output)) => {
+                        *result = Some(Ok(String::from_utf8(output.stdout).unwrap()))
+                    },
+                    Ok(Async::NotReady) => {
+                        finished = false
+                    },
+                    Err(err) => {
+                        *result = Some(Err(RuntimeError::from(err)))
+                    },
+                }
+            }
+
+            if finished {
+                let res: Vec<(String, Result<String, RuntimeError>)> = self.hosts.iter()
+                    .zip(self.futures.lock().unwrap().iter_mut())
+                    .map(|(host, (_, result))| {
+                        (host.hostname().to_string(), result.take().unwrap())
+                    })
+                    .collect();
+
+                for (h, out) in res.iter() {
+                    match out {
+                        Ok(out) => {
+                            eprintln!("Host {}\n{}", h, out);
+                        },
+                        Err(err) => {
+                            eprintln!("Host {}\n Error: {:?}", h, err);
+                        },
+                    }
+                }
+                Ok(Async::Ready(Outcome::Empty))
+            } else {
+                Ok(Async::NotReady)
+            }
         }
     }
 }

@@ -1,0 +1,14 @@
+hostname: <% @key %>
+domain: unreachable
+fqdn: <% hostname + '.' + domain %>
+ssh_dest:
+  hostname: unreachable.host
+  port: 22
+  username: root
+  auth:
+    method: public-key
+    identity_file: ~/.ssh/id_rsa
+#ifaces:
+#  ens33:
+#    ip4: 127.0.0.1
+packages: [mc, vim-enhanced2]

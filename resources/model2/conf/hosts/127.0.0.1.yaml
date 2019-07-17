@@ -1,0 +1,13 @@
+hostname: <% @key %>
+fqdn: <% hostname %>
+ssh_dest:
+  hostname: 127.0.0.1
+  port: 22
+  username: wiktor
+  auth:
+    method: public-key
+    identity_file: ~/.ssh/id_rsa
+ifaces:
+  ens33:
+    ip4: 127.0.0.1
+packages: [mc, vim-enhanced2]
