@@ -46,7 +46,10 @@ impl ParsedModelDef for UserDef {
     fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(props.contains_key("username"), "user definition must have 'username' property")?; //FIXME (jc)
+                perr_assert!(
+                    props.contains_key("username"),
+                    "user definition must have 'username' property"
+                )?; //FIXME (jc)
             }
             _ => {
                 perr!("user definition must be an object")?; //FIXME (jc)

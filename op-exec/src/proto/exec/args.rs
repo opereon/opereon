@@ -5,13 +5,18 @@ pub struct ArgumentSet(Vec<ValueDef>);
 
 impl ArgumentSet {
     pub fn new(node_set: &NodeSet, root: &NodeRef) -> ArgumentSet {
-        ArgumentSet(node_set.iter().map(|n| {
-            if n.data().is_root() && !n.is_ref_eq(root) {
-                ValueDef::Static(n.clone())
-            } else {
-                ValueDef::Resolvable(n.path())
-            }
-        }).collect())
+        ArgumentSet(
+            node_set
+                .iter()
+                .map(|n| {
+                    if n.data().is_root() && !n.is_ref_eq(root) {
+                        ValueDef::Static(n.clone())
+                    } else {
+                        ValueDef::Resolvable(n.path())
+                    }
+                })
+                .collect(),
+        )
     }
 
     pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {

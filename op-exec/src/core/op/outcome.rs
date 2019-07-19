@@ -35,7 +35,6 @@ impl std::fmt::Display for Outcome {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct NodeSetRef(Arc<Mutex<NodeSet>>);
 
@@ -72,13 +71,19 @@ impl PartialEq for NodeSetRef {
 }
 
 impl ser::Serialize for NodeSetRef {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         self.lock().serialize(serializer)
     }
 }
 
 impl<'de> de::Deserialize<'de> for NodeSetRef {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         let n = NodeSet::deserialize(deserializer)?;
         Ok(n.into())
     }

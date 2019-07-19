@@ -6,7 +6,6 @@ pub use self::task::*;
 pub use self::watch::*;
 
 mod proc;
-mod watch;
-mod task;
 mod run;
-
+mod task;
+mod watch;

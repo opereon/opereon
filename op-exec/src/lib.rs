@@ -1,8 +1,4 @@
-#![feature(
-    box_syntax,
-    specialization,
-    integer_atomics,
-)]
+#![feature(box_syntax, specialization, integer_atomics)]
 
 #[macro_use]
 extern crate kg_diag_derive;
@@ -21,13 +17,13 @@ use std::path::{Path, PathBuf};
 
 use chrono::prelude::*;
 use kg_diag::*;
-use kg_io::*;
 use kg_io::fs;
+use kg_io::*;
 use kg_symbol::Symbol;
-use kg_tree::*;
 use kg_tree::diff::*;
 use kg_tree::opath::*;
 use kg_tree::serial::from_tree;
+use kg_tree::*;
 use kg_utils::collections::{LinkedHashMap, LruCache};
 use os_pipe::pipe;
 
@@ -39,7 +35,6 @@ pub use self::exec::*;
 pub use self::proto::*;
 
 mod config;
-mod proto;
 mod core;
 mod exec;
-
+mod proto;

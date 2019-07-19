@@ -11,14 +11,14 @@ pub use self::config::*;
 pub use self::local::*;
 pub use self::ssh::*;
 
+mod config;
 mod local;
 mod ssh;
-mod config;
 
 //FIXME (jc)
 #[derive(Debug, Clone)]
 pub enum CommandError {
-    Undef
+    Undef,
 }
 
 impl From<SshError> for CommandError {
@@ -49,8 +49,8 @@ impl From<kg_io::error::IoError> for CommandError {
     }
 }
 
-impl From<kg_tree::ErrorKind> for CommandError {
-    fn from(err: kg_tree::ErrorKind) -> Self {
+impl From<kg_tree::TreeErrorDetail> for CommandError {
+    fn from(err: kg_tree::TreeErrorDetail) -> Self {
         eprintln!("tree error: {:?}", err);
         CommandError::Undef
     }
@@ -71,9 +71,7 @@ impl<'a> SourceRef<'a> {
                 kg_io::fs::read_to_string(path, &mut s)?;
                 Ok(s)
             }
-            SourceRef::Source(src) => {
-                Ok(src.into())
-            }
+            SourceRef::Source(src) => Ok(src.into()),
         }
     }
 
@@ -91,42 +89,44 @@ impl<'a> SourceRef<'a> {
     }
 }
 
-
 pub trait CommandExecutor {
-    fn exec_command(&mut self,
-                    engine: &EngineRef,
-                    cmd: &str,
-                    args: &[String],
-                    out_format: Option<FileFormat>,
-                    log: &OutputLog) -> Result<TaskResult, CommandError>;
+    fn exec_command(
+        &mut self,
+        engine: &EngineRef,
+        cmd: &str,
+        args: &[String],
+        out_format: Option<FileFormat>,
+        log: &OutputLog,
+    ) -> Result<TaskResult, CommandError>;
 
-    fn exec_script(&mut self,
-                    engine: &EngineRef,
-                    script: SourceRef,
-                    args: &[String],
-                    env: Option<&EnvVars>,
-                    cwd: Option<&Path>,
-                    run_as: Option<&str>,
-                    out_format: Option<FileFormat>,
-                    log: &OutputLog) -> Result<TaskResult, CommandError>;
+    fn exec_script(
+        &mut self,
+        engine: &EngineRef,
+        script: SourceRef,
+        args: &[String],
+        env: Option<&EnvVars>,
+        cwd: Option<&Path>,
+        run_as: Option<&str>,
+        out_format: Option<FileFormat>,
+        log: &OutputLog,
+    ) -> Result<TaskResult, CommandError>;
 }
 
-
-pub fn create_command_executor(host: &Host, engine: &EngineRef) -> Result<Box<dyn CommandExecutor>, CommandError> {
-    let e = engine.write().ssh_session_cache_mut().get(host.ssh_dest())?;
+pub fn create_command_executor(
+    host: &Host,
+    engine: &EngineRef,
+) -> Result<Box<dyn CommandExecutor>, CommandError> {
+    let e = engine
+        .write()
+        .ssh_session_cache_mut()
+        .get(host.ssh_dest())?;
     Ok(Box::new(e))
 }
 
-
-pub fn resolve_env(
-    env: &TaskEnv,
-    root: &NodeRef,
-    current: &NodeRef,
-    scope: &Scope,
-) -> EnvVars {
-    lazy_static!(
+pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Scope) -> EnvVars {
+    lazy_static! {
         static ref VAR_NAME_RE: Regex = Regex::new(r"[^A-Za-z0-9]").unwrap();
-    );
+    };
 
     fn env_name_from_path(node: &NodeRef) -> Option<String> {
         let mut env_name = vec![];
@@ -135,7 +135,7 @@ pub fn resolve_env(
         while let Some(c) = current {
             let node = c.data();
             let key = node.key();
-            if key.is_empty() && !node.is_root(){
+            if key.is_empty() && !node.is_root() {
                 eprintln!("Warn! Cannot create env var from node, empty key.  {}", c);
                 return None;
             }
@@ -193,7 +193,6 @@ pub fn resolve_env(
         }
     }
 }
-
 
 fn prepare_script<W: Write>(
     script: SourceRef,
@@ -277,7 +276,7 @@ fn execute(
                         log_err.log_stderr(line.as_bytes())?;
                         stderr_buf.write_all(line.as_bytes())?;
                     }
-                };
+                }
             }
             Ok(stderr_buf)
         })
@@ -293,7 +292,7 @@ fn execute(
                 } else {
                     log_err.log_stderr(line.as_bytes())?;
                 }
-            };
+            }
             Ok(Cursor::new(Vec::new()))
         })
     };
@@ -313,7 +312,7 @@ fn execute(
                         log_out.log_stdout(line.as_bytes())?;
                         stdout_buf.write_all(line.as_bytes())?;
                     }
-                };
+                }
             }
             Ok(stdout_buf)
         })
@@ -329,7 +328,7 @@ fn execute(
                 } else {
                     log_out.log_stdout(line.as_bytes())?;
                 }
-            };
+            }
             Ok(Cursor::new(Vec::new()))
         })
     };
@@ -351,7 +350,6 @@ fn execute(
 
     Ok(TaskResult::new(outcome, status.code(), None))
 }
-
 
 #[derive(Debug, Clone)]
 pub struct CommandBuilder {
@@ -383,7 +381,11 @@ impl CommandBuilder {
         self
     }
 
-    pub fn env<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut CommandBuilder {
+    pub fn env<K: Into<String>, V: Into<String>>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> &mut CommandBuilder {
         self.envs.insert(key.into(), value.into());
         self
     }
@@ -443,7 +445,6 @@ impl std::fmt::Display for CommandBuilder {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -520,8 +521,14 @@ mod tests {
         env.insert("USER_USERNAME".into(), "root".into());
 
         let mut s = Vec::new();
-        prepare_script(SourceRef::Source("#!/usr/bin/env python\nprint 'Hello world';"), &[], Some(&env), None, &mut s).unwrap();
+        prepare_script(
+            SourceRef::Source("#!/usr/bin/env python\nprint 'Hello world';"),
+            &[],
+            Some(&env),
+            None,
+            &mut s,
+        )
+        .unwrap();
         println!("{}", unsafe { std::str::from_utf8_unchecked(&s) });
     }
 }
-

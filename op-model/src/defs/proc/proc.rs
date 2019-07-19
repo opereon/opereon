@@ -3,7 +3,7 @@ use std::str::FromStr;
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all="kebab-case")]
+#[serde(rename_all = "kebab-case")]
 pub enum ProcKind {
     Exec,
     Check,
@@ -30,7 +30,6 @@ impl Default for ProcKind {
         ProcKind::Exec
     }
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProcDef {

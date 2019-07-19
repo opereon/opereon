@@ -52,7 +52,9 @@ impl ProcExec {
 
     fn get_proc_exec_dir_name(&self) -> String {
         let mut dir_name = format!("{}_{}", self.created.format("%Y%m%d_%H%M%S%.3f"), self.name);
-        unsafe { dir_name.as_mut_vec()[15] = b'_'; }
+        unsafe {
+            dir_name.as_mut_vec()[15] = b'_';
+        }
         dir_name
     }
 
@@ -64,7 +66,12 @@ impl ProcExec {
         Ok(())
     }
 
-    pub fn prepare(&mut self, model: &Model, proc: &ProcDef, proc_exec_dir: &Path) -> Result<(), ProtoError> {
+    pub fn prepare(
+        &mut self,
+        model: &Model,
+        proc: &ProcDef,
+        proc_exec_dir: &Path,
+    ) -> Result<(), ProtoError> {
         self.name = proc.id().to_string();
         self.label = proc.label().to_string();
         self.kind = proc.kind();
@@ -73,7 +80,8 @@ impl ProcExec {
 
         self.proc_path = proc.node().path();
 
-        self.args.resolve(proc.root(), proc.node(), proc.scope_mut());
+        self.args
+            .resolve(proc.root(), proc.node(), proc.scope_mut());
 
         if proc_exec_dir.is_absolute() {
             self.create_proc_exec_dir(proc_exec_dir)?;
@@ -159,7 +167,7 @@ impl ProcExec {
         &self.run
     }
 
-    pub fn args(&self)-> &Arguments {
+    pub fn args(&self) -> &Arguments {
         &self.args
     }
 }
@@ -171,7 +179,6 @@ impl PartialEq for ProcExec {
 }
 
 impl Eq for ProcExec {}
-
 
 #[derive(Debug, Clone)]
 pub struct ProcExecRef(Arc<Mutex<ProcExec>>);

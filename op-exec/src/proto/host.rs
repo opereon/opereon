@@ -41,7 +41,6 @@ impl std::fmt::Display for Host {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,7 +52,9 @@ mod tests {
                 "h1.kodegenix.pl",
                 22,
                 "root",
-                SshAuth::PublicKey { identity_file: PathBuf::from("~/.ssh/id_rsa") }
+                SshAuth::PublicKey {
+                    identity_file: PathBuf::from("~/.ssh/id_rsa"),
+                },
             ),
         }
     }

@@ -35,7 +35,6 @@ pub fn parse_path_list(path_list: &str) -> Vec<PathBuf> {
     paths
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DaemonConfig {
@@ -62,7 +61,6 @@ impl Default for DaemonConfig {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QueueConfig {
@@ -82,7 +80,6 @@ impl Default for QueueConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -109,7 +106,6 @@ impl Default for ModelConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -159,7 +155,6 @@ impl Default for LogConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

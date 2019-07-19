@@ -1,14 +1,13 @@
-use std::any::{TypeId};
+use std::any::TypeId;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-
 
 use super::*;
 
@@ -27,14 +26,14 @@ pub struct Model {
 #[derive(Debug, Clone)]
 struct LoadFileFunc {
     model_dir: PathBuf,
-    model_oid: Oid
+    model_oid: Oid,
 }
 
 impl LoadFileFunc {
     fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
         Self {
             model_dir,
-            model_oid
+            model_oid,
         }
     }
 }
@@ -46,10 +45,17 @@ impl FuncCallable for LoadFileFunc {
         // TODO ws error handling
         let repo = Repository::open(&self.model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database");
-        let obj = repo.find_object(self.model_oid, None).expect("cannot find object");
+        let obj = repo
+            .find_object(self.model_oid, None)
+            .expect("cannot find object");
         let tree = obj.peel_to_tree().expect("Non-tree oid found");
 
-        let paths = args.resolve_column(false,0, env);
+        let paths = args.resolve_column(false, 0, env).map_err(|d| {
+            FuncCallErrorDetail::FuncCallCustomErr {
+                id: FuncId::Custom(name.to_string()),
+                err: Box::new(d),
+            }
+        })?;
 
         if args.count() == 1 {
             for path in paths.into_iter() {
@@ -57,13 +63,20 @@ impl FuncCallable for LoadFileFunc {
                 let entry = tree.get_path(&path).expect("file not found");
                 let obj = odb.read(entry.id()).expect("Cannot find object!");
 
-                let format = path.extension().map_or(FileFormat::Text, |ext| FileFormat::from(ext.to_str().unwrap()));
+                let format = path.extension().map_or(FileFormat::Text, |ext| {
+                    FileFormat::from(ext.to_str().unwrap())
+                });
 
                 let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
                 out.add(node)
             }
         } else {
-            let formats = args.resolve_column(false, 1, env);
+            let formats = args.resolve_column(false, 1, env).map_err(|d| {
+                FuncCallErrorDetail::FuncCallCustomErr {
+                    id: FuncId::Custom(name.to_string()),
+                    err: Box::new(d),
+                }
+            })?;
 
             for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                 let path = PathBuf::from(p.as_string());
@@ -119,7 +132,11 @@ impl Model {
 
         let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())?;
 
-        m.root().data_mut().set_file(Some(&FileInfo::new(m.metadata.path(), FileType::Dir, FileFormat::Binary)));
+        m.root().data_mut().set_file(Some(&FileInfo::new(
+            m.metadata.path(),
+            FileType::Dir,
+            FileFormat::Binary,
+        )));
 
         let commit = m.metadata.id().as_oid();
         let model_dir = m.metadata.path().to_owned();
@@ -130,7 +147,10 @@ impl Model {
         let tree = obj.peel_to_tree().expect("Non-tree oid found");
 
         let scope = ScopeMut::new();
-        scope.set_func("loadFile".into(), Box::new(LoadFileFunc::new(model_dir, commit)));
+        scope.set_func(
+            "loadFile".into(),
+            Box::new(LoadFileFunc::new(model_dir, commit)),
+        );
 
         tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
             let entry_name = entry.name().unwrap();
@@ -140,11 +160,14 @@ impl Model {
                 ObjectType::Blob => FileType::File,
                 _ => {
                     eprintln!("Unknown git object type, skipping = {:?}", entry.kind());
-                    return TreeWalkResult::Ok
+                    return TreeWalkResult::Ok;
                 }
             };
 
-            if file_type == FileType::File && (entry_name == DEFAULT_MANIFEST_FILENAME || entry_name == DEFAULT_CONFIG_FILENAME) {
+            if file_type == FileType::File
+                && (entry_name == DEFAULT_MANIFEST_FILENAME
+                    || entry_name == DEFAULT_CONFIG_FILENAME)
+            {
                 return TreeWalkResult::Ok;
             }
 
@@ -171,21 +194,35 @@ impl Model {
                 inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
             }
             TreeWalkResult::Ok
-        }).expect("Error reading tree"); // FIXME ws error handling
+        })
+        .expect("Error reading tree"); // FIXME ws error handling
 
         // defines
         {
             let defs = manifest.defines().to_node();
             if manifest.defines().is_user_defined() {
-                defs.data_mut().set_file(Some(&FileInfo::new(&m.metadata.path().join(DEFAULT_MANIFEST_FILENAME), FileType::File, FileFormat::Toml)));
+                defs.data_mut().set_file(Some(&FileInfo::new(
+                    &m.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
+                    FileType::File,
+                    FileFormat::Toml,
+                )));
             }
 
             let scope_def = m.scoped.scope_def_mut();
 
             scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
-            scope_def.set_var_def("$hosts".into(), ValueDef::Resolvable(manifest.defines().hosts().clone()));
-            scope_def.set_var_def("$users".into(), ValueDef::Resolvable(manifest.defines().users().clone()));
-            scope_def.set_var_def("$procs".into(), ValueDef::Resolvable(manifest.defines().procs().clone()));
+            scope_def.set_var_def(
+                "$hosts".into(),
+                ValueDef::Resolvable(manifest.defines().hosts().clone()),
+            );
+            scope_def.set_var_def(
+                "$users".into(),
+                ValueDef::Resolvable(manifest.defines().users().clone()),
+            );
+            scope_def.set_var_def(
+                "$procs".into(),
+                ValueDef::Resolvable(manifest.defines().procs().clone()),
+            );
         }
 
         // overrides
@@ -247,8 +284,6 @@ impl Model {
 
         return Ok(m);
     }
-
-
 
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
@@ -333,8 +368,8 @@ impl Model {
         for p in self.procs() {
             init_proc(&mut lookup, self, p);
         }
-        let ptr = std::mem::transmute::<&Model, *const()>(self);
-        let mut_model = std::mem::transmute::<*const(), &mut Model>(ptr);
+        let ptr = std::mem::transmute::<&Model, *const ()>(self);
+        let mut_model = std::mem::transmute::<*const (), &mut Model>(ptr);
 
         mut_model.lookup = lookup;
     }
@@ -419,7 +454,6 @@ impl ScopedModelDef for Model {
     }
 }
 
-
 struct ModelLookup {
     node_map: HashMap<*const Node, &'static dyn ModelDef>,
     path_map: HashMap<Opath, &'static dyn ModelDef>,
@@ -450,8 +484,12 @@ impl ModelLookup {
     }
 
     fn put(&mut self, def: &dyn ModelDef) {
-        self.node_map.insert(def.node().data_ptr(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
-        self.path_map.insert(def.node().path(), unsafe { std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def) });
+        self.node_map.insert(def.node().data_ptr(), unsafe {
+            std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def)
+        });
+        self.path_map.insert(def.node().path(), unsafe {
+            std::mem::transmute::<&dyn ModelDef, &'static dyn ModelDef>(def)
+        });
     }
 }
 
@@ -488,7 +526,6 @@ impl std::fmt::Debug for ModelLookup {
         s.finish()
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct ModelRef(Arc<ReentrantMutex<Model>>);
@@ -542,7 +579,6 @@ unsafe impl Send for ModelRef {}
 
 unsafe impl Sync for ModelRef {}
 
-
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -553,7 +589,8 @@ mod tests {
     fn read_test() {
         let mut metadata = Metadata::default();
         metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
-        metadata.set_path(PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap());
+        metadata
+            .set_path(PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap());
         let model = Model::read_revision(metadata).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }

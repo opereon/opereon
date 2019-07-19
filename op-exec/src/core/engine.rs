@@ -23,7 +23,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> Engine {
-        let model_manager = ModelManager::new(model_dir,config.clone(), logger.clone());
+        let model_manager = ModelManager::new(model_dir, config.clone(), logger.clone());
         let exec_manager = ExecManager::new(config.clone());
         let resource_manager = ResourceManager::new();
         let ssh_session_cache = SshSessionCache::new(config.clone());
@@ -114,9 +114,15 @@ pub struct EngineRef(Arc<RwLock<Engine>>);
 
 impl EngineRef {
     pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> EngineRef {
-        EngineRef(Arc::new(RwLock::new(Engine::new(model_dir, config, logger))))
+        EngineRef(Arc::new(RwLock::new(Engine::new(
+            model_dir, config, logger,
+        ))))
     }
-    pub fn start(current_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> IoResult<EngineRef> {
+    pub fn start(
+        current_dir: PathBuf,
+        config: ConfigRef,
+        logger: slog::Logger,
+    ) -> IoResult<EngineRef> {
         let engine = EngineRef::new(current_dir, config, logger.clone());
         engine.init_ssh_session_cache()?;
         Ok(engine)
@@ -165,7 +171,8 @@ impl EngineRef {
                     Err(_) => UNIX_EPOCH,
                 };
                 (path, timestamp)
-            }).collect();
+            })
+            .collect();
 
         files.sort_by(|a, b| match a.1.cmp(&b.1) {
             Ordering::Equal => a.0.cmp(&b.0),
@@ -196,12 +203,12 @@ impl EngineRef {
         {
             let op = operation.read();
             debug!(engine.logger, "New Operation scheduled";
-            o!(
-//                "context"=> format!("{:?}", op.context()),
-                "id"=> format!("{}", op.id()),
-                 "label"=> format!("{}", op.label()),
-              )
-            );
+                        o!(
+            //                "context"=> format!("{:?}", op.context()),
+                            "id"=> format!("{}", op.id()),
+                             "label"=> format!("{}", op.label()),
+                          )
+                        );
         }
 
         Ok(OutcomeFuture::new(operation))

@@ -162,9 +162,7 @@ impl RemoteCommandOperation {
             .hosts
             .iter()
             .zip(self.futures.lock().unwrap().iter_mut())
-            .map(|(host, (_, result))| {
-                (host.hostname().to_string(), result.take().unwrap())
-            })
+            .map(|(host, (_, result))| (host.hostname().to_string(), result.take().unwrap()))
             .collect();
         info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
         for (h, out) in res.iter() {

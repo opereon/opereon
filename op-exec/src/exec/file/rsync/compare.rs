@@ -97,7 +97,6 @@ impl ModFlags {
     }
 }
 
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum State {
     /// Item is identical in both source and destination locations
@@ -146,7 +145,6 @@ impl State {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FileType {
     File,
@@ -169,18 +167,21 @@ impl FileType {
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DiffInfo {
     state: State,
     file_type: Option<FileType>,
     file_path: PathBuf,
     /// Size of file in destination location
-    file_size: FileSize
+    file_size: FileSize,
 }
 
 impl DiffInfo {
-    pub fn parse(details: &[u8], file_path: &str, file_size: FileSize) -> Result<DiffInfo, ParseError> {
+    pub fn parse(
+        details: &[u8],
+        file_path: &str,
+        file_size: FileSize,
+    ) -> Result<DiffInfo, ParseError> {
         let (file_type, state) = {
             if details == b"*deleting  " {
                 (None, State::Extraneous)
@@ -189,15 +190,9 @@ impl DiffInfo {
                 let mod_flags = &details[2..];
 
                 let state = match mod_flags {
-                    b"+++++++++" => {
-                        State::Missing
-                    }
-                    b"         " => {
-                        State::Identical
-                    }
-                    _ => {
-                        State::Modified(ModFlags::parse(mod_flags)?)
-                    }
+                    b"+++++++++" => State::Missing,
+                    b"         " => State::Identical,
+                    _ => State::Modified(ModFlags::parse(mod_flags)?),
                 };
                 (Some(file_type), state)
             }
@@ -207,7 +202,7 @@ impl DiffInfo {
             file_path: file_path.into(),
             file_type,
             state,
-            file_size
+            file_size,
         })
     }
 
@@ -228,8 +223,11 @@ impl DiffInfo {
     }
 }
 
-
-pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams, checksum: bool) -> RsyncResult<Vec<DiffInfo>> {
+pub fn rsync_compare(
+    config: &RsyncConfig,
+    params: &RsyncParams,
+    checksum: bool,
+) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = params.to_cmd(config);
 
     rsync_cmd
@@ -254,7 +252,7 @@ pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams, checksum: bool)
     let Output {
         status,
         stdout,
-        stderr
+        stderr,
     } = output;
 
     match status.code() {
@@ -271,7 +269,6 @@ pub fn rsync_compare(config: &RsyncConfig, params: &RsyncParams, checksum: bool)
     }
 }
 
-
 fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
     let mut diffs = Vec::new();
 
@@ -286,17 +283,19 @@ fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
     let file_reg = Regex::new(r"[\[\]]").unwrap();
 
     for (details, rest) in items {
-
-        let file_info = file_reg.split(rest)
-            .filter(|s|!s.is_empty())
+        let file_info = file_reg
+            .split(rest)
+            .filter(|s| !s.is_empty())
             .collect::<Vec<&str>>();
 
         if file_info.len() != 2 {
-            return Err(ParseError::Line(line!())) // FIXME ws
+            return Err(ParseError::Line(line!())); // FIXME ws
         }
 
         let file_path = file_info[0];
-        let file_size = file_info[1].parse::<FileSize>().map_err(|_e|ParseError::Line(line!()))?;// FIXME ws
+        let file_size = file_info[1]
+            .parse::<FileSize>()
+            .map_err(|_e| ParseError::Line(line!()))?; // FIXME ws
 
         let diff = DiffInfo::parse(details, file_path, file_size)?;
         diffs.push(diff);
@@ -304,7 +303,6 @@ fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
 
     Ok(diffs)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -367,7 +365,11 @@ total size is 2,099  speedup is 1.33 (DRY RUN)
     #[test]
     fn rsync_compare_() {
         let config = RsyncConfig::default();
-        let mut p = RsyncParams::new( "./","../op-model/test-data/model2/", "../op-model/test-data/model1/");
+        let mut p = RsyncParams::new(
+            "./",
+            "../op-model/test-data/model2/",
+            "../op-model/test-data/model1/",
+        );
         p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.opereon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
 
         let diffs = rsync_compare(&config, &p, true).unwrap();
@@ -377,4 +379,3 @@ total size is 2,099  speedup is 1.33 (DRY RUN)
         }
     }
 }
-

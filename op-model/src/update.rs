@@ -49,67 +49,96 @@ impl<'a> ModelUpdate<'a> {
 
         for mw in u.model_watches().iter() {
             if mw.mask().has_removed() {
-                self.matcher1_r.resolve_ext_cache(mw.path(), root1, root1, &scope1, &mut self.cache);
+                self.matcher1_r.resolve_ext_cache(
+                    mw.path(),
+                    root1,
+                    root1,
+                    &scope1,
+                    &mut self.cache,
+                );
             }
             if mw.mask().has_added() {
-                self.matcher2_a.resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache);
+                self.matcher2_a.resolve_ext_cache(
+                    mw.path(),
+                    root2,
+                    root2,
+                    &scope2,
+                    &mut self.cache,
+                );
             }
             if mw.mask().has_updated() {
-                self.matcher2_u.resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache);
+                self.matcher2_u.resolve_ext_cache(
+                    mw.path(),
+                    root2,
+                    root2,
+                    &scope2,
+                    &mut self.cache,
+                );
             }
         }
 
         let mut model_changes = Vec::new();
         for c in self.model_diff.changes().iter() {
             match c.kind() {
-                ChangeKind::Removed => if self.matcher1_r.matches(c.path()) {
-                    model_changes.push(c)
+                ChangeKind::Removed => {
+                    if self.matcher1_r.matches(c.path()) {
+                        model_changes.push(c)
+                    }
                 }
-                ChangeKind::Added => if self.matcher2_a.matches(c.path()) {
-                    model_changes.push(c)
+                ChangeKind::Added => {
+                    if self.matcher2_a.matches(c.path()) {
+                        model_changes.push(c)
+                    }
                 }
-                ChangeKind::Updated => if self.matcher2_u.matches(c.path()) {
-                    model_changes.push(c)
+                ChangeKind::Updated => {
+                    if self.matcher2_u.matches(c.path()) {
+                        model_changes.push(c)
+                    }
                 }
-                ChangeKind::Renamed => {
-                    unreachable!()
-                }
+                ChangeKind::Renamed => unreachable!(),
             }
         }
 
         let fw: &[FileWatch] = u.file_watches();
 
-        let removed_watches:Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_removed()).collect();
-        let added_watches:Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_added()).collect();
-        let updated_watches:Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_updated()).collect();
-        let renamed_watches:Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_renamed()).collect();
+        let removed_watches: Vec<&FileWatch> =
+            fw.iter().filter(|w| w.mask().has_removed()).collect();
+        let added_watches: Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_added()).collect();
+        let updated_watches: Vec<&FileWatch> =
+            fw.iter().filter(|w| w.mask().has_updated()).collect();
+        let renamed_watches: Vec<&FileWatch> =
+            fw.iter().filter(|w| w.mask().has_renamed()).collect();
 
         let mut file_changes = Vec::new();
         for c in self.file_diff.changes().iter() {
             match c.kind() {
                 ChangeKind::Removed => {
-                    removed_watches.iter()
+                    removed_watches
+                        .iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.old_path().unwrap()))
                         .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Added => {
-                    added_watches.iter()
+                    added_watches
+                        .iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.new_path().unwrap()))
                         .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Updated => {
-                    updated_watches.iter()
+                    updated_watches
+                        .iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.new_path().unwrap()))
                         .for_each(|_w| {
                             file_changes.push(c);
                         });
                 }
                 ChangeKind::Renamed => {
-                    renamed_watches.iter()
+                    renamed_watches
+                        .iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.old_path().unwrap()))
                         .for_each(|_w| {
                             file_changes.push(c);
@@ -121,8 +150,6 @@ impl<'a> ModelUpdate<'a> {
     }
 }
 
-
-
 fn delta_to_change_kind(delta: git2::Delta) -> ChangeKind {
     use git2::*;
     match delta {
@@ -130,7 +157,7 @@ fn delta_to_change_kind(delta: git2::Delta) -> ChangeKind {
         Delta::Deleted => ChangeKind::Removed,
         Delta::Modified => ChangeKind::Updated,
         Delta::Renamed => ChangeKind::Renamed,
-        _ => { panic!("Unsupported") }
+        _ => panic!("Unsupported"),
     }
 }
 
@@ -171,13 +198,25 @@ impl From<git2::DiffDelta<'_>> for FileChange {
         let old = if diff_delta.old_file().id().is_zero() {
             None
         } else {
-            Some(diff_delta.old_file().path().expect("Path cannot be None!").to_owned())
+            Some(
+                diff_delta
+                    .old_file()
+                    .path()
+                    .expect("Path cannot be None!")
+                    .to_owned(),
+            )
         };
 
         let new = if diff_delta.new_file().id().is_zero() {
             None
         } else {
-            Some(diff_delta.new_file().path().expect("Path cannot be None!").to_owned())
+            Some(
+                diff_delta
+                    .new_file()
+                    .path()
+                    .expect("Path cannot be None!")
+                    .to_owned(),
+            )
         };
 
         FileChange::new(kind, old, new)
@@ -190,7 +229,6 @@ impl From<git2::DiffDelta<'_>> for FileChange {
 pub struct FileDiff {
     changes: Vec<FileChange>,
 }
-
 
 impl FileDiff {
     pub fn minimal(model1: &Model, model2: &Model) -> Self {
@@ -209,24 +247,24 @@ impl FileDiff {
         let mut opts = DiffOptions::new();
         opts.minimal(true);
 
-        let mut diff = repo.diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts)).expect("Cannot get diff");
+        let mut diff = repo
+            .diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
+            .expect("Cannot get diff");
 
         let mut find_opts = DiffFindOptions::new();
         find_opts.renames(true);
         find_opts.renames_from_rewrites(true);
         find_opts.remove_unmodified(true);
 
-        diff.find_similar(Some(&mut find_opts)).expect("Cannot find similar!");
+        diff.find_similar(Some(&mut find_opts))
+            .expect("Cannot find similar!");
 
         let changes = diff.deltas().map(|d| d.into()).collect();
 
-        Self {
-            changes
-        }
+        Self { changes }
     }
 
     pub fn changes(&self) -> &Vec<FileChange> {
         &self.changes
     }
 }
-

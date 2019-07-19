@@ -28,8 +28,8 @@ impl ModelWatch {
 }
 
 fn glob_serialize<S>(glob: &Glob, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     s.serialize_str(glob.glob())
 }

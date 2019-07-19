@@ -35,7 +35,7 @@ macro_rules! perr {
     ( $msg:expr ) => {{
         eprintln!("ERROR in {}:{} - {}", file!(), line!(), $msg);
         Err(DefsParseError::Undef)
-    }}
+    }};
 }
 
 //FIXME (jc) to be removed
@@ -46,14 +46,13 @@ macro_rules! perr_assert {
         } else {
             perr!($msg)
         }
-    }}
+    }};
 }
 
-
 mod host;
-mod user;
 mod proc;
 mod scope;
+mod user;
 
 pub trait ModelDef: Remappable + 'static {
     fn root(&self) -> &NodeRef;
@@ -92,7 +91,6 @@ pub trait AsScoped: 'static {
     fn as_scoped(&self) -> &Scoped;
 }
 
-
 fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> T {
     let expr = Opath::parse(expr).unwrap();
     match expr.apply(def.root(), def.node()).into_one() {
@@ -100,7 +98,6 @@ fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> T {
         None => T::empty(),
     }
 }
-
 
 #[derive(Debug, Serialize)]
 pub struct Scoped {
@@ -160,10 +157,20 @@ impl Scoped {
     }
 
     pub unsafe fn add_child<T: AsScoped>(&self, child: &T) {
-        child.as_scoped().parent.set(Some(std::mem::transmute::<&Scoped, &'static Scoped>(self)));
-        child.as_scoped().scope.set_parent(Some(self.scope.clone().into()));
+        child
+            .as_scoped()
+            .parent
+            .set(Some(std::mem::transmute::<&Scoped, &'static Scoped>(self)));
+        child
+            .as_scoped()
+            .scope
+            .set_parent(Some(self.scope.clone().into()));
         child.as_scoped().resolved.set(false);
-        self.children.borrow_mut().push(std::mem::transmute::<&Scoped, &'static Scoped>(child.as_scoped()));
+        self.children
+            .borrow_mut()
+            .push(std::mem::transmute::<&Scoped, &'static Scoped>(
+                child.as_scoped(),
+            ));
     }
 
     pub fn clear_scope(&self) {
@@ -179,7 +186,8 @@ impl Scoped {
             if let Some(p) = self.parent.get() {
                 p.resolve();
             }
-            self.scope_def.resolve(self.root(), self.node(), &self.scope);
+            self.scope_def
+                .resolve(self.root(), self.node(), &self.scope);
             self.resolved.set(true);
         }
     }
@@ -216,4 +224,3 @@ impl Clone for Scoped {
         s
     }
 }
-

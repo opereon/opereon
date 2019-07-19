@@ -8,10 +8,8 @@ pub struct Run {
 }
 
 impl Run {
-    pub (crate) fn new() -> Run {
-        Run {
-            steps: Vec::new(),
-        }
+    pub(crate) fn new() -> Run {
+        Run { steps: Vec::new() }
     }
 
     pub fn steps(&self) -> &[Step] {
@@ -21,9 +19,7 @@ impl Run {
 
 impl ParsedModelDef for Run {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
-        let mut run = Run {
-            steps: Vec::new(),
-        };
+        let mut run = Run { steps: Vec::new() };
 
         if let Some(rn) = node.get_child_key("run") {
             match *rn.data().value() {
@@ -55,7 +51,6 @@ impl Remappable for Run {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 pub struct Step {
     index: usize,
@@ -64,19 +59,26 @@ pub struct Step {
 }
 
 impl Step {
-    pub fn resolve_hosts<'a>(&self, model: &'a Model, proc: &ProcDef) -> Result<Vec<Cow<'a, HostDef>>, DefsParseError> {
-        self.hosts.as_ref().map_or(Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()), |hosts_expr| {
-            let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope());
-            let mut res = Vec::with_capacity(hs.len());
-            for h in hs.iter() {
-                let host: Cow<HostDef> = match model.get_host(h) {
-                    Some(host) => Cow::Borrowed(host),
-                    None => Cow::Owned(HostDef::parse(model, model.as_scoped(), h)?),
-                };
-                res.push(host);
-            }
-            Ok(res)
-        })
+    pub fn resolve_hosts<'a>(
+        &self,
+        model: &'a Model,
+        proc: &ProcDef,
+    ) -> Result<Vec<Cow<'a, HostDef>>, DefsParseError> {
+        self.hosts.as_ref().map_or(
+            Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
+            |hosts_expr| {
+                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope());
+                let mut res = Vec::with_capacity(hs.len());
+                for h in hs.iter() {
+                    let host: Cow<HostDef> = match model.get_host(h) {
+                        Some(host) => Cow::Borrowed(host),
+                        None => Cow::Owned(HostDef::parse(model, model.as_scoped(), h)?),
+                    };
+                    res.push(host);
+                }
+                Ok(res)
+            },
+        )
     }
 
     pub fn tasks(&self) -> &[TaskDef] {
@@ -94,11 +96,11 @@ impl ParsedModelDef for Step {
             let hosts = if let Some(h) = props.get("hosts") {
                 match ValueDef::parse(h)? {
                     ValueDef::Static(_n) => {
-                        return perr!("'hosts' property must be a dynamic expression in step definition");
+                        return perr!(
+                            "'hosts' property must be a dynamic expression in step definition"
+                        );
                     }
-                    ValueDef::Resolvable(h) => {
-                        Some(h)
-                    }
+                    ValueDef::Resolvable(h) => Some(h),
                 }
             } else {
                 None
@@ -106,13 +108,15 @@ impl ParsedModelDef for Step {
 
             let tasks = if let Some(t) = props.get("tasks") {
                 match *t.data().value() {
-                    Value::Array(ref elems) => {
-                        elems.iter().map(|t| TaskDef::parse(model, parent, t)).collect::<Result<Vec<_>, _>>()?
-                    }
-                    Value::Object(ref props) => {
-                        props.values().map(|t| TaskDef::parse(model, parent, t)).collect::<Result<Vec<_>, _>>()?
-                    }
-                    _ => return perr!("invalid type of 'tasks' property in step definition")
+                    Value::Array(ref elems) => elems
+                        .iter()
+                        .map(|t| TaskDef::parse(model, parent, t))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    Value::Object(ref props) => props
+                        .values()
+                        .map(|t| TaskDef::parse(model, parent, t))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    _ => return perr!("invalid type of 'tasks' property in step definition"),
                 }
             } else {
                 return perr!("step definition must have 'tasks' property");

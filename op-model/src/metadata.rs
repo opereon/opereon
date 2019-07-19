@@ -97,25 +97,33 @@ impl From<git2::Oid> for Sha1Hash {
 
 impl ser::Serialize for Sha1Hash {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer {
+    where
+        S: ser::Serializer,
+    {
         serializer.serialize_str(&self.to_string())
     }
 }
 
 impl<'de> de::Deserialize<'de> for Sha1Hash {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: de::Deserializer<'de> {
+    where
+        D: de::Deserializer<'de>,
+    {
         let s: String = de::Deserialize::deserialize(deserializer)?;
         match Self::from_str(&s) {
             Ok(h) => Ok(h),
             Err(err) => match err {
-                Sha1HashParseError::InvalidLength => Err(serde::de::Error::invalid_length(s.len(), &"40")),
-                Sha1HashParseError::InvalidValue => Err(serde::de::Error::invalid_value(serde::de::Unexpected::Str(&s), &"40 hexadecimal digits")),
-            }
+                Sha1HashParseError::InvalidLength => {
+                    Err(serde::de::Error::invalid_length(s.len(), &"40"))
+                }
+                Sha1HashParseError::InvalidValue => Err(serde::de::Error::invalid_value(
+                    serde::de::Unexpected::Str(&s),
+                    &"40 hexadecimal digits",
+                )),
+            },
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -133,7 +141,8 @@ impl User {
 
     pub fn current() -> Self {
         let uid = users::get_current_uid() as usize;
-        let username = users::get_current_username().map_or(String::new(), |u| u.into_string().unwrap());
+        let username =
+            users::get_current_username().map_or(String::new(), |u| u.into_string().unwrap());
         User::new(uid, username.into())
     }
 
@@ -155,7 +164,6 @@ impl Default for User {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     /// Model identifier as git Oid
@@ -172,7 +180,7 @@ impl Metadata {
             id,
             path,
             user,
-            timestamp
+            timestamp,
         }
     }
 
@@ -207,11 +215,10 @@ impl Default for Metadata {
             id: Sha1Hash::nil(),
             user: User::default(),
             timestamp: Utc.timestamp(0, 0),
-            path: PathBuf::new()
+            path: PathBuf::new(),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -239,12 +246,17 @@ mod tests {
         let m = example_meta();
         let res = serde_yaml::to_string(&m);
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), indoc!(r#"---
+        assert_eq!(
+            res.unwrap(),
+            indoc!(
+                r#"---
             id: "0000000000000000000000000000000000000000"
             path: /home/example
             user:
               uid: 1000
               username: johnny
-            timestamp: "1970-01-01T00:00:00Z""#));
+            timestamp: "1970-01-01T00:00:00Z""#
+            )
+        );
     }
 }

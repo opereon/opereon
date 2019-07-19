@@ -14,7 +14,7 @@ impl ValueDef {
             Value::String(ref s) => {
                 let expr = s.trim();
                 if expr.starts_with("${") && expr.ends_with('}') {
-                    match Opath::parse(&expr[2..expr.len()-1]) {
+                    match Opath::parse(&expr[2..expr.len() - 1]) {
                         Ok(expr) => Ok(ValueDef::Resolvable(expr)),
                         Err(_err) => perr!("opath parse error"), //FIXME (jc)
                     }
@@ -22,7 +22,7 @@ impl ValueDef {
                     Ok(ValueDef::Static(node.clone()))
                 }
             }
-            _ => Ok(ValueDef::Static(node.clone()))
+            _ => Ok(ValueDef::Static(node.clone())),
         }
     }
 
@@ -50,14 +50,17 @@ impl Remappable for ValueDef {
                 } else {
                     *n = n.deep_copy();
                 }
-            },
-            ValueDef::Resolvable(..) => {},
+            }
+            ValueDef::Resolvable(..) => {}
         }
     }
 }
 
 impl ser::Serialize for ValueDef {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         match *self {
             ValueDef::Static(ref n) => n.serialize(serializer),
             ValueDef::Resolvable(ref e) => e.serialize(serializer),
@@ -66,12 +69,14 @@ impl ser::Serialize for ValueDef {
 }
 
 impl<'de> de::Deserialize<'de> for ValueDef {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         let n = NodeRef::deserialize(deserializer)?;
         ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error")) //FIXME (jc) error message
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeDef {

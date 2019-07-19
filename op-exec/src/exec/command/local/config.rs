@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LocalConfig {

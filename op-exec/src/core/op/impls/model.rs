@@ -1,13 +1,11 @@
-
-
 use kg_tree::diff::ModelDiff;
 use regex::Regex;
 
 use super::*;
 use kg_tree::opath::Opath;
 use op_model::ModelUpdate;
-use std::path::Path;
 use slog::Logger;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -23,7 +21,7 @@ impl std::str::FromStr for DiffMethod {
         match s {
             "minimal" => Ok(DiffMethod::Minimal),
             "full" => Ok(DiffMethod::Full),
-            _ => Err("unknown diff method".to_string())
+            _ => Err("unknown diff method".to_string()),
         }
     }
 }
@@ -36,10 +34,7 @@ pub struct ModelInitOperation {
 
 impl ModelInitOperation {
     pub fn new(operation: OperationRef, engine: EngineRef) -> ModelInitOperation {
-        ModelInitOperation {
-            operation,
-            engine,
-        }
+        ModelInitOperation { operation, engine }
     }
 }
 
@@ -95,7 +90,6 @@ impl OperationImpl for ModelCommitOperation {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ModelQueryOperation {
     operation: OperationRef,
@@ -106,7 +100,12 @@ pub struct ModelQueryOperation {
 }
 
 impl ModelQueryOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath, expr: String) -> ModelQueryOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        model_path: ModelPath,
+        expr: String,
+    ) -> ModelQueryOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -156,7 +155,6 @@ impl OperationImpl for ModelQueryOperation {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ModelTestOperation {
     operation: OperationRef,
@@ -165,7 +163,11 @@ pub struct ModelTestOperation {
 }
 
 impl ModelTestOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath) -> ModelTestOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        model_path: ModelPath,
+    ) -> ModelTestOperation {
         ModelTestOperation {
             operation,
             engine,
@@ -192,7 +194,6 @@ impl OperationImpl for ModelTestOperation {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ModelDiffOperation {
     operation: OperationRef,
@@ -203,7 +204,13 @@ pub struct ModelDiffOperation {
 }
 
 impl ModelDiffOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, source: ModelPath, target: ModelPath, method: DiffMethod) -> ModelDiffOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        source: ModelPath,
+        target: ModelPath,
+        method: DiffMethod,
+    ) -> ModelDiffOperation {
         ModelDiffOperation {
             operation,
             engine,
@@ -226,7 +233,9 @@ impl Future for ModelDiffOperation {
             DiffMethod::Minimal => ModelDiff::minimal(m1.lock().root(), m2.lock().root()),
             DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root()),
         };
-        Ok(Async::Ready(Outcome::NodeSet(to_tree(&diff).unwrap().into())))
+        Ok(Async::Ready(Outcome::NodeSet(
+            to_tree(&diff).unwrap().into(),
+        )))
     }
 }
 
@@ -235,7 +244,6 @@ impl OperationImpl for ModelDiffOperation {
         Ok(())
     }
 }
-
 
 #[derive(Debug)]
 pub struct ModelUpdateOperation {
@@ -249,7 +257,13 @@ pub struct ModelUpdateOperation {
 }
 
 impl ModelUpdateOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, prev_model: ModelPath, next_model: ModelPath, dry_run: bool) -> ModelUpdateOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        prev_model: ModelPath,
+        next_model: ModelPath,
+        dry_run: bool,
+    ) -> ModelUpdateOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -263,7 +277,7 @@ impl ModelUpdateOperation {
             next_model,
             dry_run,
             proc_op: None,
-            logger
+            logger,
         }
     }
 }
@@ -304,16 +318,30 @@ impl Future for ModelUpdateOperation {
 
                         if model_changes.is_empty() && file_changes.is_empty() {
                             info!(self.logger, "Update [{proc_id}]: skipped - no changes", proc_id = id; "verbosity"=>0);
-                            continue
+                            continue;
                         }
 
                         let mut args = ArgumentsBuilder::new(model2.root());
 
                         if !model_changes.is_empty() {
-                            args.set_arg("$model_changes".into(), &model_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                            args.set_arg(
+                                "$model_changes".into(),
+                                &model_changes
+                                    .iter()
+                                    .map(|c| to_tree(c).unwrap())
+                                    .collect::<Vec<_>>()
+                                    .into(),
+                            );
                         }
                         if !file_changes.is_empty() {
-                            args.set_arg("$file_changes".into(), &file_changes.iter().map(|c| to_tree(c).unwrap()).collect::<Vec<_>>().into());
+                            args.set_arg(
+                                "$file_changes".into(),
+                                &file_changes
+                                    .iter()
+                                    .map(|c| to_tree(c).unwrap())
+                                    .collect::<Vec<_>>()
+                                    .into(),
+                            );
                         }
                         args.set_arg("$old".into(), &model1.root().clone().into());
 
@@ -321,7 +349,10 @@ impl Future for ModelUpdateOperation {
                         e.prepare(&model2, p, exec_dir)?;
                         e.store()?;
 
-                        let op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
+                        let op: OperationRef = Context::ProcExec {
+                            exec_path: e.path().to_path_buf(),
+                        }
+                        .into();
                         proc_ops.push(op);
 
                         info!(self.logger, "Update [{proc_id}]: prepared in [{path}]", proc_id = id, path = e.path().display(); "verbosity"=>1);
@@ -342,7 +373,6 @@ impl OperationImpl for ModelUpdateOperation {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ModelCheckOperation {
     operation: OperationRef,
@@ -355,7 +385,13 @@ pub struct ModelCheckOperation {
 }
 
 impl ModelCheckOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, model_path: ModelPath, filter: Option<String>, dry_run: bool) -> ModelCheckOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        model_path: ModelPath,
+        filter: Option<String>,
+        dry_run: bool,
+    ) -> ModelCheckOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -369,7 +405,7 @@ impl ModelCheckOperation {
             dry_run,
             filter,
             proc_op: None,
-            logger
+            logger,
         }
     }
 }
@@ -418,7 +454,10 @@ impl Future for ModelCheckOperation {
                             e.prepare(&model, p, exec_dir)?;
                             e.store()?;
 
-                            let proc_op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
+                            let proc_op: OperationRef = Context::ProcExec {
+                                exec_path: e.path().to_path_buf(),
+                            }
+                            .into();
                             proc_ops.push(proc_op);
 
                             info!(self.logger, "Check [{proc_id}]: prepared in {path}", proc_id = id, path=e.path().display(); "verbosity"=>1);
@@ -446,7 +485,6 @@ impl OperationImpl for ModelCheckOperation {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ModelProbeOperation {
     operation: OperationRef,
@@ -459,7 +497,14 @@ pub struct ModelProbeOperation {
 }
 
 impl ModelProbeOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, ssh_dest: SshDest, model_path: ModelPath, filter: Option<String>, _args: &[(String, String)]) -> ModelProbeOperation {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        ssh_dest: SshDest,
+        model_path: ModelPath,
+        filter: Option<String>,
+        _args: &[(String, String)],
+    ) -> ModelProbeOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -521,13 +566,19 @@ impl Future for ModelProbeOperation {
                         if filter_re.is_none() || filter_re.as_ref().unwrap().is_match(id) {
                             let host = to_tree(&Host::from_dest(self.ssh_dest.clone())).unwrap();
                             let mut args = Arguments::new();
-                            args.set_arg("$host".into(), ArgumentSet::new(&host.into(), model.root()));
+                            args.set_arg(
+                                "$host".into(),
+                                ArgumentSet::new(&host.into(), model.root()),
+                            );
 
                             let mut e = ProcExec::with_args(Utc::now(), args);
                             e.prepare(&model, p, exec_dir)?;
                             e.store()?;
 
-                            let proc_op: OperationRef = Context::ProcExec { exec_path: e.path().to_path_buf() }.into();
+                            let proc_op: OperationRef = Context::ProcExec {
+                                exec_path: e.path().to_path_buf(),
+                            }
+                            .into();
                             proc_ops.push(proc_op);
                             info!(self.logger, "Probe [{proc_id}]: prepared in [{path}]", proc_id = id, path=e.path().display(); "verbosity"=>1);
                         } else {

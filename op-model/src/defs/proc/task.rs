@@ -142,7 +142,6 @@ impl ParsedModelDef for TaskDef {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TaskKind {
@@ -172,14 +171,12 @@ impl FromStr for TaskKind {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum OutputMode {
     Var(String),
     Expr(Opath),
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -195,12 +192,12 @@ impl TaskOutput {
             Value::Object(_) => match kg_tree::serial::from_tree::<TaskOutput>(node) {
                 Ok(out) => Ok(out),
                 Err(_err) => Err(DefsParseError::Undef), //FIXME (jc)
-            }
+            },
             Value::String(ref s) => {
                 let format = FileFormat::from(s);
                 Ok(TaskOutput {
                     format,
-                    .. Default::default()
+                    ..Default::default()
                 })
             }
             _ => perr!("output definition must be an object or string"), //FIXME (jc)
@@ -222,7 +219,7 @@ impl TaskOutput {
                 let scope = ScopeMut::child(scope.clone().into());
                 scope.set_var("$output".into(), output);
                 expr.apply_ext(root, current, &scope);
-            },
+            }
         }
     }
 }
@@ -260,17 +257,18 @@ impl TaskEnv {
 
                 for node in elems.iter() {
                     let expr: Opath = serial::from_tree(node)?;
-                    envs.push( expr)
+                    envs.push(expr)
                 }
                 TaskEnv::List(envs)
             }
-            Value::String(ref key) => TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?]),
+            Value::String(ref key) => {
+                TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?])
+            }
             _ => return perr!("Unexpected property type"), //FIXME (jc)
         };
         Ok(env)
     }
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Switch {
@@ -285,9 +283,7 @@ impl Switch {
 
 impl ParsedModelDef for Switch {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
-        let mut s = Switch {
-            cases: Vec::new(),
-        };
+        let mut s = Switch { cases: Vec::new() };
 
         if let Value::Array(ref elems) = *node.data().value() {
             for e in elems.iter() {
@@ -307,7 +303,6 @@ impl Remappable for Switch {
         self.cases.iter_mut().for_each(|c| c.remap(node_map));
     }
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Case {
@@ -330,10 +325,10 @@ impl ParsedModelDef for Case {
         if let Value::Object(ref props) = *node.data().value() {
             let when = if let Some(n) = props.get("when") {
                 match ValueDef::parse(n)? {
-                    ValueDef::Resolvable(e) => {
-                        e
-                    }
-                    _ => return perr!("'when' property must be a dynamic expression in switch case definition"),
+                    ValueDef::Resolvable(e) => e,
+                    _ => return perr!(
+                        "'when' property must be a dynamic expression in switch case definition"
+                    ),
                 }
             } else {
                 return perr!("switch case expression must have 'when' property");

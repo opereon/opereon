@@ -32,8 +32,8 @@ impl From<kg_tree::opath::OpathParseError> for ProtoError {
     }
 }
 
-impl From<kg_tree::opath::OpathRuntimeError> for ProtoError {
-    fn from(err: kg_tree::opath::OpathRuntimeError) -> Self {
+impl From<kg_tree::opath::ExprErrorDetail> for ProtoError {
+    fn from(err: kg_tree::opath::ExprErrorDetail) -> Self {
         eprintln!("{:?}", err);
         unimplemented!()
     }

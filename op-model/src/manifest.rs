@@ -68,7 +68,6 @@ impl Default for Defines {
     }
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ManifestInfo {
     authors: Vec<String>,
@@ -83,8 +82,6 @@ impl Default for ManifestInfo {
         }
     }
 }
-
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -112,7 +109,6 @@ impl Manifest {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,8 +119,10 @@ mod tests {
         #[test]
         fn serialize_with_custom_defs() {
             let mut d = Defines::default();
-            d.custom.insert("cust1".into(), Opath::parse("$.cust1").unwrap());
-            d.custom.insert("cust2".into(), Opath::parse("$.cust2").unwrap());
+            d.custom
+                .insert("cust1".into(), Opath::parse("$.cust1").unwrap());
+            d.custom
+                .insert("cust2".into(), Opath::parse("$.cust2").unwrap());
 
             let _json = r#"
             {
@@ -137,7 +135,7 @@ mod tests {
             "#;
 
             let _s = serde_json::to_string_pretty(&d).unwrap();
-//            assert!(json_eq!(json, &s));
+            //            assert!(json_eq!(json, &s));
         }
 
         #[test]

@@ -46,8 +46,14 @@ impl ParsedModelDef for HostDef {
     fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(props.contains_key("hostname"), "host definition must contain 'hostname' property")?;
-                perr_assert!(props.contains_key("ssh_dest"), "host definition must contain 'ssh_dest' property")?;
+                perr_assert!(
+                    props.contains_key("hostname"),
+                    "host definition must contain 'hostname' property"
+                )?;
+                perr_assert!(
+                    props.contains_key("ssh_dest"),
+                    "host definition must contain 'ssh_dest' property"
+                )?;
             }
             _ => {
                 perr!("host definition must be an object")?;
