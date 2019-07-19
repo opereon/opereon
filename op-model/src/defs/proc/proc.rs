@@ -20,7 +20,9 @@ impl FromStr for ProcKind {
             "update" => Ok(ProcKind::Update),
             "check" => Ok(ProcKind::Check),
             "probe" => Ok(ProcKind::Probe),
-            unknown => Err(DefsParseErrorDetail::UnknownProcKind {value: unknown.to_string()}),
+            unknown => Err(DefsParseErrorDetail::UnknownProcKind {
+                value: unknown.to_string(),
+            }),
         }
     }
 }
@@ -153,7 +155,7 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject {kind}),
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }),
                         }
                     }
                     if let Some(wn) = node.get_child_key("watch_file") {
@@ -166,14 +168,18 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject {kind}),
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }),
                         }
                     }
                 }
 
                 p.run = Run::parse(model, &p.scoped, node)?;
             }
-            _ => return Err(DefsParseErrorDetail::ProcNonObject {kind: node.data().kind()}),
+            _ => {
+                return Err(DefsParseErrorDetail::ProcNonObject {
+                    kind: node.data().kind(),
+                })
+            }
         }
 
         p.id = get_expr(&p, "@.id or @.@key");

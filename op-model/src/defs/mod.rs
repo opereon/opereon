@@ -1,8 +1,8 @@
+use super::*;
+use kg_diag::Severity;
+use kg_diag::{BasicDiag, Diag};
 use std::any::TypeId;
 use std::cell::{Cell, RefCell};
-use kg_diag::{BasicDiag, Diag};
-use kg_diag::Severity;
-use super::*;
 
 pub use self::host::HostDef;
 pub use self::proc::*;
@@ -16,7 +16,6 @@ pub type DefsParseResult<T> = Result<T, DefsParseError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 900)]
 pub enum DefsParseErrorDetail {
-
     #[display(fmt = "host definition must contain 'hostname' property")]
     HostMissingHostname,
 
@@ -24,43 +23,31 @@ pub enum DefsParseErrorDetail {
     HostMissingSshDest,
 
     #[display(fmt = "host definition must be an object, found: {kind}")]
-    HostNonObject {
-        kind: Kind
-    },
+    HostNonObject { kind: Kind },
 
     #[display(fmt = "procedure must have defined 'proc' property")]
     ProcMissingProc,
 
     #[display(fmt = "procedure definition must be an object, found: {kind}")]
-    ProcNonObject {
-        kind: Kind
-    },
+    ProcNonObject { kind: Kind },
 
     #[display(fmt = "watch definition must be an object, found: {kind}")]
-    ProcWatchNonObject {
-        kind: Kind
-    },
+    ProcWatchNonObject { kind: Kind },
 
     #[display(fmt = "run definition must be an object or an array, found: {kind}")]
-    RunInvalidType {
-        kind: Kind
-    },
+    RunInvalidType { kind: Kind },
 
     #[display(fmt = "'hosts' property must be a dynamic expression in step definition")]
     StepStaticHosts,
 
     #[display(fmt = "invalid type of 'tasks' property in step definition")]
-    StepInvalidTasksType {
-        kind: Kind
-    },
+    StepInvalidTasksType { kind: Kind },
 
     #[display(fmt = "step definition must have 'tasks' property")]
     StepMissingTasks,
 
     #[display(fmt = "step definition must be an object, found: {kind}")]
-    StepNonObject {
-        kind: Kind
-    },
+    StepNonObject { kind: Kind },
 
     #[display(fmt = "task definition must have 'task' property")]
     TaskMissingTask,
@@ -69,24 +56,16 @@ pub enum DefsParseErrorDetail {
     TaskSwitchMissingCases,
 
     #[display(fmt = "task definition must be an object, found: {kind}")]
-    TaskNonObject {
-        kind: Kind
-    },
+    TaskNonObject { kind: Kind },
 
     #[display(fmt = "output definition must be an 'object' or 'string', found: {kind}")]
-    TaskOutputInvalidType {
-        kind: Kind
-    },
+    TaskOutputInvalidType { kind: Kind },
 
     #[display(fmt = "Unexpected property type: {kind}")]
-    TaskEnvUnexpectedPropType {
-        kind: Kind
-    },
+    TaskEnvUnexpectedPropType { kind: Kind },
 
     #[display(fmt = "switch definition must be an array, found: {kind}")]
-    TaskSwitchNonArray {
-        kind: Kind
-    },
+    TaskSwitchNonArray { kind: Kind },
 
     #[display(fmt = "'when' property must be a dynamic expression in switch case definition")]
     TaskCaseStaticWhen,
@@ -95,46 +74,33 @@ pub enum DefsParseErrorDetail {
     TaskCaseMissingWhen,
 
     #[display(fmt = "switch case definition must be an object, found: {kind}")]
-    TaskCaseNonObject {
-        kind: Kind
-    },
+    TaskCaseNonObject { kind: Kind },
 
     #[display(fmt = "scope definition must be an object, found: {kind}")]
-    ScopeNonObject {
-        kind: Kind
-    },
+    ScopeNonObject { kind: Kind },
 
     #[display(fmt = "user definition must have 'username' property")]
     UserMissingUsername,
 
     #[display(fmt = "user definition must be an object, found: {kind}")]
-    UserNonObject {
-        kind: Kind
-    },
-
-
-
+    UserNonObject { kind: Kind },
 
     #[display(fmt = "unknown proc kind: '{value}'")]
-    UnknownProcKind {
-        value: String
-    },
+    UnknownProcKind { value: String },
 
     #[display(fmt = "unknown task kind: '{value}'")]
-    UnknownTaskKind {
-        value: String
-    },
+    UnknownTaskKind { value: String },
 
-    #[display(fmt = "cannot parse opath expression: '{detail}'", detail = "err.detail()")]
-    OpathParseErr {
-        err: Box<dyn Diag>
-    },
+    #[display(
+        fmt = "cannot parse opath expression: '{detail}'",
+        detail = "err.detail()"
+    )]
+    OpathParseErr { err: Box<dyn Diag> },
 
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
     Undef(u32),
 }
-
 
 mod host;
 mod proc;

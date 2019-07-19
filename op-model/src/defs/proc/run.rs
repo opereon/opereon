@@ -39,7 +39,7 @@ impl ParsedModelDef for Run {
                     }
                 }
                 Value::Null => {}
-                _ => return Err(DefsParseErrorDetail::RunInvalidType {kind}),
+                _ => return Err(DefsParseErrorDetail::RunInvalidType { kind }),
             }
         }
         Ok(run)
@@ -116,7 +116,7 @@ impl ParsedModelDef for Step {
                         .values()
                         .map(|t| TaskDef::parse(model, parent, t))
                         .collect::<Result<Vec<_>, _>>()?,
-                    _ => return Err(DefsParseErrorDetail::StepInvalidTasksType {kind}.into()),
+                    _ => return Err(DefsParseErrorDetail::StepInvalidTasksType { kind }.into()),
                 }
             } else {
                 return Err(DefsParseErrorDetail::StepMissingTasks.into());
@@ -128,7 +128,9 @@ impl ParsedModelDef for Step {
                 tasks,
             })
         } else {
-            return Err(DefsParseErrorDetail::StepNonObject {kind: node.data().kind()});
+            return Err(DefsParseErrorDetail::StepNonObject {
+                kind: node.data().kind(),
+            });
         }
     }
 }

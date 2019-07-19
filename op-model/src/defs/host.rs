@@ -47,20 +47,16 @@ impl ParsedModelDef for HostDef {
         let kind = node.data().kind();
         match *node.data().value() {
             Value::Object(ref props) => {
-
                 if !props.contains_key("hostname") {
-                    return Err(DefsParseErrorDetail::HostMissingHostname.into())
+                    return Err(DefsParseErrorDetail::HostMissingHostname.into());
                 }
 
-                if ! props.contains_key("ssh_dest") {
-                    return Err(DefsParseErrorDetail::HostMissingSshDest.into())
-
+                if !props.contains_key("ssh_dest") {
+                    return Err(DefsParseErrorDetail::HostMissingSshDest.into());
                 }
             }
             _ => {
-                return Err(DefsParseErrorDetail::HostNonObject {
-                    kind
-                }.into());
+                return Err(DefsParseErrorDetail::HostNonObject { kind }.into());
             }
         }
         Ok(HostDef::new(parent.root().clone(), node.clone()))

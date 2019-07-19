@@ -16,7 +16,9 @@ impl ValueDef {
                 if expr.starts_with("${") && expr.ends_with('}') {
                     match Opath::parse(&expr[2..expr.len() - 1]) {
                         Ok(expr) => Ok(ValueDef::Resolvable(expr)),
-                        Err(err) => Err(DefsParseErrorDetail::OpathParseErr {err: Box::new(err)}.into())
+                        Err(err) => {
+                            Err(DefsParseErrorDetail::OpathParseErr { err: Box::new(err) }.into())
+                        }
                     }
                 } else {
                     Ok(ValueDef::Static(node.clone()))
@@ -126,7 +128,12 @@ impl ParsedModelDef for ScopeDef {
                     }
                 }
                 Value::Null => {}
-                _ => return Err(DefsParseErrorDetail::ScopeNonObject {kind: node.data().kind()}.into())
+                _ => {
+                    return Err(DefsParseErrorDetail::ScopeNonObject {
+                        kind: node.data().kind(),
+                    }
+                    .into())
+                }
             }
         }
         Ok(scope)

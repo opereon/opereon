@@ -47,11 +47,14 @@ impl ParsedModelDef for UserDef {
         match *node.data().value() {
             Value::Object(ref props) => {
                 if !props.contains_key("username") {
-                    return Err(DefsParseErrorDetail::UserMissingUsername.into())
+                    return Err(DefsParseErrorDetail::UserMissingUsername.into());
                 }
             }
             _ => {
-                return Err(DefsParseErrorDetail::UserNonObject {kind: node.data().kind()}.into());
+                return Err(DefsParseErrorDetail::UserNonObject {
+                    kind: node.data().kind(),
+                }
+                .into());
             }
         }
         Ok(UserDef::new(parent.root().clone(), node.clone()))

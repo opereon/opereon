@@ -133,7 +133,7 @@ impl ParsedModelDef for TaskDef {
                     t.output = Some(TaskOutput::parse(n)?);
                 }
             }
-            _ => return Err(DefsParseErrorDetail::TaskNonObject {kind}.into())
+            _ => return Err(DefsParseErrorDetail::TaskNonObject { kind }.into()),
         }
 
         t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)");
@@ -167,7 +167,9 @@ impl FromStr for TaskKind {
             "script" => Ok(TaskKind::Script),
             "file-copy" => Ok(TaskKind::FileCopy),
             "file-compare" => Ok(TaskKind::FileCompare),
-            unknown => Err(DefsParseErrorDetail::UnknownTaskKind {value: unknown.to_string()}),
+            unknown => Err(DefsParseErrorDetail::UnknownTaskKind {
+                value: unknown.to_string(),
+            }),
         }
     }
 }
@@ -201,7 +203,10 @@ impl TaskOutput {
                     ..Default::default()
                 })
             }
-            _ => Err(DefsParseErrorDetail::TaskOutputInvalidType {kind: node.data().kind()}.into()),
+            _ => Err(DefsParseErrorDetail::TaskOutputInvalidType {
+                kind: node.data().kind(),
+            }
+            .into()),
         }
     }
 
@@ -265,7 +270,11 @@ impl TaskEnv {
             Value::String(ref key) => {
                 TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?])
             }
-            _ => return Err(DefsParseErrorDetail::TaskEnvUnexpectedPropType {kind: n.data().kind()})
+            _ => {
+                return Err(DefsParseErrorDetail::TaskEnvUnexpectedPropType {
+                    kind: n.data().kind(),
+                })
+            }
         };
         Ok(env)
     }
@@ -292,7 +301,10 @@ impl ParsedModelDef for Switch {
                 s.cases.push(case);
             }
         } else {
-            return Err(DefsParseErrorDetail::TaskSwitchNonArray{kind: node.data().kind()}.into())
+            return Err(DefsParseErrorDetail::TaskSwitchNonArray {
+                kind: node.data().kind(),
+            }
+            .into());
         }
 
         Ok(s)
@@ -330,7 +342,7 @@ impl ParsedModelDef for Case {
                     _ => return Err(DefsParseErrorDetail::TaskCaseStaticWhen.into()),
                 }
             } else {
-                return Err(DefsParseErrorDetail::TaskCaseMissingWhen.into())
+                return Err(DefsParseErrorDetail::TaskCaseMissingWhen.into());
             };
 
             Ok(Case {
@@ -338,7 +350,10 @@ impl ParsedModelDef for Case {
                 proc: ProcDef::parse(model, parent, node)?,
             })
         } else {
-            return Err(DefsParseErrorDetail::TaskCaseNonObject{kind: node.data().kind()}.into());
+            return Err(DefsParseErrorDetail::TaskCaseNonObject {
+                kind: node.data().kind(),
+            }
+            .into());
         }
     }
 }
