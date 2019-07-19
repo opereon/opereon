@@ -9,14 +9,14 @@ pub enum ValueDef {
 }
 
 impl ValueDef {
-    pub fn parse(node: &NodeRef) -> Result<ValueDef, DefsParseError> {
+    pub fn parse(node: &NodeRef) -> DefsParseResult<ValueDef> {
         match *node.data().value() {
             Value::String(ref s) => {
                 let expr = s.trim();
                 if expr.starts_with("${") && expr.ends_with('}') {
                     match Opath::parse(&expr[2..expr.len() - 1]) {
                         Ok(expr) => Ok(ValueDef::Resolvable(expr)),
-                        Err(_err) => perr!("opath parse error"), //FIXME (jc)
+                        Err(err) => Err(DefsParseErrorDetail::OpathParseErr {err: Box::new(err)}.into())
                     }
                 } else {
                     Ok(ValueDef::Static(node.clone()))
@@ -114,7 +114,7 @@ impl Remappable for ScopeDef {
 }
 
 impl ParsedModelDef for ScopeDef {
-    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         let mut scope = ScopeDef::new();
 
         if let Some(sn) = node.get_child_key("scope") {
@@ -126,7 +126,7 @@ impl ParsedModelDef for ScopeDef {
                     }
                 }
                 Value::Null => {}
-                _ => return perr!("scope definition must be an object"), //FIXME (jc)
+                _ => return Err(DefsParseErrorDetail::ScopeNonObject {kind: node.data().kind()}.into())
             }
         }
         Ok(scope)

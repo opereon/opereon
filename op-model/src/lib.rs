@@ -6,6 +6,10 @@ extern crate indoc;
 extern crate parking_lot;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate kg_diag_derive;
+#[macro_use]
+extern crate kg_display_derive;
 
 use std::path::{Path, PathBuf};
 

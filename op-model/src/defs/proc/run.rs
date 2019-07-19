@@ -18,10 +18,11 @@ impl Run {
 }
 
 impl ParsedModelDef for Run {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         let mut run = Run { steps: Vec::new() };
 
         if let Some(rn) = node.get_child_key("run") {
+            let kind = rn.data().kind();
             match *rn.data().value() {
                 Value::Array(ref elems) => {
                     for v in elems.iter() {
@@ -38,7 +39,7 @@ impl ParsedModelDef for Run {
                     }
                 }
                 Value::Null => {}
-                _ => return perr!("run definition must be an object or an array"), //FIXME (jc)
+                _ => return Err(DefsParseErrorDetail::RunInvalidType {kind}),
             }
         }
         Ok(run)
@@ -63,7 +64,7 @@ impl Step {
         &self,
         model: &'a Model,
         proc: &ProcDef,
-    ) -> Result<Vec<Cow<'a, HostDef>>, DefsParseError> {
+    ) -> Result<Vec<Cow<'a, HostDef>>, DefsParseErrorDetail> {
         self.hosts.as_ref().map_or(
             Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
             |hosts_expr| {
@@ -91,14 +92,12 @@ impl Step {
 }
 
 impl ParsedModelDef for Step {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let hosts = if let Some(h) = props.get("hosts") {
                 match ValueDef::parse(h)? {
                     ValueDef::Static(_n) => {
-                        return perr!(
-                            "'hosts' property must be a dynamic expression in step definition"
-                        );
+                        return Err(DefsParseErrorDetail::StepStaticHosts.into());
                     }
                     ValueDef::Resolvable(h) => Some(h),
                 }
@@ -107,6 +106,7 @@ impl ParsedModelDef for Step {
             };
 
             let tasks = if let Some(t) = props.get("tasks") {
+                let kind = t.data().kind();
                 match *t.data().value() {
                     Value::Array(ref elems) => elems
                         .iter()
@@ -116,10 +116,10 @@ impl ParsedModelDef for Step {
                         .values()
                         .map(|t| TaskDef::parse(model, parent, t))
                         .collect::<Result<Vec<_>, _>>()?,
-                    _ => return perr!("invalid type of 'tasks' property in step definition"),
+                    _ => return Err(DefsParseErrorDetail::StepInvalidTasksType {kind}.into()),
                 }
             } else {
-                return perr!("step definition must have 'tasks' property");
+                return Err(DefsParseErrorDetail::StepMissingTasks.into());
             };
 
             Ok(Step {
@@ -128,7 +128,7 @@ impl ParsedModelDef for Step {
                 tasks,
             })
         } else {
-            return perr!("step definition must be an object");
+            return Err(DefsParseErrorDetail::StepNonObject {kind: node.data().kind()});
         }
     }
 }

@@ -39,8 +39,8 @@ impl From<kg_tree::opath::ExprErrorDetail> for ProtoError {
     }
 }
 
-impl From<op_model::DefsParseError> for ProtoError {
-    fn from(err: op_model::DefsParseError) -> Self {
+impl From<op_model::DefsParseErrorDetail> for ProtoError {
+    fn from(err: op_model::DefsParseErrorDetail) -> Self {
         eprintln!("{:?}", err);
         unimplemented!()
     }

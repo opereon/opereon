@@ -88,7 +88,7 @@ impl ScopedModelDef for TaskDef {
 }
 
 impl ParsedModelDef for TaskDef {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         let mut t = TaskDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: TaskKind::Exec,
@@ -100,12 +100,13 @@ impl ParsedModelDef for TaskDef {
             label: String::new(),
         };
 
+        let kind = node.data().kind();
         match *node.data().value() {
             Value::Object(ref props) => {
                 if let Some(n) = props.get("task") {
                     t.kind = TaskKind::from_str(&n.data().as_string())?;
                 } else {
-                    return perr!("task definition must have 'task' property"); //FIXME (jc)
+                    return Err(DefsParseErrorDetail::TaskMissingTask.into());
                 }
 
                 if let Some(n) = props.get("ro") {
@@ -124,7 +125,7 @@ impl ParsedModelDef for TaskDef {
                     if let Some(s) = props.get("cases") {
                         t.switch = Some(Switch::parse(model, &t.scoped, s)?);
                     } else {
-                        return perr!("switch task definition must have 'cases' property");
+                        return Err(DefsParseErrorDetail::TaskSwitchMissingCases.into());
                     }
                 }
 
@@ -132,7 +133,7 @@ impl ParsedModelDef for TaskDef {
                     t.output = Some(TaskOutput::parse(n)?);
                 }
             }
-            _ => return perr!("task definition must be an object"), //FIXME (jc)
+            _ => return Err(DefsParseErrorDetail::TaskNonObject {kind}.into())
         }
 
         t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)");
@@ -155,7 +156,7 @@ pub enum TaskKind {
 }
 
 impl FromStr for TaskKind {
-    type Err = DefsParseError;
+    type Err = DefsParseErrorDetail;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -166,7 +167,7 @@ impl FromStr for TaskKind {
             "script" => Ok(TaskKind::Script),
             "file-copy" => Ok(TaskKind::FileCopy),
             "file-compare" => Ok(TaskKind::FileCompare),
-            _ => perr!("unknown task kind"), //FIXME (jc)
+            unknown => Err(DefsParseErrorDetail::UnknownTaskKind {value: unknown.to_string()}),
         }
     }
 }
@@ -187,11 +188,11 @@ pub struct TaskOutput {
 }
 
 impl TaskOutput {
-    fn parse(node: &NodeRef) -> Result<TaskOutput, DefsParseError> {
+    fn parse(node: &NodeRef) -> DefsParseResult<TaskOutput> {
         match *node.data().value() {
             Value::Object(_) => match kg_tree::serial::from_tree::<TaskOutput>(node) {
                 Ok(out) => Ok(out),
-                Err(_err) => Err(DefsParseError::Undef), //FIXME (jc)
+                Err(_err) => Err(DefsParseErrorDetail::Undef(line!()).into()), //FIXME (jc)
             },
             Value::String(ref s) => {
                 let format = FileFormat::from(s);
@@ -200,7 +201,7 @@ impl TaskOutput {
                     ..Default::default()
                 })
             }
-            _ => perr!("output definition must be an object or string"), //FIXME (jc)
+            _ => Err(DefsParseErrorDetail::TaskOutputInvalidType {kind: node.data().kind()}.into()),
         }
     }
 
@@ -241,7 +242,7 @@ pub enum TaskEnv {
 }
 
 impl TaskEnv {
-    pub fn parse(n: &NodeRef) -> Result<TaskEnv, DefsParseError> {
+    pub fn parse(n: &NodeRef) -> Result<TaskEnv, DefsParseErrorDetail> {
         let env = match *n.data().value() {
             Value::Object(ref props) => {
                 let mut envs = LinkedHashMap::with_capacity(props.len());
@@ -264,7 +265,7 @@ impl TaskEnv {
             Value::String(ref key) => {
                 TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?])
             }
-            _ => return perr!("Unexpected property type"), //FIXME (jc)
+            _ => return Err(DefsParseErrorDetail::TaskEnvUnexpectedPropType {kind: n.data().kind()})
         };
         Ok(env)
     }
@@ -282,7 +283,7 @@ impl Switch {
 }
 
 impl ParsedModelDef for Switch {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         let mut s = Switch { cases: Vec::new() };
 
         if let Value::Array(ref elems) = *node.data().value() {
@@ -291,7 +292,7 @@ impl ParsedModelDef for Switch {
                 s.cases.push(case);
             }
         } else {
-            return perr!("switch definition must be an array");
+            return Err(DefsParseErrorDetail::TaskSwitchNonArray{kind: node.data().kind()}.into())
         }
 
         Ok(s)
@@ -321,17 +322,15 @@ impl Case {
 }
 
 impl ParsedModelDef for Case {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let when = if let Some(n) = props.get("when") {
                 match ValueDef::parse(n)? {
                     ValueDef::Resolvable(e) => e,
-                    _ => return perr!(
-                        "'when' property must be a dynamic expression in switch case definition"
-                    ),
+                    _ => return Err(DefsParseErrorDetail::TaskCaseStaticWhen.into()),
                 }
             } else {
-                return perr!("switch case expression must have 'when' property");
+                return Err(DefsParseErrorDetail::TaskCaseMissingWhen.into())
             };
 
             Ok(Case {
@@ -339,7 +338,7 @@ impl ParsedModelDef for Case {
                 proc: ProcDef::parse(model, parent, node)?,
             })
         } else {
-            return perr!("switch case definition must be an object");
+            return Err(DefsParseErrorDetail::TaskCaseNonObject{kind: node.data().kind()}.into());
         }
     }
 }

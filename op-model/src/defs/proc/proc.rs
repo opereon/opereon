@@ -12,7 +12,7 @@ pub enum ProcKind {
 }
 
 impl FromStr for ProcKind {
-    type Err = DefsParseError;
+    type Err = DefsParseErrorDetail;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -20,7 +20,7 @@ impl FromStr for ProcKind {
             "update" => Ok(ProcKind::Update),
             "check" => Ok(ProcKind::Check),
             "probe" => Ok(ProcKind::Probe),
-            _ => perr!("unknown proc kind"), //FIXME (jc)
+            unknown => Err(DefsParseErrorDetail::UnknownProcKind {value: unknown.to_string()}),
         }
     }
 }
@@ -119,7 +119,7 @@ impl ScopedModelDef for ProcDef {
 }
 
 impl ParsedModelDef for ProcDef {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         let mut p = ProcDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: ProcKind::Exec,
@@ -139,11 +139,12 @@ impl ParsedModelDef for ProcDef {
                 } else if let Some(n) = props.get("proc") {
                     p.kind = ProcKind::from_str(&n.data().as_string())?;
                 } else {
-                    return perr!("procedure must have defined 'proc' property");
+                    return Err(DefsParseErrorDetail::ProcMissingProc.into());
                 }
 
                 if p.kind == ProcKind::Update {
                     if let Some(wn) = node.get_child_key("watch") {
+                        let kind = wn.data().kind();
                         match *wn.data().value() {
                             Value::Object(ref props) => {
                                 for (k, v) in props.iter() {
@@ -152,10 +153,11 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return perr!("watch definition must be an object"), //FIXME (jc)
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject {kind}),
                         }
                     }
                     if let Some(wn) = node.get_child_key("watch_file") {
+                        let kind = wn.data().kind();
                         match *wn.data().value() {
                             Value::Object(ref props) => {
                                 for (k, v) in props.iter() {
@@ -164,14 +166,14 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return perr!("watch definition must be an object"), //FIXME (jc)
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject {kind}),
                         }
                     }
                 }
 
                 p.run = Run::parse(model, &p.scoped, node)?;
             }
-            _ => return perr!("procedure definition must be an object"), //FIXME (jc)
+            _ => return Err(DefsParseErrorDetail::ProcNonObject {kind: node.data().kind()}),
         }
 
         p.id = get_expr(&p, "@.id or @.@key");

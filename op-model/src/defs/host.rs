@@ -43,20 +43,24 @@ impl ModelDef for HostDef {
 }
 
 impl ParsedModelDef for HostDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+        let kind = node.data().kind();
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(
-                    props.contains_key("hostname"),
-                    "host definition must contain 'hostname' property"
-                )?;
-                perr_assert!(
-                    props.contains_key("ssh_dest"),
-                    "host definition must contain 'ssh_dest' property"
-                )?;
+
+                if !props.contains_key("hostname") {
+                    return Err(DefsParseErrorDetail::HostMissingHostname.into())
+                }
+
+                if ! props.contains_key("ssh_dest") {
+                    return Err(DefsParseErrorDetail::HostMissingSshDest.into())
+
+                }
             }
             _ => {
-                perr!("host definition must be an object")?;
+                return Err(DefsParseErrorDetail::HostNonObject {
+                    kind
+                }.into());
             }
         }
         Ok(HostDef::new(parent.root().clone(), node.clone()))

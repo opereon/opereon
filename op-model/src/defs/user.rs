@@ -43,16 +43,15 @@ impl ModelDef for UserDef {
 }
 
 impl ParsedModelDef for UserDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(
-                    props.contains_key("username"),
-                    "user definition must have 'username' property"
-                )?; //FIXME (jc)
+                if !props.contains_key("username") {
+                    return Err(DefsParseErrorDetail::UserMissingUsername.into())
+                }
             }
             _ => {
-                perr!("user definition must be an object")?; //FIXME (jc)
+                return Err(DefsParseErrorDetail::UserNonObject {kind: node.data().kind()}.into());
             }
         }
         Ok(UserDef::new(parent.root().clone(), node.clone()))
