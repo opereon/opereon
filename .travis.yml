@@ -4,6 +4,6 @@ rust:
 cache: cargo
 git:
   submodules: false
-before_install: false
+before_install:
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
   - git submodule update --init --recursive
