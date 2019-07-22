@@ -8,7 +8,7 @@ use crate::core::error::RuntimeResult;
 use crate::ConfigRef;
 use kg_io::IoResult;
 use kg_utils::collections::LruCache;
-use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
+use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME, GitManager};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
 
@@ -135,6 +135,12 @@ impl ModelManager {
     /// Commit current model
     pub fn commit(&mut self, message: &str) -> RuntimeResult<ModelRef> {
         self.init()?;
+
+        let git = GitManager::new(self.model_dir());
+        let signature = Signature::now("opereon", "example@email.com").unwrap();
+
+
+
         // TODO ws error handling
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
@@ -204,48 +210,12 @@ impl ModelManager {
         self.get(oid.into())
     }
 
-    /// Update provided index and return created tree Oid
-    fn update_index(index: &mut Index) -> RuntimeResult<Oid> {
-        // TODO ws error handling
-
-        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
-        // Changes in index won't be saved to disk until index.write*() called.
-        index.clear().expect("Cannot clear index");
-        index
-            .add_all(&["*"], IndexAddOption::default(), None)
-            .expect("Cannot update index");
-
-        // get oid of index tree
-        let oid = index.write_tree().expect("Cannot write index");
-        Ok(oid)
-    }
-
-    /// Returns last commit or `None` if repository have no commits.
-    fn find_last_commit(repo: &Repository) -> RuntimeResult<Option<Commit>> {
-        // TODO error handling
-        let obj = match repo.head() {
-            Ok(head) => head,
-            Err(err) => match err.code() {
-                ErrorCode::UnbornBranch => return Ok(None),
-                _ => {
-                    eprintln!("err = {:?}", err);
-                    panic!("Error searching last commit")
-                }
-            },
-        };
-
-        let obj = obj.resolve().unwrap().peel(ObjectType::Commit).unwrap();
-        let commit = obj.peel_to_commit().unwrap();
-        Ok(Some(commit))
-    }
-
     fn init_git_repo<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
         use std::fmt::Write;
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
-        // TODO error handling
-        let _repo =
-            Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
+
+        GitManager::init_new_repository(&path, &opts)?;
 
         // ignore ./op directory
         let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
@@ -281,11 +251,10 @@ impl ModelManager {
         Ok(())
     }
 
-    fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let obj = repo.revparse_single(spec).expect("Cannot find revision!");
-        Ok(obj.id().into())
+    fn resolve_revision_str(&self, spec: &str) -> RuntimeResult<Sha1Hash> {
+        let mut git = GitManager::new(self.model_dir());
+        let id = git.resolve_revision_str(spec)?;
+        Ok(id)
     }
 
     fn cache_model(&mut self, m: ModelRef) {

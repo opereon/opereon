@@ -28,6 +28,7 @@ pub use self::manifest::*;
 pub use self::metadata::*;
 pub use self::model::*;
 pub use self::update::*;
+pub use self::git::*;
 
 mod config;
 mod defs;
