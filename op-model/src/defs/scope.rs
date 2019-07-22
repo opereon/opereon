@@ -31,8 +31,9 @@ impl ValueDef {
     pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> DefsResult<NodeSet> {
         match *self {
             ValueDef::Static(ref n) => Ok(n.clone().into()),
-            ValueDef::Resolvable(ref expr) => expr.apply_ext(root, current, scope)
-                .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)}.into()),
+            ValueDef::Resolvable(ref expr) => expr
+                .apply_ext(root, current, scope)
+                .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) }.into()),
         }
     }
 
@@ -102,7 +103,7 @@ impl ScopeDef {
         self.values.get(name)
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()>{
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()> {
         for (name, value) in self.values.iter() {
             let rval = value.resolve(root, current, &scope)?;
             scope.set_var(name.clone(), rval);

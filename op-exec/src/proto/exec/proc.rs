@@ -82,7 +82,8 @@ impl ProcExec {
 
         // FIXME ws error handling
         self.args
-            .resolve(proc.root(), proc.node(), proc.scope_mut()?).expect("Cannot resolve args");
+            .resolve(proc.root(), proc.node(), proc.scope_mut()?)
+            .expect("Cannot resolve args");
 
         if proc_exec_dir.is_absolute() {
             self.create_proc_exec_dir(proc_exec_dir)?;

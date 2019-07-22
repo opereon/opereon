@@ -4,13 +4,13 @@ use git2::{
 };
 
 use super::*;
+use crate::core::error::RuntimeResult;
 use crate::ConfigRef;
 use kg_io::IoResult;
 use kg_utils::collections::LruCache;
 use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
-use crate::core::error::RuntimeResult;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]

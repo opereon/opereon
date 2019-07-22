@@ -111,7 +111,7 @@ impl ScopedModelDef for ProcDef {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> DefsResult<&Scope>{
+    fn scope(&self) -> DefsResult<&Scope> {
         self.as_scoped().scope()
     }
 
@@ -178,7 +178,8 @@ impl ParsedModelDef for ProcDef {
             _ => {
                 return Err(DefsErrorDetail::ProcNonObject {
                     kind: node.data().kind(),
-                }.into())
+                }
+                .into())
             }
         }
 

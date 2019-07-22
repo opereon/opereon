@@ -65,12 +65,12 @@ impl Step {
         model: &'a Model,
         proc: &ProcDef,
     ) -> DefsResult<Vec<Cow<'a, HostDef>>> {
-        self.hosts.as_ref()
-            .map_or(
+        self.hosts.as_ref().map_or(
             Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
             |hosts_expr| {
-                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope()?)
-                    .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)})?;
+                let hs = hosts_expr
+                    .apply_ext(proc.root(), proc.node(), proc.scope()?)
+                    .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
                 let mut res = Vec::with_capacity(hs.len());
                 for h in hs.iter() {
                     let host: Cow<HostDef> = match model.get_host(h) {
@@ -132,7 +132,8 @@ impl ParsedModelDef for Step {
         } else {
             return Err(DefsErrorDetail::StepNonObject {
                 kind: node.data().kind(),
-            }.into());
+            }
+            .into());
         }
     }
 }

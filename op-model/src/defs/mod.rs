@@ -103,14 +103,9 @@ pub enum DefsErrorDetail {
     )]
     ExprErr { err: Box<dyn Diag> },
 
-
     /// FIXME ws this variant should be replaced with Diag
     #[display(fmt = "serialization/deserialization error: '{err}'")]
-    SerialErr {
-        err: kg_tree::serial::Error
-    },
-
-
+    SerialErr { err: kg_tree::serial::Error },
 
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
@@ -161,7 +156,8 @@ pub trait AsScoped: 'static {
 
 fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> DefsResult<T> {
     let expr = Opath::parse(expr).unwrap();
-    let res = expr.apply(def.root(), def.node())
+    let res = expr
+        .apply(def.root(), def.node())
         .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
     match res.into_one() {
         Some(n) => Ok(T::get(&n)),

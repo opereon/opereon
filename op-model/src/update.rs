@@ -19,7 +19,7 @@ impl<'a> ModelUpdate<'a> {
     pub fn new(model1: &'a Model, model2: &'a Model) -> ModelResult<ModelUpdate<'a>> {
         let mut cache = NodePathCache::new();
         let model_diff = ModelDiff::full_cache(model1.root(), model2.root(), &mut cache)
-            .map_err(|err| ModelErrorDetail::ModelDiffErr {err: Box::new(err)})?;
+            .map_err(|err| ModelErrorDetail::ModelDiffErr { err: Box::new(err) })?;
         let file_diff = FileDiff::minimal(model1, model2);
         let update = ModelUpdate {
             cache,
@@ -38,7 +38,10 @@ impl<'a> ModelUpdate<'a> {
         &self.model_diff
     }
 
-    pub fn check_updater(&mut self, u: &ProcDef) -> ModelResult<(Vec<&ModelChange>, Vec<&FileChange>)> {
+    pub fn check_updater(
+        &mut self,
+        u: &ProcDef,
+    ) -> ModelResult<(Vec<&ModelChange>, Vec<&FileChange>)> {
         debug_assert!(u.kind() == ProcKind::Update);
 
         self.matcher1_r.clear();
@@ -52,31 +55,25 @@ impl<'a> ModelUpdate<'a> {
 
         for mw in u.model_watches().iter() {
             if mw.mask().has_removed() {
-                self.matcher1_r.resolve_ext_cache(
-                    mw.path(),
-                    root1,
-                    root1,
-                    &scope1,
-                    &mut self.cache,
-                ).map_err(|err| BasicDiag::from(ModelErrorDetail::ExprErr {err: Box::new(err)}))?;
+                self.matcher1_r
+                    .resolve_ext_cache(mw.path(), root1, root1, &scope1, &mut self.cache)
+                    .map_err(|err| {
+                        BasicDiag::from(ModelErrorDetail::ExprErr { err: Box::new(err) })
+                    })?;
             }
             if mw.mask().has_added() {
-                self.matcher2_a.resolve_ext_cache(
-                    mw.path(),
-                    root2,
-                    root2,
-                    &scope2,
-                    &mut self.cache,
-                ).map_err(|err| BasicDiag::from(ModelErrorDetail::ExprErr {err: Box::new(err)}))?;
+                self.matcher2_a
+                    .resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache)
+                    .map_err(|err| {
+                        BasicDiag::from(ModelErrorDetail::ExprErr { err: Box::new(err) })
+                    })?;
             }
             if mw.mask().has_updated() {
-                self.matcher2_u.resolve_ext_cache(
-                    mw.path(),
-                    root2,
-                    root2,
-                    &scope2,
-                    &mut self.cache,
-                ).map_err(|err| BasicDiag::from(ModelErrorDetail::ExprErr {err: Box::new(err)}))?;
+                self.matcher2_u
+                    .resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache)
+                    .map_err(|err| {
+                        BasicDiag::from(ModelErrorDetail::ExprErr { err: Box::new(err) })
+                    })?;
             }
         }
 

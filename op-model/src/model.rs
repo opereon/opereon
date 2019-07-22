@@ -18,14 +18,11 @@ pub type ModelResult<T> = Result<T, ModelError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1000)]
 pub enum ModelErrorDetail {
-
     #[display(fmt = "config not found")]
     ConfigNotFound,
 
     #[display(fmt = "cannot parse manifest file: '{err}'")]
-    MalformedManifest {
-        err: toml::de::Error
-    },
+    MalformedManifest { err: toml::de::Error },
 
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
@@ -46,9 +43,8 @@ pub enum ModelErrorDetail {
         fmt = "cannot generate model diff: '{detail}'",
         detail = "err.detail()"
     )]
-    ModelDiffErr{ err: Box<dyn Diag> },
+    ModelDiffErr { err: Box<dyn Diag> },
 }
-
 
 #[derive(Debug, Serialize)]
 pub struct Model {
@@ -154,8 +150,8 @@ impl Model {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
         kg_io::fs::read_to_string(&path, &mut content)?;
-        let manifest: Manifest = toml::from_str(&content)
-            .map_err(|err| ModelErrorDetail::MalformedManifest {err})?;
+        let manifest: Manifest =
+            toml::from_str(&content).map_err(|err| ModelErrorDetail::MalformedManifest { err })?;
         Ok(manifest)
     }
 
@@ -225,8 +221,10 @@ impl Model {
                     let n = NodeRef::binary(obj.data());
                     n.data_mut().set_file(Some(&file_info));
 
-                    let item = inc.item().apply_one_ext(m.root(), &n, scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
+                    let item = inc
+                        .item()
+                        .apply_one_ext(m.root(), &n, scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
 
                     if item.data().file().is_none() {
                         item.data_mut().set_file(Some(&file_info));
@@ -234,8 +232,9 @@ impl Model {
 
                     scope.set_var("item".into(), NodeSet::One(item));
 
-                    inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
+                    inc.mapping()
+                        .apply_ext(m.root(), m.root(), scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                 }
                 Ok(())
             };
@@ -290,15 +289,17 @@ impl Model {
                     Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
                 };
 
-                let current = path.apply_one_ext(m.root(), m.root(), scope.as_ref())
-                    .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
+                let current = path
+                    .apply_one_ext(m.root(), m.root(), scope.as_ref())
+                    .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
 
                 for (p, e) in config.overrides().iter() {
-                    let res = p.apply_ext(m.root(), &current, scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
+                    let res = p
+                        .apply_ext(m.root(), &current, scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                     for n in res.into_iter() {
                         e.apply_ext(m.root(), &n, scope.as_ref())
-                            .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
+                            .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                     }
                 }
             }
@@ -306,8 +307,9 @@ impl Model {
 
         // interpolations
         let mut resolver = TreeResolver::new();
-        resolver.resolve(m.root())
-            .map_err(|err| BasicDiag::from(ModelErrorDetail::InterpolationsResloveErr {err: Box::new(err)}))?;
+        resolver.resolve(m.root()).map_err(|err| {
+            BasicDiag::from(ModelErrorDetail::InterpolationsResloveErr { err: Box::new(err) })
+        })?;
 
         {
             let scope = m.scoped.scope_mut()?;

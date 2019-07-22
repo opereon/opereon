@@ -31,8 +31,8 @@ pub use self::update::*;
 
 mod config;
 mod defs;
+mod git;
 mod manifest;
 mod metadata;
 mod model;
 mod update;
-mod git;

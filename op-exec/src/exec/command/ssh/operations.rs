@@ -1,6 +1,6 @@
 use crate::{
     AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
-    SourceRef, RuntimeResult
+    RuntimeResult, SourceRef,
 };
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};

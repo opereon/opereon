@@ -371,7 +371,7 @@ impl Future for TaskExecOperation {
                         let cwd: Option<PathBuf> = scope.get_var_value_opt("cwd");
                         let run_as: Option<String> = scope.get_var_value_opt("run_as");
 
-                        let env = if let Some(e) = task.env(){
+                        let env = if let Some(e) = task.env() {
                             Some(resolve_env(e, task.root(), task.node(), task.scope()?)?)
                         } else {
                             None

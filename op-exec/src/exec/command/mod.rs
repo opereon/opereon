@@ -122,7 +122,12 @@ pub fn create_command_executor(
     Ok(Box::new(e))
 }
 
-pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Scope) -> RuntimeResult<EnvVars> {
+pub fn resolve_env(
+    env: &TaskEnv,
+    root: &NodeRef,
+    current: &NodeRef,
+    scope: &Scope,
+) -> RuntimeResult<EnvVars> {
     lazy_static! {
         static ref VAR_NAME_RE: Regex = Regex::new(r"[^A-Za-z0-9]").unwrap();
     };

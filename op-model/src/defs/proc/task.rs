@@ -78,7 +78,7 @@ impl ScopedModelDef for TaskDef {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> DefsResult<&Scope>{
+    fn scope(&self) -> DefsResult<&Scope> {
         self.as_scoped().scope()
     }
 
@@ -218,14 +218,20 @@ impl TaskOutput {
         self.format
     }
 
-    pub fn apply(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut, output: NodeSet) -> DefsResult<()> {
+    pub fn apply(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &ScopeMut,
+        output: NodeSet,
+    ) -> DefsResult<()> {
         match self.mode {
             OutputMode::Var(ref name) => scope.set_var(name.into(), output),
             OutputMode::Expr(ref expr) => {
                 let scope = ScopeMut::child(scope.clone().into());
                 scope.set_var("$output".into(), output);
                 expr.apply_ext(root, current, &scope)
-                    .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)})?;
+                    .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
             }
         }
         Ok(())
@@ -256,7 +262,7 @@ impl TaskEnv {
 
                 for (k, node) in props.iter() {
                     let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsErrorDetail::SerialErr {err})?;
+                        .map_err(|err| DefsErrorDetail::SerialErr { err })?;
                     envs.insert(k.to_string(), expr);
                 }
                 TaskEnv::Map(envs)
@@ -266,19 +272,18 @@ impl TaskEnv {
 
                 for node in elems.iter() {
                     let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsErrorDetail::SerialErr {err})?;
+                        .map_err(|err| DefsErrorDetail::SerialErr { err })?;
                     envs.push(expr)
                 }
                 TaskEnv::List(envs)
             }
-            Value::String(ref key) => {
-                TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
-                    .map_err(|err| DefsErrorDetail::OpathParseErr {err: Box::new(err)})?])
-            }
+            Value::String(ref key) => TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
+                .map_err(|err| DefsErrorDetail::OpathParseErr { err: Box::new(err) })?]),
             _ => {
                 return Err(DefsErrorDetail::TaskEnvUnexpectedPropType {
                     kind: n.data().kind(),
-                }.into())
+                }
+                .into())
             }
         };
         Ok(env)
