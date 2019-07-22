@@ -599,7 +599,7 @@ impl ModelRef {
 
     /// Read model for provided metadata.
     /// Returns error if `metadata.path()` is not model dir
-    pub fn read(metadata: Metadata) -> IoResult<ModelRef> {
+    pub fn read(metadata: Metadata) -> ModelResult<ModelRef> {
         Ok(Self::new(Model::read_revision(metadata)?))
     }
 
