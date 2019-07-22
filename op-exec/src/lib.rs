@@ -21,8 +21,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::prelude::*;
 use kg_diag::*;
-use kg_io::*;
-use kg_io::fs;
+use kg_diag::io::fs;
 use kg_symbol::Symbol;
 use kg_tree::*;
 use kg_tree::diff::*;

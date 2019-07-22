@@ -9,7 +9,6 @@ use crate::{ConfigRef};
 use kg_utils::collections::LruCache;
 use std::path::{PathBuf, Path};
 use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
-use kg_io::IoResult;
 use slog::{Record, Serializer, Key, Result as SlogResult};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -84,7 +83,7 @@ impl ModelManager {
             let curr_dir = parent.unwrap();
             let manifest = curr_dir.join(&manifest_filename);
 
-            match kg_io::fs::metadata(manifest){
+            match fs::metadata(manifest){
                 Ok(_) => {
                     return Ok(curr_dir.to_owned());
                 }
@@ -98,7 +97,7 @@ impl ModelManager {
             }
         }
 
-        return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
+        return Err(IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
     /// Initialize model manager.

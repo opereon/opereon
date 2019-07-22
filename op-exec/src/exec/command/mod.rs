@@ -42,8 +42,8 @@ impl From<std::fmt::Error> for CommandError {
     }
 }
 
-impl From<kg_io::error::IoError> for CommandError {
-    fn from(err: kg_io::error::IoError) -> Self {
+impl From<kg_diag::IoError> for CommandError {
+    fn from(err: kg_diag::IoError) -> Self {
         eprintln!("io error: {:?}", err);
         CommandError::Undef
     }
@@ -64,11 +64,11 @@ pub enum SourceRef<'a> {
 }
 
 impl<'a> SourceRef<'a> {
-    pub fn read(&self) -> Result<String, kg_io::error::IoError> {
+    pub fn read(&self) -> Result<String, kg_diag::IoError> {
         match *self {
             SourceRef::Path(path) => {
                 let mut s = String::new();
-                kg_io::fs::read_to_string(path, &mut s)?;
+                fs::read_to_string(path, &mut s)?;
                 Ok(s)
             }
             SourceRef::Source(src) => {
@@ -77,10 +77,10 @@ impl<'a> SourceRef<'a> {
         }
     }
 
-    pub fn read_to(&self, buf: &mut String) -> Result<(), kg_io::error::IoError> {
+    pub fn read_to(&self, buf: &mut String) -> Result<(), kg_diag::IoError> {
         match *self {
             SourceRef::Path(path) => {
-                kg_io::fs::read_to_string(path, buf)?;
+                fs::read_to_string(path, buf)?;
                 Ok(())
             }
             SourceRef::Source(src) => {
@@ -201,7 +201,7 @@ fn prepare_script<W: Write>(
     env: Option<&EnvVars>,
     cwd: Option<&Path>,
     mut out: W,
-) -> Result<(), kg_io::error::IoError> {
+) -> Result<(), IoError> {
     let mut rng = rand::thread_rng();
 
     let script = script.read()?;

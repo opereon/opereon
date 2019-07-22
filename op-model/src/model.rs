@@ -9,7 +9,6 @@ use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
-
 use super::*;
 
 #[derive(Debug, Serialize)]
@@ -101,7 +100,7 @@ impl Model {
     pub fn load_manifest(model_dir: &Path) -> IoResult<Manifest> {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
-        kg_io::fs::read_to_string(&path, &mut content)?;
+        fs::read_to_string(&path, &mut content)?;
         // FIXME ws error handling
         let manifest: Manifest = toml::from_str(&content).expect("Cannot parse manifest file!");
         Ok(manifest)
