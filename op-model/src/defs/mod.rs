@@ -97,6 +97,21 @@ pub enum DefsParseErrorDetail {
     )]
     OpathParseErr { err: Box<dyn Diag> },
 
+    #[display(
+        fmt = "cannot evaluate expression: '{detail}'",
+        detail = "err.detail()"
+    )]
+    ExprErr { err: Box<dyn Diag> },
+
+
+    /// FIXME ws this variant should be replaced with Diag
+    #[display(fmt = "serialization/deserialization error: '{err}'")]
+    SerialErr {
+        err: kg_tree::serial::Error
+    },
+
+
+
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
     Undef(u32),
@@ -144,11 +159,13 @@ pub trait AsScoped: 'static {
     fn as_scoped(&self) -> &Scoped;
 }
 
-fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> T {
+fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> DefsParseResult<T> {
     let expr = Opath::parse(expr).unwrap();
-    match expr.apply(def.root(), def.node()).into_one() {
-        Some(n) => T::get(&n),
-        None => T::empty(),
+    let res = expr.apply(def.root(), def.node())
+        .map_err(|err| DefsParseErrorDetail::ExprErr { err: Box::new(err) })?;
+    match res.into_one() {
+        Some(n) => Ok(T::get(&n)),
+        None => Ok(T::empty()),
     }
 }
 

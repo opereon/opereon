@@ -10,14 +10,14 @@ pub struct HostDef {
 }
 
 impl HostDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> HostDef {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsParseResult<HostDef> {
         let mut h = HostDef {
             root,
             node,
             hostname: String::new(),
         };
-        h.hostname = get_expr(&h, "fqdn or hostname");
-        h
+        h.hostname = get_expr(&h, "fqdn or hostname")?;
+        Ok(h)
     }
 
     pub fn hostname(&self) -> &str {
@@ -59,6 +59,6 @@ impl ParsedModelDef for HostDef {
                 return Err(DefsParseErrorDetail::HostNonObject { kind }.into());
             }
         }
-        Ok(HostDef::new(parent.root().clone(), node.clone()))
+        Ok(HostDef::new(parent.root().clone(), node.clone())?)
     }
 }

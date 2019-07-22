@@ -28,10 +28,11 @@ impl ValueDef {
         }
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> DefsParseResult<NodeSet> {
         match *self {
-            ValueDef::Static(ref n) => n.clone().into(),
-            ValueDef::Resolvable(ref expr) => expr.apply_ext(root, current, scope),
+            ValueDef::Static(ref n) => Ok(n.clone().into()),
+            ValueDef::Resolvable(ref expr) => expr.apply_ext(root, current, scope)
+                .map_err(|err| DefsParseErrorDetail::ExprErr {err: Box::new(err)}.into()),
         }
     }
 
@@ -101,11 +102,12 @@ impl ScopeDef {
         self.values.get(name)
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsParseResult<()>{
         for (name, value) in self.values.iter() {
-            let rval = value.resolve(root, current, &scope);
+            let rval = value.resolve(root, current, &scope)?;
             scope.set_var(name.clone(), rval);
         }
+        Ok(())
     }
 }
 

@@ -10,14 +10,14 @@ pub struct UserDef {
 }
 
 impl UserDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> UserDef {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsParseResult<UserDef> {
         let mut u = UserDef {
             root,
             node,
             username: String::new(),
         };
-        u.username = get_expr(&u, "username");
-        u
+        u.username = get_expr(&u, "username")?;
+        Ok(u)
     }
 
     pub fn username(&self) -> &str {
@@ -57,6 +57,6 @@ impl ParsedModelDef for UserDef {
                 .into());
             }
         }
-        Ok(UserDef::new(parent.root().clone(), node.clone()))
+        Ok(UserDef::new(parent.root().clone(), node.clone())?)
     }
 }

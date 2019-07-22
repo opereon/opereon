@@ -136,8 +136,8 @@ impl ParsedModelDef for TaskDef {
             _ => return Err(DefsParseErrorDetail::TaskNonObject { kind }.into()),
         }
 
-        t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)");
-        t.label = get_expr(&t, "@.label or @.id or (@.task + '-' + @.@key)");
+        t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)")?;
+        t.label = get_expr(&t, "@.label or @.id or (@.task + '-' + @.@key)")?;
 
         Ok(t)
     }
@@ -247,13 +247,14 @@ pub enum TaskEnv {
 }
 
 impl TaskEnv {
-    pub fn parse(n: &NodeRef) -> Result<TaskEnv, DefsParseErrorDetail> {
+    pub fn parse(n: &NodeRef) -> DefsParseResult<TaskEnv> {
         let env = match *n.data().value() {
             Value::Object(ref props) => {
                 let mut envs = LinkedHashMap::with_capacity(props.len());
 
                 for (k, node) in props.iter() {
-                    let expr: Opath = serial::from_tree(node)?;
+                    let expr: Opath = serial::from_tree(node)
+                        .map_err(|err| DefsParseErrorDetail::SerialErr {err})?;
                     envs.insert(k.to_string(), expr);
                 }
                 TaskEnv::Map(envs)
@@ -262,18 +263,20 @@ impl TaskEnv {
                 let mut envs = Vec::with_capacity(elems.len());
 
                 for node in elems.iter() {
-                    let expr: Opath = serial::from_tree(node)?;
+                    let expr: Opath = serial::from_tree(node)
+                        .map_err(|err| DefsParseErrorDetail::SerialErr {err})?;
                     envs.push(expr)
                 }
                 TaskEnv::List(envs)
             }
             Value::String(ref key) => {
-                TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")?])
+                TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
+                    .map_err(|err| DefsParseErrorDetail::OpathParseErr {err: Box::new(err)})?])
             }
             _ => {
                 return Err(DefsParseErrorDetail::TaskEnvUnexpectedPropType {
                     kind: n.data().kind(),
-                })
+                }.into())
             }
         };
         Ok(env)

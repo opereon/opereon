@@ -155,7 +155,7 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }),
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                     if let Some(wn) = node.get_child_key("watch_file") {
@@ -168,7 +168,7 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }),
+                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                 }
@@ -178,14 +178,14 @@ impl ParsedModelDef for ProcDef {
             _ => {
                 return Err(DefsParseErrorDetail::ProcNonObject {
                     kind: node.data().kind(),
-                })
+                }.into())
             }
         }
 
-        p.id = get_expr(&p, "@.id or @.@key");
-        p.label = get_expr(&p, "@.label or @.id or @.@key");
-        p.path = get_expr(&p, "@.@file_path_abs");
-        p.dir = get_expr(&p, "@.@dir_abs");
+        p.id = get_expr(&p, "@.id or @.@key")?;
+        p.label = get_expr(&p, "@.label or @.id or @.@key")?;
+        p.path = get_expr(&p, "@.@file_path_abs")?;
+        p.dir = get_expr(&p, "@.@dir_abs")?;
 
         Ok(p)
     }

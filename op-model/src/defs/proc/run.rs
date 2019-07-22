@@ -39,7 +39,7 @@ impl ParsedModelDef for Run {
                     }
                 }
                 Value::Null => {}
-                _ => return Err(DefsParseErrorDetail::RunInvalidType { kind }),
+                _ => return Err(DefsParseErrorDetail::RunInvalidType { kind }.into()),
             }
         }
         Ok(run)
@@ -64,11 +64,13 @@ impl Step {
         &self,
         model: &'a Model,
         proc: &ProcDef,
-    ) -> Result<Vec<Cow<'a, HostDef>>, DefsParseErrorDetail> {
-        self.hosts.as_ref().map_or(
+    ) -> DefsParseResult<Vec<Cow<'a, HostDef>>> {
+        self.hosts.as_ref()
+            .map_or(
             Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
             |hosts_expr| {
-                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope());
+                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope())
+                    .map_err(|err| DefsParseErrorDetail::ExprErr {err: Box::new(err)})?;
                 let mut res = Vec::with_capacity(hs.len());
                 for h in hs.iter() {
                     let host: Cow<HostDef> = match model.get_host(h) {
@@ -130,7 +132,7 @@ impl ParsedModelDef for Step {
         } else {
             return Err(DefsParseErrorDetail::StepNonObject {
                 kind: node.data().kind(),
-            });
+            }.into());
         }
     }
 }
