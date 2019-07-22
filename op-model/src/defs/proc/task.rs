@@ -78,17 +78,17 @@ impl ScopedModelDef for TaskDef {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> &Scope {
+    fn scope(&self) -> DefsResult<&Scope>{
         self.as_scoped().scope()
     }
 
-    fn scope_mut(&self) -> &ScopeMut {
+    fn scope_mut(&self) -> DefsResult<&ScopeMut> {
         self.as_scoped().scope_mut()
     }
 }
 
 impl ParsedModelDef for TaskDef {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut t = TaskDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: TaskKind::Exec,
@@ -106,7 +106,7 @@ impl ParsedModelDef for TaskDef {
                 if let Some(n) = props.get("task") {
                     t.kind = TaskKind::from_str(&n.data().as_string())?;
                 } else {
-                    return Err(DefsParseErrorDetail::TaskMissingTask.into());
+                    return Err(DefsErrorDetail::TaskMissingTask.into());
                 }
 
                 if let Some(n) = props.get("ro") {
@@ -125,7 +125,7 @@ impl ParsedModelDef for TaskDef {
                     if let Some(s) = props.get("cases") {
                         t.switch = Some(Switch::parse(model, &t.scoped, s)?);
                     } else {
-                        return Err(DefsParseErrorDetail::TaskSwitchMissingCases.into());
+                        return Err(DefsErrorDetail::TaskSwitchMissingCases.into());
                     }
                 }
 
@@ -133,7 +133,7 @@ impl ParsedModelDef for TaskDef {
                     t.output = Some(TaskOutput::parse(n)?);
                 }
             }
-            _ => return Err(DefsParseErrorDetail::TaskNonObject { kind }.into()),
+            _ => return Err(DefsErrorDetail::TaskNonObject { kind }.into()),
         }
 
         t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)")?;
@@ -156,7 +156,7 @@ pub enum TaskKind {
 }
 
 impl FromStr for TaskKind {
-    type Err = DefsParseErrorDetail;
+    type Err = DefsErrorDetail;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -167,7 +167,7 @@ impl FromStr for TaskKind {
             "script" => Ok(TaskKind::Script),
             "file-copy" => Ok(TaskKind::FileCopy),
             "file-compare" => Ok(TaskKind::FileCompare),
-            unknown => Err(DefsParseErrorDetail::UnknownTaskKind {
+            unknown => Err(DefsErrorDetail::UnknownTaskKind {
                 value: unknown.to_string(),
             }),
         }
@@ -190,11 +190,11 @@ pub struct TaskOutput {
 }
 
 impl TaskOutput {
-    fn parse(node: &NodeRef) -> DefsParseResult<TaskOutput> {
+    fn parse(node: &NodeRef) -> DefsResult<TaskOutput> {
         match *node.data().value() {
             Value::Object(_) => match kg_tree::serial::from_tree::<TaskOutput>(node) {
                 Ok(out) => Ok(out),
-                Err(_err) => Err(DefsParseErrorDetail::Undef(line!()).into()), //FIXME (jc)
+                Err(_err) => Err(DefsErrorDetail::Undef(line!()).into()), //FIXME (jc)
             },
             Value::String(ref s) => {
                 let format = FileFormat::from(s);
@@ -203,7 +203,7 @@ impl TaskOutput {
                     ..Default::default()
                 })
             }
-            _ => Err(DefsParseErrorDetail::TaskOutputInvalidType {
+            _ => Err(DefsErrorDetail::TaskOutputInvalidType {
                 kind: node.data().kind(),
             }
             .into()),
@@ -218,15 +218,17 @@ impl TaskOutput {
         self.format
     }
 
-    pub fn apply(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut, output: NodeSet) {
+    pub fn apply(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut, output: NodeSet) -> DefsResult<()> {
         match self.mode {
             OutputMode::Var(ref name) => scope.set_var(name.into(), output),
             OutputMode::Expr(ref expr) => {
                 let scope = ScopeMut::child(scope.clone().into());
                 scope.set_var("$output".into(), output);
-                expr.apply_ext(root, current, &scope);
+                expr.apply_ext(root, current, &scope)
+                    .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)})?;
             }
         }
+        Ok(())
     }
 }
 
@@ -247,14 +249,14 @@ pub enum TaskEnv {
 }
 
 impl TaskEnv {
-    pub fn parse(n: &NodeRef) -> DefsParseResult<TaskEnv> {
+    pub fn parse(n: &NodeRef) -> DefsResult<TaskEnv> {
         let env = match *n.data().value() {
             Value::Object(ref props) => {
                 let mut envs = LinkedHashMap::with_capacity(props.len());
 
                 for (k, node) in props.iter() {
                     let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsParseErrorDetail::SerialErr {err})?;
+                        .map_err(|err| DefsErrorDetail::SerialErr {err})?;
                     envs.insert(k.to_string(), expr);
                 }
                 TaskEnv::Map(envs)
@@ -264,17 +266,17 @@ impl TaskEnv {
 
                 for node in elems.iter() {
                     let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsParseErrorDetail::SerialErr {err})?;
+                        .map_err(|err| DefsErrorDetail::SerialErr {err})?;
                     envs.push(expr)
                 }
                 TaskEnv::List(envs)
             }
             Value::String(ref key) => {
                 TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
-                    .map_err(|err| DefsParseErrorDetail::OpathParseErr {err: Box::new(err)})?])
+                    .map_err(|err| DefsErrorDetail::OpathParseErr {err: Box::new(err)})?])
             }
             _ => {
-                return Err(DefsParseErrorDetail::TaskEnvUnexpectedPropType {
+                return Err(DefsErrorDetail::TaskEnvUnexpectedPropType {
                     kind: n.data().kind(),
                 }.into())
             }
@@ -295,7 +297,7 @@ impl Switch {
 }
 
 impl ParsedModelDef for Switch {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut s = Switch { cases: Vec::new() };
 
         if let Value::Array(ref elems) = *node.data().value() {
@@ -304,7 +306,7 @@ impl ParsedModelDef for Switch {
                 s.cases.push(case);
             }
         } else {
-            return Err(DefsParseErrorDetail::TaskSwitchNonArray {
+            return Err(DefsErrorDetail::TaskSwitchNonArray {
                 kind: node.data().kind(),
             }
             .into());
@@ -337,15 +339,15 @@ impl Case {
 }
 
 impl ParsedModelDef for Case {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let when = if let Some(n) = props.get("when") {
                 match ValueDef::parse(n)? {
                     ValueDef::Resolvable(e) => e,
-                    _ => return Err(DefsParseErrorDetail::TaskCaseStaticWhen.into()),
+                    _ => return Err(DefsErrorDetail::TaskCaseStaticWhen.into()),
                 }
             } else {
-                return Err(DefsParseErrorDetail::TaskCaseMissingWhen.into());
+                return Err(DefsErrorDetail::TaskCaseMissingWhen.into());
             };
 
             Ok(Case {
@@ -353,7 +355,7 @@ impl ParsedModelDef for Case {
                 proc: ProcDef::parse(model, parent, node)?,
             })
         } else {
-            return Err(DefsParseErrorDetail::TaskCaseNonObject {
+            return Err(DefsErrorDetail::TaskCaseNonObject {
                 kind: node.data().kind(),
             }
             .into());

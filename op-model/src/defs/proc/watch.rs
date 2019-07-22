@@ -10,7 +10,7 @@ pub struct ModelWatch {
 }
 
 impl ModelWatch {
-    pub fn parse(path: &str, mask: &str) -> Result<ModelWatch, DefsParseErrorDetail> {
+    pub fn parse(path: &str, mask: &str) -> Result<ModelWatch, DefsErrorDetail> {
         //FIXME (jc) handle opath parse errors
         Ok(ModelWatch {
             path: Opath::parse(path).unwrap(),
@@ -42,7 +42,7 @@ pub struct FileWatch {
 }
 
 impl FileWatch {
-    pub fn parse(glob: &str, mask: &str) -> Result<FileWatch, DefsParseErrorDetail> {
+    pub fn parse(glob: &str, mask: &str) -> Result<FileWatch, DefsErrorDetail> {
         //FIXME ws glob parse errors
         let glob = GlobBuilder::new(glob).build().expect("Cannot build glob!");
         Ok(FileWatch {

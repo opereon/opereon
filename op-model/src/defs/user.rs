@@ -10,7 +10,7 @@ pub struct UserDef {
 }
 
 impl UserDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> DefsParseResult<UserDef> {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsResult<UserDef> {
         let mut u = UserDef {
             root,
             node,
@@ -43,15 +43,15 @@ impl ModelDef for UserDef {
 }
 
 impl ParsedModelDef for UserDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         match *node.data().value() {
             Value::Object(ref props) => {
                 if !props.contains_key("username") {
-                    return Err(DefsParseErrorDetail::UserMissingUsername.into());
+                    return Err(DefsErrorDetail::UserMissingUsername.into());
                 }
             }
             _ => {
-                return Err(DefsParseErrorDetail::UserNonObject {
+                return Err(DefsErrorDetail::UserNonObject {
                     kind: node.data().kind(),
                 }
                 .into());

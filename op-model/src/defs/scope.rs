@@ -9,7 +9,7 @@ pub enum ValueDef {
 }
 
 impl ValueDef {
-    pub fn parse(node: &NodeRef) -> DefsParseResult<ValueDef> {
+    pub fn parse(node: &NodeRef) -> DefsResult<ValueDef> {
         match *node.data().value() {
             Value::String(ref s) => {
                 let expr = s.trim();
@@ -17,7 +17,7 @@ impl ValueDef {
                     match Opath::parse(&expr[2..expr.len() - 1]) {
                         Ok(expr) => Ok(ValueDef::Resolvable(expr)),
                         Err(err) => {
-                            Err(DefsParseErrorDetail::OpathParseErr { err: Box::new(err) }.into())
+                            Err(DefsErrorDetail::OpathParseErr { err: Box::new(err) }.into())
                         }
                     }
                 } else {
@@ -28,11 +28,11 @@ impl ValueDef {
         }
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> DefsParseResult<NodeSet> {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> DefsResult<NodeSet> {
         match *self {
             ValueDef::Static(ref n) => Ok(n.clone().into()),
             ValueDef::Resolvable(ref expr) => expr.apply_ext(root, current, scope)
-                .map_err(|err| DefsParseErrorDetail::ExprErr {err: Box::new(err)}.into()),
+                .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)}.into()),
         }
     }
 
@@ -102,7 +102,7 @@ impl ScopeDef {
         self.values.get(name)
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsParseResult<()>{
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()>{
         for (name, value) in self.values.iter() {
             let rval = value.resolve(root, current, &scope)?;
             scope.set_var(name.clone(), rval);
@@ -118,7 +118,7 @@ impl Remappable for ScopeDef {
 }
 
 impl ParsedModelDef for ScopeDef {
-    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut scope = ScopeDef::new();
 
         if let Some(sn) = node.get_child_key("scope") {
@@ -131,7 +131,7 @@ impl ParsedModelDef for ScopeDef {
                 }
                 Value::Null => {}
                 _ => {
-                    return Err(DefsParseErrorDetail::ScopeNonObject {
+                    return Err(DefsErrorDetail::ScopeNonObject {
                         kind: node.data().kind(),
                     }
                     .into())

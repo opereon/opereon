@@ -10,6 +10,45 @@ use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use super::*;
+use kg_diag::{BasicDiag, Diag, Severity};
+
+pub type ModelError = BasicDiag;
+pub type ModelResult<T> = Result<T, ModelError>;
+
+#[derive(Debug, Display, Detail)]
+#[diag(code_offset = 1000)]
+pub enum ModelErrorDetail {
+
+    #[display(fmt = "config not found")]
+    ConfigNotFound,
+
+    #[display(fmt = "cannot parse manifest file: '{err}'")]
+    MalformedManifest {
+        err: toml::de::Error
+    },
+
+    #[display(fmt = "cannot find manifest file")]
+    ManifestNotFount,
+
+    #[display(
+        fmt = "cannot resolve interpolations: '{detail}'",
+        detail = "err.detail()"
+    )]
+    InterpolationsResloveErr { err: Box<dyn Diag> },
+
+    #[display(
+        fmt = "cannot evaluate expression: '{detail}'",
+        detail = "err.detail()"
+    )]
+    ExprErr { err: Box<dyn Diag> },
+
+    #[display(
+        fmt = "cannot generate model diff: '{detail}'",
+        detail = "err.detail()"
+    )]
+    ModelDiffErr{ err: Box<dyn Diag> },
+}
+
 
 #[derive(Debug, Serialize)]
 pub struct Model {
@@ -111,16 +150,16 @@ impl Model {
         }
     }
 
-    pub fn load_manifest(model_dir: &Path) -> IoResult<Manifest> {
+    pub fn load_manifest(model_dir: &Path) -> ModelResult<Manifest> {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
         kg_io::fs::read_to_string(&path, &mut content)?;
-        // FIXME ws error handling
-        let manifest: Manifest = toml::from_str(&content).expect("Cannot parse manifest file!");
+        let manifest: Manifest = toml::from_str(&content)
+            .map_err(|err| ModelErrorDetail::MalformedManifest {err})?;
         Ok(manifest)
     }
 
-    fn read_revision(metadata: Metadata) -> IoResult<Model> {
+    fn read_revision(metadata: Metadata) -> ModelResult<Model> {
         let manifest = Model::load_manifest(metadata.path())?;
 
         kg_tree::set_base_path(metadata.path());
@@ -152,6 +191,8 @@ impl Model {
             Box::new(LoadFileFunc::new(model_dir, commit)),
         );
 
+        let mut walk_err = None;
+
         tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
             let entry_name = entry.name().unwrap();
 
@@ -175,27 +216,42 @@ impl Model {
             let path_abs = m.metadata.path().join(&path);
             let config = cr.resolve(&path_abs);
 
-            if let Some(inc) = config.find_include(&path, file_type) {
-                let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
+            let inner = || -> ModelResult<()> {
+                if let Some(inc) = config.find_include(&path, file_type) {
+                    let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                let obj = odb.read(entry.id()).expect("Cannot get git object!");
+                    let obj = odb.read(entry.id()).expect("Cannot get git object!");
 
-                let n = NodeRef::binary(obj.data());
-                n.data_mut().set_file(Some(&file_info));
+                    let n = NodeRef::binary(obj.data());
+                    n.data_mut().set_file(Some(&file_info));
 
-                let item = inc.item().apply_one_ext(m.root(), &n, scope.as_ref());
+                    let item = inc.item().apply_one_ext(m.root(), &n, scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
 
-                if item.data().file().is_none() {
-                    item.data_mut().set_file(Some(&file_info));
+                    if item.data().file().is_none() {
+                        item.data_mut().set_file(Some(&file_info));
+                    }
+
+                    scope.set_var("item".into(), NodeSet::One(item));
+
+                    inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
                 }
+                Ok(())
+            };
 
-                scope.set_var("item".into(), NodeSet::One(item));
-
-                inc.mapping().apply_ext(m.root(), m.root(), scope.as_ref());
+            if let Err(err) = inner() {
+                walk_err = Some(err);
+                TreeWalkResult::Abort
+            } else {
+                TreeWalkResult::Ok
             }
-            TreeWalkResult::Ok
         })
         .expect("Error reading tree"); // FIXME ws error handling
+
+        if let Some(err) = walk_err {
+            return Err(err);
+        }
 
         // defines
         {
@@ -234,12 +290,15 @@ impl Model {
                     Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
                 };
 
-                let current = path.apply_one_ext(m.root(), m.root(), scope.as_ref());
+                let current = path.apply_one_ext(m.root(), m.root(), scope.as_ref())
+                    .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
 
                 for (p, e) in config.overrides().iter() {
-                    let res = p.apply_ext(m.root(), &current, scope.as_ref());
+                    let res = p.apply_ext(m.root(), &current, scope.as_ref())
+                        .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
                     for n in res.into_iter() {
-                        e.apply_ext(m.root(), &n, scope.as_ref());
+                        e.apply_ext(m.root(), &n, scope.as_ref())
+                            .map_err(|err| ModelErrorDetail::ExprErr {err: Box::new(err)})?;
                     }
                 }
             }
@@ -247,10 +306,11 @@ impl Model {
 
         // interpolations
         let mut resolver = TreeResolver::new();
-        resolver.resolve(m.root());
+        resolver.resolve(m.root())
+            .map_err(|err| BasicDiag::from(ModelErrorDetail::InterpolationsResloveErr {err: Box::new(err)}))?;
 
         {
-            let scope = m.scoped.scope_mut();
+            let scope = m.scoped.scope_mut()?;
 
             // definitions (hosts, users, processors)
             //FIXME (jc) error handling
@@ -445,11 +505,11 @@ impl ScopedModelDef for Model {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> &Scope {
+    fn scope(&self) -> DefsResult<&Scope> {
         self.as_scoped().scope()
     }
 
-    fn scope_mut(&self) -> &ScopeMut {
+    fn scope_mut(&self) -> DefsResult<&ScopeMut> {
         self.as_scoped().scope_mut()
     }
 }

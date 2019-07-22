@@ -9,13 +9,13 @@ pub use self::proc::*;
 pub use self::scope::*;
 pub use self::user::UserDef;
 
-pub type DefsParseError = BasicDiag;
-pub type DefsParseResult<T> = Result<T, DefsParseError>;
+pub type DefsError = BasicDiag;
+pub type DefsResult<T> = Result<T, DefsError>;
 
 //FIXME (jc) collect error kinds, implement Diags Kind
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 900)]
-pub enum DefsParseErrorDetail {
+pub enum DefsErrorDetail {
     #[display(fmt = "host definition must contain 'hostname' property")]
     HostMissingHostname,
 
@@ -146,23 +146,23 @@ impl dyn ModelDef {
 pub trait ScopedModelDef: ModelDef {
     fn scope_def(&self) -> &ScopeDef;
 
-    fn scope(&self) -> &Scope;
+    fn scope(&self) -> DefsResult<&Scope>;
 
-    fn scope_mut(&self) -> &ScopeMut;
+    fn scope_mut(&self) -> DefsResult<&ScopeMut>;
 }
 
 pub trait ParsedModelDef: Sized {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self>;
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self>;
 }
 
 pub trait AsScoped: 'static {
     fn as_scoped(&self) -> &Scoped;
 }
 
-fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> DefsParseResult<T> {
+fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> DefsResult<T> {
     let expr = Opath::parse(expr).unwrap();
     let res = expr.apply(def.root(), def.node())
-        .map_err(|err| DefsParseErrorDetail::ExprErr { err: Box::new(err) })?;
+        .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
     match res.into_one() {
         Some(n) => Ok(T::get(&n)),
         None => Ok(T::empty()),
@@ -215,15 +215,15 @@ impl Scoped {
         &mut self.scope_def
     }
 
-    pub fn scope(&self) -> &Scope {
-        self.resolve();
-        &self.scope
+    pub fn scope(&self) -> DefsResult<&Scope> {
+        self.resolve()?;
+        Ok(&self.scope)
     }
 
-    pub fn scope_mut(&self) -> &ScopeMut {
-        self.resolve();
+    pub fn scope_mut(&self) -> DefsResult<&ScopeMut> {
+        self.resolve()?;
         self.invalidate();
-        &self.scope
+        Ok(&self.scope)
     }
 
     pub unsafe fn add_child<T: AsScoped>(&self, child: &T) {
@@ -251,15 +251,16 @@ impl Scoped {
         }
     }
 
-    fn resolve(&self) {
+    fn resolve(&self) -> DefsResult<()> {
         if !self.resolved.get() {
             if let Some(p) = self.parent.get() {
-                p.resolve();
+                p.resolve()?;
             }
             self.scope_def
-                .resolve(self.root(), self.node(), &self.scope);
+                .resolve(self.root(), self.node(), &self.scope)?;
             self.resolved.set(true);
         }
+        Ok(())
     }
 
     fn invalidate(&self) {

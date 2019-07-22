@@ -35,3 +35,4 @@ mod manifest;
 mod metadata;
 mod model;
 mod update;
+mod git;

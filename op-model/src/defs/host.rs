@@ -10,7 +10,7 @@ pub struct HostDef {
 }
 
 impl HostDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> DefsParseResult<HostDef> {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsResult<HostDef> {
         let mut h = HostDef {
             root,
             node,
@@ -43,20 +43,20 @@ impl ModelDef for HostDef {
 }
 
 impl ParsedModelDef for HostDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let kind = node.data().kind();
         match *node.data().value() {
             Value::Object(ref props) => {
                 if !props.contains_key("hostname") {
-                    return Err(DefsParseErrorDetail::HostMissingHostname.into());
+                    return Err(DefsErrorDetail::HostMissingHostname.into());
                 }
 
                 if !props.contains_key("ssh_dest") {
-                    return Err(DefsParseErrorDetail::HostMissingSshDest.into());
+                    return Err(DefsErrorDetail::HostMissingSshDest.into());
                 }
             }
             _ => {
-                return Err(DefsParseErrorDetail::HostNonObject { kind }.into());
+                return Err(DefsErrorDetail::HostNonObject { kind }.into());
             }
         }
         Ok(HostDef::new(parent.root().clone(), node.clone())?)

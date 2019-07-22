@@ -12,7 +12,7 @@ pub enum ProcKind {
 }
 
 impl FromStr for ProcKind {
-    type Err = DefsParseErrorDetail;
+    type Err = DefsErrorDetail;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -20,7 +20,7 @@ impl FromStr for ProcKind {
             "update" => Ok(ProcKind::Update),
             "check" => Ok(ProcKind::Check),
             "probe" => Ok(ProcKind::Probe),
-            unknown => Err(DefsParseErrorDetail::UnknownProcKind {
+            unknown => Err(DefsErrorDetail::UnknownProcKind {
                 value: unknown.to_string(),
             }),
         }
@@ -111,17 +111,17 @@ impl ScopedModelDef for ProcDef {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> &Scope {
+    fn scope(&self) -> DefsResult<&Scope>{
         self.as_scoped().scope()
     }
 
-    fn scope_mut(&self) -> &ScopeMut {
+    fn scope_mut(&self) -> DefsResult<&ScopeMut> {
         self.as_scoped().scope_mut()
     }
 }
 
 impl ParsedModelDef for ProcDef {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut p = ProcDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: ProcKind::Exec,
@@ -141,7 +141,7 @@ impl ParsedModelDef for ProcDef {
                 } else if let Some(n) = props.get("proc") {
                     p.kind = ProcKind::from_str(&n.data().as_string())?;
                 } else {
-                    return Err(DefsParseErrorDetail::ProcMissingProc.into());
+                    return Err(DefsErrorDetail::ProcMissingProc.into());
                 }
 
                 if p.kind == ProcKind::Update {
@@ -155,7 +155,7 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }.into()),
+                            _ => return Err(DefsErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                     if let Some(wn) = node.get_child_key("watch_file") {
@@ -168,7 +168,7 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return Err(DefsParseErrorDetail::ProcWatchNonObject { kind }.into()),
+                            _ => return Err(DefsErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                 }
@@ -176,7 +176,7 @@ impl ParsedModelDef for ProcDef {
                 p.run = Run::parse(model, &p.scoped, node)?;
             }
             _ => {
-                return Err(DefsParseErrorDetail::ProcNonObject {
+                return Err(DefsErrorDetail::ProcNonObject {
                     kind: node.data().kind(),
                 }.into())
             }

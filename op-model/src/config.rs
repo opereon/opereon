@@ -265,7 +265,7 @@ pub struct ConfigResolver {
 }
 
 impl ConfigResolver {
-    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
+    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
         let repo = Repository::open(model_dir).expect("Cannot open repository");
         let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
 

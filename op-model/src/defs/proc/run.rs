@@ -18,7 +18,7 @@ impl Run {
 }
 
 impl ParsedModelDef for Run {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut run = Run { steps: Vec::new() };
 
         if let Some(rn) = node.get_child_key("run") {
@@ -39,7 +39,7 @@ impl ParsedModelDef for Run {
                     }
                 }
                 Value::Null => {}
-                _ => return Err(DefsParseErrorDetail::RunInvalidType { kind }.into()),
+                _ => return Err(DefsErrorDetail::RunInvalidType { kind }.into()),
             }
         }
         Ok(run)
@@ -64,13 +64,13 @@ impl Step {
         &self,
         model: &'a Model,
         proc: &ProcDef,
-    ) -> DefsParseResult<Vec<Cow<'a, HostDef>>> {
+    ) -> DefsResult<Vec<Cow<'a, HostDef>>> {
         self.hosts.as_ref()
             .map_or(
             Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
             |hosts_expr| {
-                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope())
-                    .map_err(|err| DefsParseErrorDetail::ExprErr {err: Box::new(err)})?;
+                let hs = hosts_expr.apply_ext(proc.root(), proc.node(), proc.scope()?)
+                    .map_err(|err| DefsErrorDetail::ExprErr {err: Box::new(err)})?;
                 let mut res = Vec::with_capacity(hs.len());
                 for h in hs.iter() {
                     let host: Cow<HostDef> = match model.get_host(h) {
@@ -94,12 +94,12 @@ impl Step {
 }
 
 impl ParsedModelDef for Step {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsParseResult<Self> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let hosts = if let Some(h) = props.get("hosts") {
                 match ValueDef::parse(h)? {
                     ValueDef::Static(_n) => {
-                        return Err(DefsParseErrorDetail::StepStaticHosts.into());
+                        return Err(DefsErrorDetail::StepStaticHosts.into());
                     }
                     ValueDef::Resolvable(h) => Some(h),
                 }
@@ -118,10 +118,10 @@ impl ParsedModelDef for Step {
                         .values()
                         .map(|t| TaskDef::parse(model, parent, t))
                         .collect::<Result<Vec<_>, _>>()?,
-                    _ => return Err(DefsParseErrorDetail::StepInvalidTasksType { kind }.into()),
+                    _ => return Err(DefsErrorDetail::StepInvalidTasksType { kind }.into()),
                 }
             } else {
-                return Err(DefsParseErrorDetail::StepMissingTasks.into());
+                return Err(DefsErrorDetail::StepMissingTasks.into());
             };
 
             Ok(Step {
@@ -130,7 +130,7 @@ impl ParsedModelDef for Step {
                 tasks,
             })
         } else {
-            return Err(DefsParseErrorDetail::StepNonObject {
+            return Err(DefsErrorDetail::StepNonObject {
                 kind: node.data().kind(),
             }.into());
         }
