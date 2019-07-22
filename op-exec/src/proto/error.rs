@@ -1,3 +1,5 @@
+use kg_diag::BasicDiag;
+
 //FIXME (jc)
 #[derive(Debug, Clone)]
 pub enum ProtoError {
@@ -39,8 +41,15 @@ impl From<kg_tree::opath::ExprErrorDetail> for ProtoError {
     }
 }
 
-impl From<op_model::DefsParseErrorDetail> for ProtoError {
-    fn from(err: op_model::DefsParseErrorDetail) -> Self {
+impl From<op_model::DefsErrorDetail> for ProtoError {
+    fn from(err: op_model::DefsErrorDetail) -> Self {
+        eprintln!("{:?}", err);
+        unimplemented!()
+    }
+}
+
+impl From<BasicDiag> for ProtoError {
+    fn from(err: BasicDiag) -> Self {
         eprintln!("{:?}", err);
         unimplemented!()
     }

@@ -10,6 +10,7 @@ use kg_utils::collections::LruCache;
 use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
+use crate::core::error::RuntimeResult;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -120,7 +121,7 @@ impl ModelManager {
     }
 
     /// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model(&mut self) -> IoResult<()> {
+    pub fn init_model(&mut self) -> RuntimeResult<()> {
         let current_dir = fs::current_dir()?;
 
         // TODO error handling
@@ -132,7 +133,7 @@ impl ModelManager {
     }
 
     /// Commit current model
-    pub fn commit(&mut self, message: &str) -> IoResult<ModelRef> {
+    pub fn commit(&mut self, message: &str) -> RuntimeResult<ModelRef> {
         self.init()?;
         // TODO ws error handling
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
@@ -166,7 +167,7 @@ impl ModelManager {
         self.get(oid.into())
     }
 
-    pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
+    pub fn get(&mut self, id: Sha1Hash) -> RuntimeResult<ModelRef> {
         self.init()?;
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
@@ -182,7 +183,7 @@ impl ModelManager {
         Ok(model)
     }
 
-    pub fn resolve(&mut self, model_path: &ModelPath) -> IoResult<ModelRef> {
+    pub fn resolve(&mut self, model_path: &ModelPath) -> RuntimeResult<ModelRef> {
         self.init()?;
         match *model_path {
             ModelPath::Current => self.current(),
@@ -193,7 +194,7 @@ impl ModelManager {
 
     /// Returns current model - model represented by content of the git index.
     /// This method loads model on each call.
-    pub fn current(&mut self) -> IoResult<ModelRef> {
+    pub fn current(&mut self) -> RuntimeResult<ModelRef> {
         // TODO ws error handling
         let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
         let mut index = repo.index().expect("Cannot get index!");
@@ -204,7 +205,7 @@ impl ModelManager {
     }
 
     /// Update provided index and return created tree Oid
-    fn update_index(index: &mut Index) -> IoResult<Oid> {
+    fn update_index(index: &mut Index) -> RuntimeResult<Oid> {
         // TODO ws error handling
 
         // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
@@ -220,7 +221,7 @@ impl ModelManager {
     }
 
     /// Returns last commit or `None` if repository have no commits.
-    fn find_last_commit(repo: &Repository) -> IoResult<Option<Commit>> {
+    fn find_last_commit(repo: &Repository) -> RuntimeResult<Option<Commit>> {
         // TODO error handling
         let obj = match repo.head() {
             Ok(head) => head,
@@ -238,7 +239,7 @@ impl ModelManager {
         Ok(Some(commit))
     }
 
-    fn init_git_repo<P: AsRef<Path>>(path: P) -> IoResult<()> {
+    fn init_git_repo<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
         use std::fmt::Write;
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);

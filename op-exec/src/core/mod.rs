@@ -5,7 +5,7 @@ use tokio::prelude::*;
 use super::*;
 
 pub use self::engine::*;
-pub use self::error::RuntimeError;
+pub use self::error::*;
 pub use self::exec::*;
 pub use self::model::*;
 pub use self::op::*;

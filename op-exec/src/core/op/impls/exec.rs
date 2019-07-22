@@ -239,7 +239,7 @@ impl Future for TaskExecOperation {
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
                 {
-                    let s = proc.scope_mut();
+                    let s = proc.scope_mut()?;
                     s.set_var("$proc".into(), proc.node().clone().into());
                     let host = match step_exec.host_path() {
                         Some(p) => curr_model.get_host_path(p).unwrap().node().clone(),
@@ -248,7 +248,7 @@ impl Future for TaskExecOperation {
                     s.set_var("$host".into(), host.into());
                 }
                 {
-                    let s = task.scope_mut();
+                    let s = task.scope_mut()?;
                     s.set_var("$task".into(), task.node().clone().into());
                 }
 
@@ -262,7 +262,7 @@ impl Future for TaskExecOperation {
 
                 info!(self.logger, "Executing task [{exec_name}] on host [{host}] ...", host=format!("{}", step_exec.host()), exec_name=task_exec.name(); "verbosity"=>1);
 
-                let scope = task.scope();
+                let scope = task.scope()?;
                 let base_path = proc.dir();
 
                 let result = match task.kind() {
@@ -296,7 +296,7 @@ impl Future for TaskExecOperation {
                         for case in task.switch().unwrap().cases() {
                             let when = case
                                 .when()
-                                .apply_ext(task.root(), task.node(), scope)
+                                .apply_ext(task.root(), task.node(), scope)?
                                 .into_one();
                             if let Some(when) = when {
                                 if when.as_boolean() {
@@ -307,7 +307,7 @@ impl Future for TaskExecOperation {
                         }
                         if let Some(p) = p {
                             let mut args = ArgumentsBuilder::new(curr_model.root());
-                            for k in proc.scope().var_names() {
+                            for k in proc.scope()?.var_names() {
                                 if !k.starts_with('$') {
                                     let var = scope.get_var(&k).unwrap();
                                     args.set_arg(k, &var);
@@ -370,9 +370,12 @@ impl Future for TaskExecOperation {
                         });
                         let cwd: Option<PathBuf> = scope.get_var_value_opt("cwd");
                         let run_as: Option<String> = scope.get_var_value_opt("run_as");
-                        let env: Option<EnvVars> = task
-                            .env()
-                            .map(|e| resolve_env(e, task.root(), task.node(), task.scope()));
+
+                        let env = if let Some(e) = task.env(){
+                            Some(resolve_env(e, task.root(), task.node(), task.scope()?)?)
+                        } else {
+                            None
+                        };
                         let out_format = task.output().map(|o| o.format());
                         let mut executor = create_command_executor(step_exec.host(), &self.engine)?;
                         executor.exec_script(
@@ -439,9 +442,9 @@ impl Future for TaskExecOperation {
                         out.apply(
                             task.root(),
                             task.node(),
-                            proc.scope_mut(),
+                            proc.scope_mut()?,
                             ns.lock().clone(),
-                        );
+                        )?;
                         //print!(" => ${}", out.var());
                     }
                 }

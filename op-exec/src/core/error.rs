@@ -2,6 +2,8 @@ use super::*;
 use crate::{FileError, ProtoError};
 use kg_diag::{BasicDiag, Diag};
 
+pub type RuntimeResult<T> = Result<T, RuntimeError>;
+
 //FIXME (jc)
 #[derive(Debug, Detail)]
 #[diag(code_offset = 500)]
@@ -85,6 +87,14 @@ impl From<kg_diag::BasicDiag> for RuntimeError {
 impl From<SshError> for RuntimeError {
     fn from(err: SshError) -> Self {
         println!("ssh err {:?}", err);
+        RuntimeError::Custom
+    }
+}
+
+//FIXME ws
+impl From<std::fmt::Error> for RuntimeError {
+    fn from(err: std::fmt::Error) -> Self {
+        println!("fmt err {:?}", err);
         RuntimeError::Custom
     }
 }

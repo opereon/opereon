@@ -135,8 +135,8 @@ impl Future for ModelQueryOperation {
                 let res = {
                     let m = m.lock();
                     kg_tree::set_base_path(m.metadata().path());
-                    let scope = m.scope();
-                    expr.apply_ext(m.root(), m.root(), &scope)
+                    let scope = m.scope()?;
+                    expr.apply_ext(m.root(), m.root(), &scope)?
                 };
 
                 Ok(Async::Ready(Outcome::NodeSet(res.into())))
@@ -231,7 +231,7 @@ impl Future for ModelDiffOperation {
         let m2 = e.model_manager_mut().resolve(&self.target)?;
         let diff = match self.method {
             DiffMethod::Minimal => ModelDiff::minimal(m1.lock().root(), m2.lock().root()),
-            DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root()),
+            DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root())?,
         };
         Ok(Async::Ready(Outcome::NodeSet(
             to_tree(&diff).unwrap().into(),
@@ -307,14 +307,14 @@ impl Future for ModelUpdateOperation {
                 };
                 let model1 = m1.lock();
                 let model2 = m2.lock();
-                let mut update = ModelUpdate::new(&model1, &model2);
+                let mut update = ModelUpdate::new(&model1, &model2)?;
 
                 let exec_dir = Path::new(".op");
                 for p in model2.procs().iter() {
                     if p.kind() == ProcKind::Update {
                         let id = p.id();
 
-                        let (model_changes, file_changes) = update.check_updater(p);
+                        let (model_changes, file_changes) = update.check_updater(p)?;
 
                         if model_changes.is_empty() && file_changes.is_empty() {
                             info!(self.logger, "Update [{proc_id}]: skipped - no changes", proc_id = id; "verbosity"=>0);

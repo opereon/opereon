@@ -10,7 +10,6 @@ use super::*;
 pub use self::config::*;
 pub use self::local::*;
 pub use self::ssh::*;
-
 mod config;
 mod local;
 mod ssh;
@@ -123,7 +122,7 @@ pub fn create_command_executor(
     Ok(Box::new(e))
 }
 
-pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Scope) -> EnvVars {
+pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Scope) -> RuntimeResult<EnvVars> {
     lazy_static! {
         static ref VAR_NAME_RE: Regex = Regex::new(r"[^A-Za-z0-9]").unwrap();
     };
@@ -156,7 +155,7 @@ pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Sco
             let mut resolved = LinkedHashMap::with_capacity(items.len());
 
             for expr in items.iter() {
-                let res = expr.apply_one_ext(root, current, scope);
+                let res = expr.apply_one_ext(root, current, scope)?;
                 if res.is_string() {
                     if let Some(env_name) = env_name_from_path(&res) {
                         let prev = resolved.insert(env_name.clone(), res.as_string());
@@ -172,13 +171,13 @@ pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Sco
                 }
             }
 
-            resolved
+            Ok(resolved)
         }
         TaskEnv::Map(items) => {
             let mut resolved = LinkedHashMap::with_capacity(items.len());
 
             for (name, expr) in items.iter() {
-                let res = expr.apply_one_ext(root, current, scope);
+                let res = expr.apply_one_ext(root, current, scope)?;
                 if res.is_string() {
                     resolved.insert(name.clone(), res.as_string());
                 } else {
@@ -189,7 +188,7 @@ pub fn resolve_env(env: &TaskEnv, root: &NodeRef, current: &NodeRef, scope: &Sco
                 }
             }
 
-            resolved
+            Ok(resolved)
         }
     }
 }
@@ -342,7 +341,8 @@ fn execute(
     log.log_status(status.code())?;
 
     let outcome = if let Some(fmt) = out_format {
-        let n = NodeRef::from_bytes(stdout.get_ref(), fmt)?;
+        // FIXME ws error handling
+        let n = NodeRef::from_bytes(stdout.get_ref(), fmt).expect("cannot build node from bytes!");
         Outcome::NodeSet(n.into())
     } else {
         Outcome::Empty

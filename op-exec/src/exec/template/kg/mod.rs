@@ -23,7 +23,7 @@ impl TemplateExecutor for TemplateResolver {
         src_path: &Path,
         dst_path: &Path,
         _log: &OutputLog,
-    ) -> Result<TaskResult, RuntimeError> {
+    ) -> RuntimeResult<TaskResult> {
         let template = {
             let mut f = FileBuffer::open(src_path)?;
             let mut r = f.char_reader();
@@ -39,7 +39,7 @@ impl TemplateExecutor for TemplateResolver {
 
         let mut res = String::new();
         template
-            .render_ext(task.root(), task.node(), task.scope(), &mut res)
+            .render_ext(task.root(), task.node(), task.scope()?, &mut res)
             .unwrap(); //FIXME (jc)
 
         if let Some(p) = dst_path.parent() {
