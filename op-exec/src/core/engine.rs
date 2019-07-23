@@ -145,7 +145,7 @@ impl EngineRef {
     }
 
     pub fn init_operation_queue(&self) -> IoResult<()> {
-        kg_io::fs::create_dir_all(self.read().config.queue().persist_dir())?;
+        fs::create_dir_all(self.read().config.queue().persist_dir())?;
         self.load_operation_queue()?;
         Ok(())
     }
@@ -159,7 +159,7 @@ impl EngineRef {
             let persist_dir = engine.config.queue().persist_dir();
             info!(engine.logger, "Loading operation queue from"; o!("path"=>persist_dir.display()));
 
-            kg_io::fs::read_dir(persist_dir)?
+            fs::read_dir(persist_dir)?
         };
 
         let mut files: Vec<_> = r

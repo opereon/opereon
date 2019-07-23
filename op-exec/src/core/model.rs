@@ -1,13 +1,11 @@
 use git2::{RepositoryInitOptions, Signature};
 
 use super::*;
-use crate::core::error::RuntimeResult;
-use crate::ConfigRef;
-use kg_io::IoResult;
+use crate::{ConfigRef};
 use kg_utils::collections::LruCache;
-use op_model::{GitManager, ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
-use slog::{Key, Record, Result as SlogResult, Serializer};
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf, Path};
+use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
+use slog::{Record, Serializer, Key, Result as SlogResult};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -81,7 +79,7 @@ impl ModelManager {
             let curr_dir = parent.unwrap();
             let manifest = curr_dir.join(&manifest_filename);
 
-            match kg_io::fs::metadata(manifest) {
+            match fs::metadata(manifest) {
                 Ok(_) => {
                     return Ok(curr_dir.to_owned());
                 }
@@ -95,7 +93,7 @@ impl ModelManager {
             }
         }
 
-        return Err(kg_io::IoError::file_not_found(
+        return Err(IoError::file_not_found(
             manifest_filename,
             OpType::Read,
         ));

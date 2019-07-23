@@ -176,7 +176,7 @@ impl Config {
         let mut read_paths = 0;
         let mut content = String::new();
         for path in paths {
-            match kg_io::fs::read_to_string(path, &mut content) {
+            match fs::read_to_string(path, &mut content) {
                 Ok(_) => {
                     let c: NodeRef = NodeRef::from_toml(&content).unwrap(); //FIXME (jc) handle parse errors
                     d.extend(c, None).unwrap(); //FIXME (jc) handle errors

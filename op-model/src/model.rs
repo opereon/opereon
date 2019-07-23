@@ -170,7 +170,7 @@ impl Model {
     pub fn load_manifest(model_dir: &Path) -> ModelResult<Manifest> {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
-        kg_io::fs::read_to_string(&path, &mut content)?;
+        fs::read_to_string(&path, &mut content)?;
         let manifest: Manifest =
             toml::from_str(&content).map_err(|err| ModelErrorDetail::MalformedManifest { err })?;
         Ok(manifest)

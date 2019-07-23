@@ -8,8 +8,8 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-kg-diag = "0.1.1"
-kg-tree = "0.1.3"
+kg-diag = "0.2.0"
+kg-tree = "0.1.4"
 kg-utils = "0.2.4"
 op-exec = { version = "0.1.1", path = "../op-exec" }
 op-log = {path = "../op-log" }

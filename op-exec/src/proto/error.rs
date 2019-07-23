@@ -13,8 +13,8 @@ impl From<std::io::Error> for ProtoError {
     }
 }
 
-impl From<kg_io::error::IoError> for ProtoError {
-    fn from(err: kg_io::error::IoError) -> Self {
+impl From<kg_diag::IoError> for ProtoError {
+    fn from(err: kg_diag::IoError) -> Self {
         eprintln!("{}", err);
         unimplemented!()
     }

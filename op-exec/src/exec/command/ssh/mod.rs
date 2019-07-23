@@ -19,7 +19,7 @@ mod operations;
 
 #[derive(Debug)]
 pub enum SshError {
-    IoError(kg_io::error::IoError),
+    IoError(kg_diag::IoError),
     SshOpen(String),
     SshProcessTerminated,
     SshClosed,
@@ -27,8 +27,8 @@ pub enum SshError {
 }
 
 //FIXME (jc)
-impl From<kg_io::error::IoError> for SshError {
-    fn from(err: kg_io::error::IoError) -> Self {
+impl From<kg_diag::IoError> for SshError {
+    fn from(err: kg_diag::IoError) -> Self {
         SshError::IoError(err)
     }
 }
@@ -58,7 +58,7 @@ impl SshSessionCache {
 
     pub fn init(&mut self) -> IoResult<()> {
         std::fs::remove_dir_all(self.config.exec().command().ssh().socket_dir())?;
-        kg_io::fs::create_dir_all(self.config.exec().command().ssh().socket_dir())?;
+        fs::create_dir_all(self.config.exec().command().ssh().socket_dir())?;
         Ok(())
     }
 

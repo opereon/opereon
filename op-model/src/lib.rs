@@ -14,8 +14,10 @@ extern crate kg_display_derive;
 use std::path::{Path, PathBuf};
 
 use chrono::prelude::*;
-use kg_io::*;
 use kg_symbol::Symbol;
+use kg_diag::*;
+use kg_diag::io::fs;
+use kg_tree::*;
 use kg_tree::diff::*;
 use kg_tree::opath::*;
 use kg_tree::*;
