@@ -1,6 +1,6 @@
 use crate::{
     AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
-    SourceRef,
+    RuntimeResult, SourceRef,
 };
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
@@ -61,7 +61,7 @@ impl RemoteCommandOperation {
     }
 
     /// Returns hosts matching `self.expr`
-    fn resolve_hosts(&self) -> Result<Vec<Host>, RuntimeError> {
+    fn resolve_hosts(&self) -> RuntimeResult<Vec<Host>> {
         let mut e = self.engine.write();
         let m = e.model_manager_mut().resolve(&self.model_path)?;
 
@@ -70,8 +70,8 @@ impl RemoteCommandOperation {
         let hosts_nodes = {
             let m = m.lock();
             kg_tree::set_base_path(m.metadata().path());
-            let scope = m.scope();
-            expr.apply_ext(m.root(), m.root(), &scope)
+            let scope = m.scope()?;
+            expr.apply_ext(m.root(), m.root(), &scope)?
         };
 
         let mut hosts = Vec::new();
@@ -162,9 +162,7 @@ impl RemoteCommandOperation {
             .hosts
             .iter()
             .zip(self.futures.lock().unwrap().iter_mut())
-            .map(|(host, (_, result))| {
-                (host.hostname().to_string(), result.take().unwrap())
-            })
+            .map(|(host, (_, result))| (host.hostname().to_string(), result.take().unwrap()))
             .collect();
         info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
         for (h, out) in res.iter() {

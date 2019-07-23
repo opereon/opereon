@@ -2,22 +2,21 @@ use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
 use std::str::Utf8Error;
 
-
 use os_pipe::PipeWriter;
 use tokio::prelude::{Async, Future, Poll};
 
-use crate::{Host};
 use crate::core::OperationImpl;
 use crate::exec::file::rsync::compare::DiffInfo;
+use crate::Host;
 
 use super::*;
 
 pub use self::config::RsyncConfig;
 pub use self::copy::FileCopyOperation;
 
-mod copy;
 mod compare;
 mod config;
+mod copy;
 
 pub type RsyncResult<T> = Result<T, RsyncError>;
 type FileSize = u64;
@@ -26,8 +25,6 @@ type FileSize = u64;
 pub enum ParseError {
     Line(u32),
 }
-
-
 
 #[derive(Debug)]
 pub enum RsyncError {
@@ -61,7 +58,6 @@ impl From<SshError> for RsyncError {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct RsyncParams {
     current_dir: PathBuf,
@@ -78,7 +74,11 @@ pub struct RsyncParams {
 
 #[allow(dead_code)]
 impl RsyncParams {
-    pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>, P3: Into<PathBuf>>(current_dir: P1, src_path: P2, dst_path: P3) -> RsyncParams {
+    pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>, P3: Into<PathBuf>>(
+        current_dir: P1,
+        src_path: P2,
+        dst_path: P3,
+    ) -> RsyncParams {
         RsyncParams {
             current_dir: current_dir.into(),
             src_username: None,
@@ -140,9 +140,15 @@ impl RsyncParams {
             use std::fmt::Write;
 
             match (hostname, username) {
-                (Some(hostname), Some(username)) => write!(out, "{username}@{hostname}:", username = username, hostname = hostname).unwrap(),
+                (Some(hostname), Some(username)) => write!(
+                    out,
+                    "{username}@{hostname}:",
+                    username = username,
+                    hostname = hostname
+                )
+                .unwrap(),
                 (Some(hostname), None) => write!(out, "{hostname}:", hostname = hostname).unwrap(),
-                _ => {},
+                _ => {}
             }
         }
 
@@ -153,13 +159,21 @@ impl RsyncParams {
 
         for src_path in self.src_paths.iter() {
             path.clear();
-            print_host(self.src_hostname.as_ref(), self.src_username.as_ref(), &mut path);
+            print_host(
+                self.src_hostname.as_ref(),
+                self.src_username.as_ref(),
+                &mut path,
+            );
             path.push_str(src_path.to_str().unwrap()); //FIXME (jc) handle non-utf8 output (should not be possible at the moment)
             cmd.arg(&path);
         }
 
         path.clear();
-        print_host(self.dst_hostname.as_ref(), self.dst_username.as_ref(), &mut path);
+        print_host(
+            self.dst_hostname.as_ref(),
+            self.dst_username.as_ref(),
+            &mut path,
+        );
         path.push_str(self.dst_path.to_str().unwrap()); //FIXME (jc) handle non-utf8 output (should not be possible at the moment)
         cmd.arg(&path);
 
@@ -182,7 +196,6 @@ impl RsyncParams {
         cmd
     }
 }
-
 
 #[derive(Debug)]
 pub struct RsyncExecutor {
@@ -211,11 +224,11 @@ pub struct CompareResult {
 }
 
 impl CompareResult {
-    pub fn new (diffs: Vec<DiffInfo>, status: Option<i32>, signal: Option<i32>) -> Self {
+    pub fn new(diffs: Vec<DiffInfo>, status: Option<i32>, signal: Option<i32>) -> Self {
         Self {
             diffs,
             status,
-            signal
+            signal,
         }
     }
     pub fn is_success(&self) -> bool {
@@ -244,15 +257,20 @@ impl CompareResult {
 }
 
 impl FileExecutor for RsyncExecutor {
-    fn file_compare(&mut self,
-                    engine: &EngineRef,
-                    curr_dir: &Path,
-                    src_path: &Path,
-                    dst_path: &Path,
-                    chown: Option<&str>,
-                    chmod: Option<&str>,
-                    checksum: bool) -> Result<CompareResult, FileError> {
-        let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
+    fn file_compare(
+        &mut self,
+        engine: &EngineRef,
+        curr_dir: &Path,
+        src_path: &Path,
+        dst_path: &Path,
+        chown: Option<&str>,
+        chmod: Option<&str>,
+        checksum: bool,
+    ) -> Result<CompareResult, FileError> {
+        let ssh_session = engine
+            .write()
+            .ssh_session_cache_mut()
+            .get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
             //.dst_hostname(self.host.ssh_dest().hostname())
@@ -285,15 +303,20 @@ impl FileExecutor for RsyncExecutor {
         Ok(CompareResult::new(diffs, Some(result), None))
     }
 
-    fn file_copy(&mut self,
-                 engine: &EngineRef,
-                 curr_dir: &Path,
-                 src_path: &Path,
-                 dst_path: &Path,
-                 chown: Option<&str>,
-                 chmod: Option<&str>,
-                 _log: &OutputLog) -> Result<TaskResult, FileError> {
-        let ssh_session = engine.write().ssh_session_cache_mut().get(self.host.ssh_dest())?;
+    fn file_copy(
+        &mut self,
+        engine: &EngineRef,
+        curr_dir: &Path,
+        src_path: &Path,
+        dst_path: &Path,
+        chown: Option<&str>,
+        chmod: Option<&str>,
+        _log: &OutputLog,
+    ) -> Result<TaskResult, FileError> {
+        let ssh_session = engine
+            .write()
+            .ssh_session_cache_mut()
+            .get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
             //.dst_hostname(self.host.ssh_dest().hostname())

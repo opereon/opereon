@@ -5,19 +5,18 @@ use super::*;
 
 pub use self::command::*;
 pub use self::config::*;
-pub use self::file::*;
 pub use self::file::FileCopyOperation;
+pub use self::file::*;
 pub use self::template::*;
 
-mod config;
 mod command;
+mod config;
 mod file;
 mod template;
 
-pub trait ReadWriteSeek: Read + Write + Seek + 'static { }
+pub trait ReadWriteSeek: Read + Write + Seek + 'static {}
 
-impl<T: Read + Write + Seek + 'static> ReadWriteSeek for T { }
-
+impl<T: Read + Write + Seek + 'static> ReadWriteSeek for T {}
 
 #[derive(Clone)]
 pub struct OutputLog(Arc<Mutex<Box<dyn ReadWriteSeek>>>);

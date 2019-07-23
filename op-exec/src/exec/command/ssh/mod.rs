@@ -10,16 +10,16 @@ use super::*;
 
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
-pub use self::operations::{RemoteCommandOperation};
+pub use self::operations::RemoteCommandOperation;
 use tokio_process::CommandExt;
 
-mod operations;
 mod config;
 mod dest;
+mod operations;
 
 #[derive(Debug)]
 pub enum SshError {
-    IoError(kg_io::error::IoError),
+    IoError(kg_diag::IoError),
     SshOpen(String),
     SshProcessTerminated,
     SshClosed,
@@ -27,8 +27,8 @@ pub enum SshError {
 }
 
 //FIXME (jc)
-impl From<kg_io::error::IoError> for SshError {
-    fn from(err: kg_io::error::IoError) -> Self {
+impl From<kg_diag::IoError> for SshError {
+    fn from(err: kg_diag::IoError) -> Self {
         SshError::IoError(err)
     }
 }
@@ -39,9 +39,7 @@ impl From<std::io::Error> for SshError {
     }
 }
 
-
 pub type SshResult<T> = Result<T, SshError>;
-
 
 #[derive(Debug)]
 pub struct SshSessionCache {
@@ -60,7 +58,7 @@ impl SshSessionCache {
 
     pub fn init(&mut self) -> IoResult<()> {
         std::fs::remove_dir_all(self.config.exec().command().ssh().socket_dir())?;
-        kg_io::fs::create_dir_all(self.config.exec().command().ssh().socket_dir())?;
+        fs::create_dir_all(self.config.exec().command().ssh().socket_dir())?;
         Ok(())
     }
 
@@ -78,8 +76,6 @@ impl SshSessionCache {
     }
 }
 
-
-
 #[derive(Debug)]
 pub struct SshSession {
     opened: Cell<bool>,
@@ -92,7 +88,12 @@ pub struct SshSession {
 impl SshSession {
     pub fn new(dest: SshDest, config: ConfigRef) -> SshSession {
         let id = dest.to_id_string();
-        let socket_path = config.exec().command().ssh().socket_dir().join(id.clone() + ".sock");
+        let socket_path = config
+            .exec()
+            .command()
+            .ssh()
+            .socket_dir()
+            .join(id.clone() + ".sock");
 
         SshSession {
             opened: Cell::new(false),
@@ -111,30 +112,35 @@ impl SshSession {
         let mut cmd = CommandBuilder::new(self.config().ssh_cmd());
         self.dest.set_dest(&mut cmd);
 
-        cmd.arg("-S").arg(self.socket_path.to_str().unwrap())
+        cmd.arg("-S")
+            .arg(self.socket_path.to_str().unwrap())
             .arg("-T")
-            .arg("-o").arg("StrictHostKeyChecking=yes");
+            .arg("-o")
+            .arg("StrictHostKeyChecking=yes");
 
         cmd
     }
 
-    pub (crate) fn remote_shell_call(&self) -> String {
+    pub(crate) fn remote_shell_call(&self) -> String {
         let cmd = self.ssh_cmd();
         cmd.to_string()
     }
 
     fn open(&mut self) -> SshResult<()> {
-        let mut cmd = self.ssh_cmd()
+        let mut cmd = self
+            .ssh_cmd()
             .arg("-n")
             .arg("-M") //Master mode
             .arg("-N") //Do not execute a remote command
-            .arg("-o").arg("ControlMaster=auto")
-            .arg("-o").arg("ControlPersist=yes")
-            .arg("-o").arg("ConnectTimeout=2")
+            .arg("-o")
+            .arg("ControlMaster=auto")
+            .arg("-o")
+            .arg("ControlPersist=yes")
+            .arg("-o")
+            .arg("ConnectTimeout=2")
             .build();
 
-        cmd
-            .stdin(Stdio::null())
+        cmd.stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
 
@@ -143,7 +149,9 @@ impl SshSession {
             self.opened.set(true);
             Ok(())
         } else {
-            Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
+            Err(SshError::SshOpen(
+                String::from_utf8(output.stderr).expect("non UTF-8 stderr output"),
+            ))
         }
     }
 
@@ -153,14 +161,15 @@ impl SshSession {
             return Err(SshError::SshClosed);
         }
 
-        let mut cmd = self.ssh_cmd()
-            .arg("-O").arg("check")
-            .arg("-o").arg("ConnectTimeout=2")
+        let mut cmd = self
+            .ssh_cmd()
+            .arg("-O")
+            .arg("check")
+            .arg("-o")
+            .arg("ConnectTimeout=2")
             .build();
 
-        cmd
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
         let s = cmd.status()?;
         Ok(s.success())
@@ -171,24 +180,28 @@ impl SshSession {
             return Ok(());
         }
 
-        let mut cmd = self.ssh_cmd()
-            .arg("-O").arg("exit")
-            .arg("-o").arg("ConnectTimeout=2")
+        let mut cmd = self
+            .ssh_cmd()
+            .arg("-O")
+            .arg("exit")
+            .arg("-o")
+            .arg("ConnectTimeout=2")
             .build();
 
-        cmd
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped());
+        cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
         let output = cmd.output()?;
         if output.status.success() {
             Ok(())
         } else {
-            Err(SshError::SshOpen(String::from_utf8(output.stderr).expect("non UTF-8 stderr output")))
+            Err(SshError::SshOpen(
+                String::from_utf8(output.stderr).expect("non UTF-8 stderr output"),
+            ))
         }
     }
 
-    fn run_command(&mut self,
+    fn run_command(
+        &mut self,
         cmd: &str,
         args: &[String],
         stdout: Stdio,
@@ -199,46 +212,49 @@ impl SshSession {
             return Err(SshError::SshClosed);
         }
 
-        let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
+        let usr_cmd = CommandBuilder::new(cmd)
+            .args(args.iter().map(String::as_str))
+            .to_string();
 
         log.log_cmd(&usr_cmd)?;
 
-        let mut ssh_cmd = self.ssh_cmd()
-            .arg("-o").arg("BatchMode=yes")
+        let mut ssh_cmd = self
+            .ssh_cmd()
+            .arg("-o")
+            .arg("BatchMode=yes")
             .arg(usr_cmd)
             .build();
 
-        ssh_cmd
-            .stdout(stdout)
-            .stderr(stderr);
+        ssh_cmd.stdout(stdout).stderr(stderr);
 
         Ok(ssh_cmd.spawn()?)
     }
 
     // this code may be used during migration to non-blocking api
-//    fn run_command_async(&mut self,
-//                         cmd: &str,
-//                         args: &[String],
-//    ) -> Result<tokio_process::Child, SshError>{
-//        if !self.opened.get() {
-//            return Err(SshError::SshClosed);
-//        }
-//
-//        let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
-//
-//        let mut ssh_cmd = self.ssh_cmd()
-//            .arg("-o").arg("BatchMode=yes")
-//            .arg("-t")
-//            .arg(usr_cmd)
-//            .build();
-//
-//        ssh_cmd.stdout(Stdio::piped());
-//        ssh_cmd.stderr(Stdio::piped());
-//
-//        Ok(ssh_cmd.spawn_async()?)
-//    }
+    //    fn run_command_async(&mut self,
+    //                         cmd: &str,
+    //                         args: &[String],
+    //    ) -> Result<tokio_process::Child, SshError>{
+    //        if !self.opened.get() {
+    //            return Err(SshError::SshClosed);
+    //        }
+    //
+    //        let usr_cmd = CommandBuilder::new(cmd).args(args.iter().map(String::as_str)).to_string();
+    //
+    //        let mut ssh_cmd = self.ssh_cmd()
+    //            .arg("-o").arg("BatchMode=yes")
+    //            .arg("-t")
+    //            .arg(usr_cmd)
+    //            .build();
+    //
+    //        ssh_cmd.stdout(Stdio::piped());
+    //        ssh_cmd.stderr(Stdio::piped());
+    //
+    //        Ok(ssh_cmd.spawn_async()?)
+    //    }
 
-    fn run_script(&mut self,
+    fn run_script(
+        &mut self,
         script: SourceRef,
         args: &[String],
         env: Option<&EnvVars>,
@@ -269,8 +285,10 @@ impl SshSession {
         let (r_in, mut w_in) = pipe().unwrap();
         let _r = r_in.try_clone().unwrap();
 
-        let mut ssh_cmd = self.ssh_cmd()
-            .arg("-o").arg("BatchMode=yes")
+        let mut ssh_cmd = self
+            .ssh_cmd()
+            .arg("-o")
+            .arg("BatchMode=yes")
             .arg(usr_cmd)
             .build();
 
@@ -290,12 +308,13 @@ impl SshSession {
         Ok(ssh_cmd.spawn()?)
     }
 
-    fn run_script_async(&mut self,
-                  script: SourceRef,
-                  args: &[String],
-                  env: Option<&EnvVars>,
-                  cwd: Option<&Path>,
-                  run_as: Option<&str>,
+    fn run_script_async(
+        &mut self,
+        script: SourceRef,
+        args: &[String],
+        env: Option<&EnvVars>,
+        cwd: Option<&Path>,
+        run_as: Option<&str>,
     ) -> Result<tokio_process::Child, SshError> {
         if !self.opened.get() {
             return Err(SshError::SshClosed);
@@ -317,8 +336,10 @@ impl SshSession {
         let (r_in, mut w_in) = pipe().unwrap();
         let _r = r_in.try_clone().unwrap();
 
-        let mut ssh_cmd = self.ssh_cmd()
-            .arg("-o").arg("BatchMode=yes")
+        let mut ssh_cmd = self
+            .ssh_cmd()
+            .arg("-o")
+            .arg("BatchMode=yes")
             .arg(usr_cmd)
             .build();
 
@@ -362,7 +383,16 @@ impl CommandExecutor for SshSession {
         out_format: Option<FileFormat>,
         log: &OutputLog,
     ) -> Result<TaskResult, CommandError> {
-        let child = self.run_script(script, args, env, cwd, run_as, Stdio::piped(), Stdio::piped(), log)?;
+        let child = self.run_script(
+            script,
+            args,
+            env,
+            cwd,
+            run_as,
+            Stdio::piped(),
+            Stdio::piped(),
+            log,
+        )?;
         execute(child, out_format, None, log)
     }
 }
@@ -374,7 +404,6 @@ impl Drop for SshSession {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct SshSessionRef(Arc<Mutex<SshSession>>);
@@ -412,19 +441,19 @@ impl CommandExecutor for SshSessionRef {
         out_format: Option<FileFormat>,
         log: &OutputLog,
     ) -> Result<TaskResult, CommandError> {
-        self.read().exec_script(engine, script, args, env, cwd, run_as, out_format, log)
+        self.read()
+            .exec_script(engine, script, args, env, cwd, run_as, out_format, log)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use tokio::prelude::Stream;
-    use tokio::prelude::future::*;
     use crate::RuntimeError;
+    use tokio::prelude::future::*;
+    use tokio::prelude::Stream;
 
     lazy_static! {
         static ref LOCK: Mutex<()> = Mutex::new(());
@@ -435,7 +464,8 @@ mod tests {
     }
 
     fn ssh_session() -> SshSession {
-        let config = ConfigRef::from_json(r#"{
+        let config = ConfigRef::from_json(
+            r#"{
             "exec": {
                 "command": {
                     "ssh": {
@@ -443,10 +473,14 @@ mod tests {
                     }
                 }
             }
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
         let username = std::env::var("USER").unwrap();
-        let auth = SshAuth::PublicKey { identity_file: "~/.ssh/id_rsa".into() };
+        let auth = SshAuth::PublicKey {
+            identity_file: "~/.ssh/id_rsa".into(),
+        };
         let dest = SshDest::new("127.0.0.1", 22, username, auth);
 
         SshSession::new(dest, config)
@@ -474,12 +508,15 @@ mod tests {
 
         let mut session = ssh_session();
         session.open().unwrap();
-        let child = session.run_command(
-            "echo",
-            &vec!["\\\"${USER}\\\"".into()],
-            Stdio::piped(),
-            Stdio::piped(),
-            &log).unwrap();
+        let child = session
+            .run_command(
+                "echo",
+                &vec!["\\\"${USER}\\\"".into()],
+                Stdio::piped(),
+                Stdio::piped(),
+                &log,
+            )
+            .unwrap();
 
         let result = execute(child, Some(FileFormat::Json), None, &log).unwrap();
         session.close().unwrap();
@@ -501,21 +538,23 @@ mod tests {
         session.open().unwrap();
 
         let log = OutputLog::new(Cursor::new(Vec::new()));
-        let child = session.run_script(
-            SourceRef::Path(Path::new("../resources/files/example-script.sh")),
-            &vec![
-                "param1".into(),
-                "param 2".into(),
-                "@".into(),
-                //"&@!@#".into()
-            ],
-            Some(&envs),
-            Some(&PathBuf::from("/home")),
-            Some("root"),
-            Stdio::piped(),
-            Stdio::piped(),
-            &log,
-        ).unwrap();
+        let child = session
+            .run_script(
+                SourceRef::Path(Path::new("../resources/files/example-script.sh")),
+                &vec![
+                    "param1".into(),
+                    "param 2".into(),
+                    "@".into(),
+                    //"&@!@#".into()
+                ],
+                Some(&envs),
+                Some(&PathBuf::from("/home")),
+                Some("root"),
+                Stdio::piped(),
+                Stdio::piped(),
+                &log,
+            )
+            .unwrap();
 
         let result = execute(child, Some(FileFormat::Json), None, &log).unwrap();
         session.close().unwrap();
@@ -528,26 +567,32 @@ mod tests {
     fn run_script_async_out_streams() {
         let mut session = ssh_session();
         session.open().unwrap();
-        let mut child: tokio_process::Child = session.run_script_async(SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"), &[], None, None, None).expect("error creating session");
+        let mut child: tokio_process::Child = session
+            .run_script_async(
+                SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"),
+                &[],
+                None,
+                None,
+                None,
+            )
+            .expect("error creating session");
         let stdout = child.stdout().take().expect("Cannot get child stdout");
         let stderr = child.stderr().take().expect("Cannot get child stderr");
 
-        let child_fut = child.map_err(|err| panic!("child error"))
+        let child_fut = child
+            .map_err(|err| panic!("child error"))
             .map(|exit_status| println!("Exit status : {:?}", exit_status));
 
         let out_fut = tokio::io::lines(BufReader::new(stdout))
             .map_err(|err| panic!())
-            .map(|line| {
-                Ok(format!("out: {}", line))
-            });
+            .map(|line| Ok(format!("out: {}", line)));
         let err_fut = tokio::io::lines(BufReader::new(stderr))
             .map_err(|err| panic!())
-            .map(|line| {
-                Ok(format!("err: {}", line))
-            });
+            .map(|line| Ok(format!("err: {}", line)));
 
-        let out_fut = out_fut.select(err_fut)
-            .for_each(|line:Result<String, RuntimeError>| {
+        let out_fut = out_fut
+            .select(err_fut)
+            .for_each(|line: Result<String, RuntimeError>| {
                 eprintln!("{}", line.unwrap());
                 Ok(())
             });
@@ -558,13 +603,28 @@ mod tests {
     fn run_script_async_wait_output() {
         let mut session = ssh_session();
         session.open().unwrap();
-        let mut child :tokio_process::Child = session.run_script_async(SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"), &[], None, None, None).expect("error creating session");
+        let mut child: tokio_process::Child = session
+            .run_script_async(
+                SourceRef::Source("ls -al;sleep 5; >&2 echo 'Error!';sleep 5; ls -al"),
+                &[],
+                None,
+                None,
+                None,
+            )
+            .expect("error creating session");
 
-        let child_fut = child.wait_with_output()
+        let child_fut = child
+            .wait_with_output()
             .map_err(|err| panic!("child error"))
-            .map(|output|println!("Output : {}\n {}", std::str::from_utf8(&output.stdout).unwrap(), std::str::from_utf8(&output.stderr).unwrap()));
+            .map(|output| {
+                println!(
+                    "Output : {}\n {}",
+                    std::str::from_utf8(&output.stdout).unwrap(),
+                    std::str::from_utf8(&output.stderr).unwrap()
+                )
+            });
 
-        tokio::run(child_fut.map(|_|()));
+        tokio::run(child_fut.map(|_| ()));
     }
 
 }

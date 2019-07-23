@@ -1,17 +1,20 @@
-extern crate slog;
 extern crate colored;
+extern crate slog;
 
-use std::fs::OpenOptions;
-use slog::{Drain, Record, OwnedKVList, Never};
-use slog::*;
-use slog_kvfilter::KVFilter;
-use std::collections::{HashSet, HashMap};
-use std::path::Path;
 use crate::colored::Colorize;
+use slog::*;
+use slog::{Drain, Never, OwnedKVList, Record};
+use slog_kvfilter::KVFilter;
+use std::collections::{HashMap, HashSet};
+use std::fs::OpenOptions;
+use std::path::Path;
 
 const VERBOSITY_KEY: &str = "verbosity";
 
-pub fn build_file_drain<P: AsRef<Path>>(log_path: P, level: Level) -> impl Drain<Ok=(), Err=Never> {
+pub fn build_file_drain<P: AsRef<Path>>(
+    log_path: P,
+    level: Level,
+) -> impl Drain<Ok = (), Err = Never> {
     if let Some(log_dir) = log_path.as_ref().parent() {
         std::fs::create_dir_all(log_dir).expect("Cannot create log dir");
     }
@@ -31,7 +34,7 @@ pub fn build_file_drain<P: AsRef<Path>>(log_path: P, level: Level) -> impl Drain
 /// Creates drain printing to stdout.
 /// Only messages with `verbosity` key will be printed.
 ///
-pub fn build_cli_drain(verbosity: u8) -> impl Drain<Ok=(), Err=Never> {
+pub fn build_cli_drain(verbosity: u8) -> impl Drain<Ok = (), Err = Never> {
     let mut verbosity_vals: HashSet<String> = HashSet::new();
 
     for v in 0..verbosity + 1 {
@@ -44,10 +47,9 @@ pub fn build_cli_drain(verbosity: u8) -> impl Drain<Ok=(), Err=Never> {
     let drain = CliDrain;
     let drain = KVFilter::new(drain, Level::Error);
     let drain = drain.only_pass_any_on_all_keys(Some(filters));
-//    let drain = slog::Filter(drain, |r| r.level() == Level::Info);
+    //    let drain = slog::Filter(drain, |r| r.level() == Level::Info);
     drain.fuse()
 }
-
 
 pub struct CliDrain;
 
@@ -62,35 +64,22 @@ impl Drain for CliDrain {
         record: &Record,
         _values: &OwnedKVList,
     ) -> std::result::Result<Self::Ok, Self::Err> {
-
         let prefix = match record.level() {
-            Level::Critical => {
-                "Critical:".red()
-            },
-            Level::Error => {
-                "Error:".bright_red()
-            },
-            Level::Warning => {
-                "Warn:".yellow()
-            },
-            Level::Info => {
-                "Info:".blue()
-            },
-            Level::Debug => {
-                "Debug:".cyan()
-            }
-            Level::Trace => {
-                "Trace:".white()
-            }
+            Level::Critical => "Critical:".red(),
+            Level::Error => "Error:".bright_red(),
+            Level::Warning => "Warn:".yellow(),
+            Level::Info => "Info:".blue(),
+            Level::Debug => "Debug:".cyan(),
+            Level::Trace => "Trace:".white(),
         };
 
         println!("{} {}", prefix, record.msg());
 
-//        record
-//            .kv()
-//            .serialize(record, &mut CliSerializer)
-//            .unwrap();
-//        values.serialize(record, &mut CliSerializer).unwrap();
+        //        record
+        //            .kv()
+        //            .serialize(record, &mut CliSerializer)
+        //            .unwrap();
+        //        values.serialize(record, &mut CliSerializer).unwrap();
 
         Ok(())
     }
@@ -109,12 +98,11 @@ mod tests {
         let log = slog::Logger::root(
             drain.fuse(),
             o!("module" =>
-           FnValue(move |info| {
-                info.module()
-           })
-          ),
+             FnValue(move |info| {
+                  info.module()
+             })
+            ),
         );
-
 
         crit!(log, "CRIT! verbosity is {verbosity}", verbosity = 0);
         error!(log, "ERR! verbosity is "; "verbosity" => 0);
@@ -124,7 +112,6 @@ mod tests {
         trace!(log, "TRACE! verbosity is {verbosity}", verbosity = 2);
 
         info!(log, "INFO! info message! - KV syntax"; "verbosity" => 1);
-
 
         info!(log, "verbosity not specified!");
         warn!(log, "verbosity is {foo} {bar}", bar=3, foo = 2; "a" => "b");

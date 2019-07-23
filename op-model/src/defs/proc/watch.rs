@@ -10,10 +10,10 @@ pub struct ModelWatch {
 }
 
 impl ModelWatch {
-    pub fn parse(path: &str, mask: &str) -> Result<ModelWatch, DefsParseError> {
-        //FIXME (jc) handle opath parse errors
+    pub fn parse(path: &str, mask: &str) -> DefsResult<ModelWatch> {
         Ok(ModelWatch {
-            path: Opath::parse(path).unwrap(),
+            path: Opath::parse(path)
+                .map_err(|err| DefsErrorDetail::OpathParseErr { err: Box::new(err) })?,
             mask: ChangeKindMask::parse(mask),
         })
     }
@@ -28,8 +28,8 @@ impl ModelWatch {
 }
 
 fn glob_serialize<S>(glob: &Glob, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     s.serialize_str(glob.glob())
 }
@@ -42,9 +42,10 @@ pub struct FileWatch {
 }
 
 impl FileWatch {
-    pub fn parse(glob: &str, mask: &str) -> Result<FileWatch, DefsParseError> {
-        //FIXME ws glob parse errors
-        let glob = GlobBuilder::new(glob).build().expect("Cannot build glob!");
+    pub fn parse(glob: &str, mask: &str) -> DefsResult<FileWatch> {
+        let glob = GlobBuilder::new(glob)
+            .build()
+            .map_err(|err| DefsErrorDetail::GlobParseErr { err })?;
         Ok(FileWatch {
             glob,
             mask: ChangeKindMask::parse(mask),

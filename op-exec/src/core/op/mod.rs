@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use serde::{de, ser};
 use uuid::Uuid;
@@ -10,9 +10,9 @@ use uuid::Uuid;
 use super::*;
 
 pub use self::context::Context;
-use self::impls::{create_operation_impl, OperationImplType};
 pub use self::impls::DiffMethod;
 pub use self::impls::OperationImpl;
+use self::impls::{create_operation_impl, OperationImplType};
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
 use std::path::Path;
@@ -72,22 +72,22 @@ impl Operation {
         &self.context
     }
 
-    pub (crate) fn update_progress(&mut self, progress: Progress) {
+    pub(crate) fn update_progress(&mut self, progress: Progress) {
         self.progress = progress;
         self.progress_task.notify();
     }
 
-//    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
-//        self.progress.set_step(step, progress);
-//        self.progress_task.notify();
-//    }
+    //    pub(crate) fn update_progress_step(&mut self, step: usize, progress: Progress) {
+    //        self.progress.set_step(step, progress);
+    //        self.progress_task.notify();
+    //    }
 
-//    pub(crate) fn update_progress_value(&mut self, value: f64) {
-//        if self.progress.set_value(value) {
-//            self.progress_task.notify();
-//        }
-//    }
-//
+    //    pub(crate) fn update_progress_value(&mut self, value: f64) {
+    //        if self.progress.set_value(value) {
+    //            self.progress_task.notify();
+    //        }
+    //    }
+    //
     pub(crate) fn update_progress_value_done(&mut self) {
         if self.progress.set_value_done() {
             self.progress_task.notify();
@@ -202,7 +202,8 @@ impl From<Context> for OperationRef {
                 "{}-{}",
                 context.label(),
                 COUNTER.fetch_add(1, Ordering::SeqCst)
-            ).into(),
+            )
+            .into(),
             context,
         )
     }
@@ -263,7 +264,6 @@ impl Future for OperationTask {
 
             self.engine.write().remove_operation(&self.operation);
             self.engine.read().notify();
-
         }
         Ok(Async::Ready(()))
     }
@@ -339,7 +339,7 @@ impl Stream for ProgressStream {
                 if progress.is_done() {
                     self.done = true;
                     //FIXME ws show last progress value
-                    return Ok(Async::Ready(None))
+                    return Ok(Async::Ready(None));
                 }
                 self.progress = progress.clone();
                 Ok(Async::Ready(Some(progress.clone())))
@@ -393,28 +393,28 @@ impl OperationExec {
 mod tests {
     use super::*;
 
-//    #[test]
-//    fn operation_serialize_to_json() {
-//        let o = OperationRef::new(
-//            Uuid::nil(),
-//            "Main operation".into(),
-//            Context::ModelCommit(String::from("/home/opereon/model")),
-//        );
-//        let s = serde_json::to_string(&o).unwrap();
-//
-//        let json = r#"
-//        {
-//          "id": "00000000-0000-0000-0000-000000000000",
-//          "label": "Main operation",
-//          "context": {
-//            "type": "model-store",
-//            "arg": "/home/opereon/model"
-//          }
-//        }
-//        "#;
-//
-//        assert!(json_eq!(s, json));
-//    }
+    //    #[test]
+    //    fn operation_serialize_to_json() {
+    //        let o = OperationRef::new(
+    //            Uuid::nil(),
+    //            "Main operation".into(),
+    //            Context::ModelCommit(String::from("/home/opereon/model")),
+    //        );
+    //        let s = serde_json::to_string(&o).unwrap();
+    //
+    //        let json = r#"
+    //        {
+    //          "id": "00000000-0000-0000-0000-000000000000",
+    //          "label": "Main operation",
+    //          "context": {
+    //            "type": "model-store",
+    //            "arg": "/home/opereon/model"
+    //          }
+    //        }
+    //        "#;
+    //
+    //        assert!(json_eq!(s, json));
+    //    }
 
     #[test]
     fn operation_deserialize_from_json() {

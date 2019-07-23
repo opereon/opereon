@@ -2,14 +2,13 @@ use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use toml;
 
 use super::*;
 
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
-
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Include {
@@ -47,7 +46,6 @@ impl Include {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Exclude {
     path: PathBuf,
@@ -74,7 +72,6 @@ impl Exclude {
     }
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
@@ -93,11 +90,14 @@ pub struct Config {
     exclude_globset: RefCell<Option<GlobSet>>,
 }
 
-
 #[inline]
 fn build_glob(path: &Path) -> Glob {
     let path = path.to_str().unwrap(); //FIXME (jc) handle utf8 errors
-    GlobBuilder::new(path).case_insensitive(false).literal_separator(true).build().unwrap()
+    GlobBuilder::new(path)
+        .case_insensitive(false)
+        .literal_separator(true)
+        .build()
+        .unwrap()
 }
 
 //FIXME (jc) add Include::check(), Exclude::check() and Config::check() for glob errors, add checking and reporting glob syntax errors to the user somehow
@@ -201,9 +201,11 @@ impl Config {
         debug_assert!(path_rel.is_relative());
 
         let cpath = Candidate::new(path_rel);
-        let mut matches = Vec::with_capacity(std::cmp::max(self.includes.len(), self.excludes.len()));
+        let mut matches =
+            Vec::with_capacity(std::cmp::max(self.includes.len(), self.excludes.len()));
 
-        self.exclude_globset().matches_candidate_into(&cpath, &mut matches);
+        self.exclude_globset()
+            .matches_candidate_into(&cpath, &mut matches);
         for &i in matches.iter() {
             let ref exclude = self.excludes[i];
             if exclude.matches_file_type(file_type) {
@@ -211,7 +213,8 @@ impl Config {
             }
         }
 
-        self.include_globset().matches_candidate_into(&cpath, &mut matches);
+        self.include_globset()
+            .matches_candidate_into(&cpath, &mut matches);
         for &i in matches.iter() {
             let ref include = self.includes[i];
             if include.matches_file_type(file_type) {
@@ -255,7 +258,6 @@ impl PartialEq for Config {
 
 impl Eq for Config {}
 
-
 #[derive(Debug)]
 pub struct ConfigResolver {
     model_dir: PathBuf,
@@ -263,30 +265,51 @@ pub struct ConfigResolver {
 }
 
 impl ConfigResolver {
-    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> IoResult<ConfigResolver> {
-        let repo = Repository::open(model_dir).expect("Cannot open repository");
-        let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
-
-        // FIXME ws error handling
-        let obj = repo.find_object(commit_hash.as_oid(), None).expect("cannot find object");
-        let commit_tree = obj.peel_to_tree().expect("Non-tree oid found");
+    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
+        let git = GitManager::new(model_dir)?;
+        let odb = git.odb()?;
+        let commit_tree = git.get_tree(commit_hash)?;
 
         let mut cr = ConfigResolver::new(&model_dir);
 
-        commit_tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
-            if entry.kind() != Some(ObjectType::Blob)
-                || entry.name() != Some(DEFAULT_CONFIG_FILENAME) {
-                return TreeWalkResult::Ok
-            }
-            // FIXME ws error handling
-            let obj = odb.read(entry.id()).expect("Cannot get git object!");
-            let content = String::from_utf8(obj.data().to_vec()).expect("Config file is not valid utf8!");
+        let mut walk_err = None;
 
-            let config: Config = toml::from_str(&content).unwrap();
-            cr.add_file(&model_dir.join(parent_path), config);
+        commit_tree
+            .walk(TreeWalkMode::PreOrder, |parent_path, entry| {
+                if entry.kind() != Some(ObjectType::Blob)
+                    || entry.name() != Some(DEFAULT_CONFIG_FILENAME)
+                {
+                    return TreeWalkResult::Ok;
+                }
 
-            TreeWalkResult::Ok
-        }).expect("Error reading git tree");// FIXME ws error handling
+                let mut inner = || -> ModelResult<()> {
+                    let obj = odb
+                        .read(entry.id())
+                        .map_err(|err| GitErrorDetail::GetFile {
+                            file: entry.name().unwrap().into(),
+                            err,
+                        })?;
+                    let content = String::from_utf8(obj.data().to_vec())
+                        .map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
+
+                    // FIXME ws error handling
+                    let config: Config = toml::from_str(&content).unwrap();
+                    cr.add_file(&model_dir.join(parent_path), config);
+                    Ok(())
+                };
+
+                if let Err(err) = inner() {
+                    walk_err = Some(err);
+                    TreeWalkResult::Abort
+                } else {
+                    TreeWalkResult::Ok
+                }
+            })
+            .map_err(|err| GitErrorDetail::Custom { err })?;
+
+        if let Some(err) = walk_err {
+            return Err(err);
+        }
 
         let mut configs = BTreeMap::new();
         for path in cr.configs.keys() {
@@ -344,11 +367,11 @@ impl ConfigResolver {
     pub fn resolve(&self, path: &Path) -> &Config {
         debug_assert!(path.starts_with(&self.model_dir));
 
-//        let path = if !path.is_dir() {
-//            path.parent().unwrap()
-//        } else {
-//            path
-//        };
+        //        let path = if !path.is_dir() {
+        //            path.parent().unwrap()
+        //        } else {
+        //            path
+        //        };
 
         let path = path.strip_prefix(&self.model_dir).unwrap();
 
@@ -366,10 +389,8 @@ impl ConfigResolver {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    
 
     use super::*;
 

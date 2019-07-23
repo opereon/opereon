@@ -2,34 +2,42 @@ use super::*;
 
 #[derive(Serialize, Deserialize)]
 struct AsPath {
-    path: String
+    path: String,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RunExec {
-    #[serde(serialize_with = "RunExec::store_steps", deserialize_with = "RunExec::load_steps")]
+    #[serde(
+        serialize_with = "RunExec::store_steps",
+        deserialize_with = "RunExec::load_steps"
+    )]
     steps: Vec<StepExec>,
 }
 
 impl RunExec {
     pub fn new() -> RunExec {
-        RunExec {
-            steps: Vec::new(),
-        }
+        RunExec { steps: Vec::new() }
     }
 
-    fn store_steps<S>(steps: &Vec<StepExec>, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    fn store_steps<S>(steps: &Vec<StepExec>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         serializer.collect_seq(steps.iter().map(|e| {
             let dir = e.path().file_name().unwrap();
             let mut p = PathBuf::new();
             p.push(dir);
             p.push("_step.yaml");
-            AsPath { path: p.to_str().unwrap().into() }
+            AsPath {
+                path: p.to_str().unwrap().into(),
+            }
         }))
     }
 
-    fn load_steps<'de, D>(deserializer: D) -> Result<Vec<StepExec>, D::Error> where D: serde::Deserializer<'de> {
+    fn load_steps<'de, D>(deserializer: D) -> Result<Vec<StepExec>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         use serde::Deserialize;
 
         let paths: Vec<AsPath> = Vec::deserialize(deserializer)?;

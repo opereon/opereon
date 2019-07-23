@@ -9,27 +9,31 @@ pub enum ValueDef {
 }
 
 impl ValueDef {
-    pub fn parse(node: &NodeRef) -> Result<ValueDef, DefsParseError> {
+    pub fn parse(node: &NodeRef) -> DefsResult<ValueDef> {
         match *node.data().value() {
             Value::String(ref s) => {
                 let expr = s.trim();
                 if expr.starts_with("${") && expr.ends_with('}') {
-                    match Opath::parse(&expr[2..expr.len()-1]) {
+                    match Opath::parse(&expr[2..expr.len() - 1]) {
                         Ok(expr) => Ok(ValueDef::Resolvable(expr)),
-                        Err(_err) => perr!("opath parse error"), //FIXME (jc)
+                        Err(err) => {
+                            Err(DefsErrorDetail::OpathParseErr { err: Box::new(err) }.into())
+                        }
                     }
                 } else {
                     Ok(ValueDef::Static(node.clone()))
                 }
             }
-            _ => Ok(ValueDef::Static(node.clone()))
+            _ => Ok(ValueDef::Static(node.clone())),
         }
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> DefsResult<NodeSet> {
         match *self {
-            ValueDef::Static(ref n) => n.clone().into(),
-            ValueDef::Resolvable(ref expr) => expr.apply_ext(root, current, scope),
+            ValueDef::Static(ref n) => Ok(n.clone().into()),
+            ValueDef::Resolvable(ref expr) => expr
+                .apply_ext(root, current, scope)
+                .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) }.into()),
         }
     }
 
@@ -50,14 +54,17 @@ impl Remappable for ValueDef {
                 } else {
                     *n = n.deep_copy();
                 }
-            },
-            ValueDef::Resolvable(..) => {},
+            }
+            ValueDef::Resolvable(..) => {}
         }
     }
 }
 
 impl ser::Serialize for ValueDef {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         match *self {
             ValueDef::Static(ref n) => n.serialize(serializer),
             ValueDef::Resolvable(ref e) => e.serialize(serializer),
@@ -66,12 +73,14 @@ impl ser::Serialize for ValueDef {
 }
 
 impl<'de> de::Deserialize<'de> for ValueDef {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         let n = NodeRef::deserialize(deserializer)?;
         ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error")) //FIXME (jc) error message
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeDef {
@@ -94,11 +103,12 @@ impl ScopeDef {
         self.values.get(name)
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()> {
         for (name, value) in self.values.iter() {
-            let rval = value.resolve(root, current, &scope);
+            let rval = value.resolve(root, current, &scope)?;
             scope.set_var(name.clone(), rval);
         }
+        Ok(())
     }
 }
 
@@ -109,7 +119,7 @@ impl Remappable for ScopeDef {
 }
 
 impl ParsedModelDef for ScopeDef {
-    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, _parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut scope = ScopeDef::new();
 
         if let Some(sn) = node.get_child_key("scope") {
@@ -121,7 +131,12 @@ impl ParsedModelDef for ScopeDef {
                     }
                 }
                 Value::Null => {}
-                _ => return perr!("scope definition must be an object"), //FIXME (jc)
+                _ => {
+                    return Err(DefsErrorDetail::ScopeNonObject {
+                        kind: node.data().kind(),
+                    }
+                    .into())
+                }
             }
         }
         Ok(scope)

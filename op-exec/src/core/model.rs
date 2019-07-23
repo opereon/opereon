@@ -1,15 +1,10 @@
-
-
-
-
-use git2::{Commit, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions, Signature, ErrorCode};
+use git2::{RepositoryInitOptions, Signature};
 
 use super::*;
 use crate::{ConfigRef};
 use kg_utils::collections::LruCache;
 use std::path::{PathBuf, Path};
 use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
-use kg_io::IoResult;
 use slog::{Record, Serializer, Key, Result as SlogResult};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -84,7 +79,7 @@ impl ModelManager {
             let curr_dir = parent.unwrap();
             let manifest = curr_dir.join(&manifest_filename);
 
-            match kg_io::fs::metadata(manifest){
+            match fs::metadata(manifest) {
                 Ok(_) => {
                     return Ok(curr_dir.to_owned());
                 }
@@ -98,14 +93,17 @@ impl ModelManager {
             }
         }
 
-        return Err(kg_io::IoError::file_not_found(manifest_filename, OpType::Read));
+        return Err(IoError::file_not_found(
+            manifest_filename,
+            OpType::Read,
+        ));
     }
 
     /// Initialize model manager.
     /// This method can be called multiple times.
     pub fn init(&mut self) -> IoResult<()> {
         if self.initialized {
-            return Ok(())
+            return Ok(());
         }
 
         debug!(self.logger, "Initializing model manager");
@@ -118,8 +116,7 @@ impl ModelManager {
     }
 
     /// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model(&mut self) -> IoResult<()> {
-
+    pub fn init_model(&mut self) -> RuntimeResult<()> {
         let current_dir = fs::current_dir()?;
 
         // TODO error handling
@@ -131,40 +128,18 @@ impl ModelManager {
     }
 
     /// Commit current model
-    pub fn commit(&mut self, message: &str) -> IoResult<ModelRef> {
+    pub fn commit(&mut self, message: &str) -> RuntimeResult<ModelRef> {
         self.init()?;
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let mut index = repo.index().expect("Cannot get index!");
 
-        let oid = Self::update_index(&mut index)?;
-        let parent = Self::find_last_commit(&repo)?;
-        let tree = repo.find_tree(oid).expect("Cannot get tree!");
+        let git = GitManager::new(self.model_dir())?;
         let signature = Signature::now("opereon", "example@email.com").unwrap();
 
-        if let Some(parent) = parent  {
-            let _commit = repo.commit(Some("HEAD"),
-                                      &signature,
-                                      &signature,
-                                      message,
-                                      &tree,
-                                      &[&parent]).expect("Cannot commit model!");
-        } else {
-            let _commit = repo.commit(Some("HEAD"),
-                                      &signature,
-                                      &signature,
-                                      message,
-                                      &tree,
-                                      &[]).expect("Cannot commit model!");
-        };
-
-        repo.checkout_index(None, None).expect("Cannot checkout index");
+        let oid = git.commit(message, &signature)?;
 
         self.get(oid.into())
-
     }
 
-    pub fn get(&mut self, id: Sha1Hash) -> IoResult<ModelRef> {
+    pub fn get(&mut self, id: Sha1Hash) -> RuntimeResult<ModelRef> {
         self.init()?;
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
@@ -180,7 +155,7 @@ impl ModelManager {
         Ok(model)
     }
 
-    pub fn resolve(&mut self, model_path: &ModelPath) -> IoResult<ModelRef> {
+    pub fn resolve(&mut self, model_path: &ModelPath) -> RuntimeResult<ModelRef> {
         self.init()?;
         match *model_path {
             ModelPath::Current => self.current(),
@@ -191,63 +166,17 @@ impl ModelManager {
 
     /// Returns current model - model represented by content of the git index.
     /// This method loads model on each call.
-    pub fn current(&mut self) -> IoResult<ModelRef> {
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let mut index = repo.index().expect("Cannot get index!");
-
-        let oid = Self::update_index(&mut index)?;
-
+    pub fn current(&mut self) -> RuntimeResult<ModelRef> {
+        let oid = GitManager::new(self.model_dir())?.update_index()?;
         self.get(oid.into())
     }
 
-    /// Update provided index and return created tree Oid
-    fn update_index(index: &mut Index) -> IoResult<Oid> {
-        // TODO ws error handling
-
-        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
-        // Changes in index won't be saved to disk until index.write*() called.
-        index.clear().expect("Cannot clear index");
-        index.add_all(&["*"], IndexAddOption::default(), None).expect("Cannot update index");
-
-        // get oid of index tree
-        let oid = index.write_tree().expect("Cannot write index");
-        Ok(oid)
-    }
-
-    /// Returns last commit or `None` if repository have no commits.
-    fn find_last_commit(repo: &Repository) -> IoResult<Option<Commit>> {
-        // TODO error handling
-        let obj = match repo.head() {
-            Ok(head) => head,
-            Err(err) => {
-                match err.code() {
-                    ErrorCode::UnbornBranch => {
-                        return Ok(None)
-                    },
-                    _=> {
-                        eprintln!("err = {:?}", err);
-                        panic!("Error searching last commit")
-                    }
-                }
-            },
-        };
-
-
-
-
-        let obj = obj.resolve().unwrap().peel(ObjectType::Commit).unwrap();
-        let commit = obj.peel_to_commit().unwrap();
-        Ok(Some(commit))
-    }
-
-
-    fn init_git_repo<P: AsRef<Path>>(path: P) -> IoResult<()> {
+    fn init_git_repo<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
         use std::fmt::Write;
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
-        // TODO error handling
-        let _repo = Repository::init_opts(path.as_ref(), &opts).expect("Cannot create git repository!");
+
+        GitManager::init_new_repository(&path, &opts)?;
 
         // ignore ./op directory
         let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
@@ -283,12 +212,10 @@ impl ModelManager {
         Ok(())
     }
 
-
-    fn resolve_revision_str(&self, spec: &str) -> IoResult<Sha1Hash> {
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let obj = repo.revparse_single(spec).expect("Cannot find revision!");
-        Ok(obj.id().into())
+    fn resolve_revision_str(&self, spec: &str) -> RuntimeResult<Sha1Hash> {
+        let git = GitManager::new(self.model_dir())?;
+        let id = git.resolve_revision_str(spec)?;
+        Ok(id)
     }
 
     fn cache_model(&mut self, m: ModelRef) {
@@ -298,81 +225,5 @@ impl ModelManager {
 
     fn model_dir(&self) -> &Path {
         &self.model_dir
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use git2::{DiffFindOptions, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid};
-    use git2::build::CheckoutBuilder;
-
-    use super::*;
-
-    #[test]
-    fn checkout_to_dir() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-        let out_dir = current.join(".op/checked_out");
-
-        let commit_hash = Oid::from_str("996d94321d833a918842c69531197f9d368ec4b6").expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit = repo.find_commit(commit_hash).expect("Cannot find commit");
-        let tree = commit.tree().expect("Cannot get commit tree");
-
-        let mut builder = CheckoutBuilder::new();
-        builder.target_dir(&out_dir);
-        // cannot update current index
-        builder.update_index(false);
-        // override everything in out_dir with commit state
-        builder.force();
-
-        repo.checkout_tree(tree.as_object(), Some(&mut builder)).expect("Cannot checkout tree!");
-    }
-
-    #[test]
-    fn diff() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-
-        let commit_hash1 = Oid::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8").expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit1 = repo.find_commit(commit_hash1).expect("Cannot find commit");
-        let tree1 = commit1.tree().expect("Cannot get commit tree");
-
-        let mut opts = DiffOptions::new();
-        opts.minimal(true);
-
-        let mut index = repo.index().expect("Cannot get index!");
-
-//         TODO what about .operc [[exclude]]? Should it be equal to .gitignore?
-        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
-        // Changes in index won't be saved to disk until index.write*() called.
-        index.clear().expect("Cannot clear index");
-        index.add_all(&["*"], IndexAddOption::default(), None).expect("Cannot update index");
-
-//        index.write().expect("cannot write index");
-
-        let mut diff = repo.diff_tree_to_workdir_with_index(Some(&tree1), Some(&mut opts)).expect("Cannot get diff");
-
-        let mut find_opts = DiffFindOptions::new();
-        find_opts.renames(true);
-        find_opts.renames_from_rewrites(true);
-        find_opts.remove_unmodified(true);
-
-        diff.find_similar(Some(&mut find_opts)).expect("Cannot find similar!");
-        println!("Diffs:");
-
-        let deltas = diff.deltas();
-        eprintln!("deltas.size_hint() = {:?}", deltas.size_hint());
-        for delta in deltas {
-            println!("======");
-            eprintln!("Change type: {:?}", delta.status());
-            let old = delta.old_file();
-            let new = delta.new_file();
-            eprintln!("old = id: {:?}, path: {:?}", old.id(), old.path());
-            eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
-        }
     }
 }

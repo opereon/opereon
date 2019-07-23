@@ -9,10 +9,7 @@ pub struct ExecManager {
 impl ExecManager {
     pub fn new(config: ConfigRef) -> ExecManager {
         let cache = LruCache::new(10); //FIXME (jc) add config param
-        ExecManager {
-            config,
-            cache,
-        }
+        ExecManager { config, cache }
     }
 
     /*fn config(&self) -> &ModelConfig {

@@ -10,7 +10,11 @@ pub struct ParallelOperation {
 }
 
 impl ParallelOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef, steps: Vec<OperationRef>) -> Result<ParallelOperation, RuntimeError> {
+    pub fn new(
+        operation: OperationRef,
+        engine: EngineRef,
+        steps: Vec<OperationRef>,
+    ) -> Result<ParallelOperation, RuntimeError> {
         let n = steps.len();
         let mut steps_ = Vec::with_capacity(steps.len());
         for s in steps {
@@ -35,8 +39,8 @@ impl Future for ParallelOperation {
         for (i, s) in self.steps.iter_mut().enumerate() {
             if self.outcomes[i].is_none() {
                 if let Async::Ready(Some(p)) = s.progress.poll()? {
-                    self.operation.write().update_progress( p);
-//                    self.operation.write().update_progress_step(i, p);
+                    self.operation.write().update_progress(p);
+                    //                    self.operation.write().update_progress_step(i, p);
                 }
                 if let Async::Ready(outcome) = s.outcome.poll()? {
                     self.outcomes[i] = Some(outcome);
@@ -45,7 +49,12 @@ impl Future for ParallelOperation {
             }
         }
         if self.count == self.steps.len() {
-            Ok(Async::Ready(Outcome::Many(self.outcomes.iter_mut().map(|o| o.take().unwrap()).collect())))
+            Ok(Async::Ready(Outcome::Many(
+                self.outcomes
+                    .iter_mut()
+                    .map(|o| o.take().unwrap())
+                    .collect(),
+            )))
         } else {
             Ok(Async::NotReady)
         }
@@ -54,7 +63,12 @@ impl Future for ParallelOperation {
 
 impl OperationImpl for ParallelOperation {
     fn init(&mut self) -> Result<(), RuntimeError> {
-        self.operation.write().progress = Progress::from_steps(self.steps.iter().map(|o| o.operation.read().progress.clone()).collect());
+        self.operation.write().progress = Progress::from_steps(
+            self.steps
+                .iter()
+                .map(|o| o.operation.read().progress.clone())
+                .collect(),
+        );
         Ok(())
     }
 }

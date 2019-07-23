@@ -1,6 +1,8 @@
 use super::*;
-use crate::{ProtoError, FileError};
-use kg_diag::{Diag, BasicDiag};
+use crate::{FileError, ProtoError};
+use kg_diag::{BasicDiag, Diag};
+
+pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 //FIXME (jc)
 #[derive(Debug, Detail)]
@@ -10,7 +12,7 @@ pub enum RuntimeError {
     Cancelled,
     #[diag(code = 2)]
     Io,
-//    Io(Box<kg_diag::Diag>),
+    //    Io(Box<kg_diag::Diag>),
     #[diag(code = 3)]
     Custom,
 }
@@ -25,7 +27,6 @@ impl Diag for RuntimeError {
     }
 }
 
-
 //FIXME (jc)
 impl From<std::io::Error> for RuntimeError {
     fn from(err: std::io::Error) -> Self {
@@ -35,16 +36,16 @@ impl From<std::io::Error> for RuntimeError {
 }
 
 //FIXME (jc)
-impl From<kg_io::IoError> for RuntimeError {
-    fn from(err: kg_io::IoError) -> Self {
+impl From<kg_diag::IoError> for RuntimeError {
+    fn from(err: kg_diag::IoError) -> Self {
         println!("kg_io err: {}", err);
         RuntimeError::Io
     }
 }
 
 //FIXME (jc)
-impl From<kg_tree::opath::OpathRuntimeError> for RuntimeError {
-    fn from(_err: kg_tree::opath::OpathRuntimeError) -> Self {
+impl From<kg_tree::opath::ExprErrorDetail> for RuntimeError {
+    fn from(_err: kg_tree::opath::ExprErrorDetail) -> Self {
         println!("opath err");
         RuntimeError::Custom
     }
@@ -90,7 +91,13 @@ impl From<SshError> for RuntimeError {
     }
 }
 
-
+//FIXME ws
+impl From<std::fmt::Error> for RuntimeError {
+    fn from(err: std::fmt::Error) -> Self {
+        println!("fmt err {:?}", err);
+        RuntimeError::Custom
+    }
+}
 
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

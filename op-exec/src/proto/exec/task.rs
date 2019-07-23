@@ -9,7 +9,14 @@ pub struct TaskExec {
 }
 
 impl TaskExec {
-    pub fn create(_model: &Model, _proc: &ProcDef, task: &TaskDef, _host: &HostDef, _proc_exec: &ProcExec, _step_exec: &StepExec) -> Result<TaskExec, ProtoError> {
+    pub fn create(
+        _model: &Model,
+        _proc: &ProcDef,
+        task: &TaskDef,
+        _host: &HostDef,
+        _proc_exec: &ProcExec,
+        _step_exec: &StepExec,
+    ) -> Result<TaskExec, ProtoError> {
         Ok(TaskExec {
             name: task.label().to_string(),
             kind: task.kind(),
@@ -29,7 +36,6 @@ impl TaskExec {
         &self.task_path
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskResult {

@@ -12,7 +12,13 @@ pub struct StepExec {
 }
 
 impl StepExec {
-    pub fn create(model: &Model, proc: &ProcDef, step: &Step, host: &HostDef, proc_exec: &ProcExec) -> Result<StepExec, ProtoError> {
+    pub fn create(
+        model: &Model,
+        proc: &ProcDef,
+        step: &Step,
+        host: &HostDef,
+        proc_exec: &ProcExec,
+    ) -> Result<StepExec, ProtoError> {
         let mut step_exec = StepExec {
             step: step.index(),
             // only set host_path if host is defined inside the model
