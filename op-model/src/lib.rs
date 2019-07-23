@@ -20,7 +20,6 @@ use kg_diag::io::fs;
 use kg_tree::*;
 use kg_tree::diff::*;
 use kg_tree::opath::*;
-use kg_tree::*;
 use kg_utils::collections::LinkedHashMap;
 
 use self::config::*;
