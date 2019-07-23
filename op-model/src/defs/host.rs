@@ -10,14 +10,14 @@ pub struct HostDef {
 }
 
 impl HostDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> HostDef {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsResult<HostDef> {
         let mut h = HostDef {
             root,
             node,
             hostname: String::new(),
         };
-        h.hostname = get_expr(&h, "fqdn or hostname");
-        h
+        h.hostname = get_expr(&h, "fqdn or hostname")?;
+        Ok(h)
     }
 
     pub fn hostname(&self) -> &str {
@@ -43,16 +43,22 @@ impl ModelDef for HostDef {
 }
 
 impl ParsedModelDef for HostDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
+        let kind = node.data().kind();
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(props.contains_key("hostname"), "host definition must contain 'hostname' property")?;
-                perr_assert!(props.contains_key("ssh_dest"), "host definition must contain 'ssh_dest' property")?;
+                if !props.contains_key("hostname") {
+                    return Err(DefsErrorDetail::HostMissingHostname.into());
+                }
+
+                if !props.contains_key("ssh_dest") {
+                    return Err(DefsErrorDetail::HostMissingSshDest.into());
+                }
             }
             _ => {
-                perr!("host definition must be an object")?;
+                return Err(DefsErrorDetail::HostNonObject { kind }.into());
             }
         }
-        Ok(HostDef::new(parent.root().clone(), node.clone()))
+        Ok(HostDef::new(parent.root().clone(), node.clone())?)
     }
 }

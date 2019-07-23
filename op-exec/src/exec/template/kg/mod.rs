@@ -7,7 +7,7 @@ pub struct TemplateResolver {
 }
 
 impl TemplateResolver {
-    pub (super) fn new(engine: EngineRef) -> TemplateResolver {
+    pub(super) fn new(engine: EngineRef) -> TemplateResolver {
         let cfg = engine.read().config().exec().template().kg().clone();
         TemplateResolver {
             parser: Parser::with_config(cfg),
@@ -16,7 +16,14 @@ impl TemplateResolver {
 }
 
 impl TemplateExecutor for TemplateResolver {
-    fn process_template(&mut self, _engine: &EngineRef, task: &TaskDef, src_path: &Path, dst_path: &Path, _log: &OutputLog) -> Result<TaskResult, RuntimeError> {
+    fn process_template(
+        &mut self,
+        _engine: &EngineRef,
+        task: &TaskDef,
+        src_path: &Path,
+        dst_path: &Path,
+        _log: &OutputLog,
+    ) -> RuntimeResult<TaskResult> {
         let template = {
             let mut f = FileBuffer::open(src_path)?;
             let mut r = f.char_reader();
@@ -31,7 +38,9 @@ impl TemplateExecutor for TemplateResolver {
         };
 
         let mut res = String::new();
-        template.render_ext(task.root(), task.node(), task.scope(), &mut res).unwrap(); //FIXME (jc)
+        template
+            .render_ext(task.root(), task.node(), task.scope()?, &mut res)
+            .unwrap(); //FIXME (jc)
 
         if let Some(p) = dst_path.parent() {
             std::fs::create_dir_all(p)?;
@@ -41,4 +50,3 @@ impl TemplateExecutor for TemplateResolver {
         Ok(TaskResult::new(Outcome::Empty, Some(0), None))
     }
 }
-

@@ -5,21 +5,31 @@ pub struct ArgumentSet(Vec<ValueDef>);
 
 impl ArgumentSet {
     pub fn new(node_set: &NodeSet, root: &NodeRef) -> ArgumentSet {
-        ArgumentSet(node_set.iter().map(|n| {
-            if n.data().is_root() && !n.is_ref_eq(root) {
-                ValueDef::Static(n.clone())
-            } else {
-                ValueDef::Resolvable(n.path())
-            }
-        }).collect())
+        ArgumentSet(
+            node_set
+                .iter()
+                .map(|n| {
+                    if n.data().is_root() && !n.is_ref_eq(root) {
+                        ValueDef::Static(n.clone())
+                    } else {
+                        ValueDef::Resolvable(n.path())
+                    }
+                })
+                .collect(),
+        )
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {
+    pub fn resolve(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> RuntimeResult<NodeSet> {
         let mut n = Vec::new();
         for v in self.0.iter() {
-            n.push(v.resolve(root, current, scope).into_one().unwrap());
+            n.push(v.resolve(root, current, scope)?.into_one().unwrap());
         }
-        n.into()
+        Ok(n.into())
     }
 }
 
@@ -35,11 +45,17 @@ impl Arguments {
         self.0.insert(name, value);
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) {
+    pub fn resolve(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &ScopeMut,
+    ) -> RuntimeResult<()> {
         for (k, v) in self.0.iter() {
-            let n = v.resolve(root, current, scope);
+            let n = v.resolve(root, current, scope)?;
             scope.set_var(k.clone(), n);
         }
+        Ok(())
     }
 
     pub fn is_empty(&self) -> bool {

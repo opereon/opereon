@@ -7,8 +7,7 @@ pub use self::host::Host;
 pub use self::user::User;
 
 mod error;
+mod exec;
+mod group;
 mod host;
 mod user;
-mod group;
-mod exec;
-

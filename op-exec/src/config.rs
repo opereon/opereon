@@ -35,7 +35,6 @@ pub fn parse_path_list(path_list: &str) -> Vec<PathBuf> {
     paths
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DaemonConfig {
@@ -62,7 +61,6 @@ impl Default for DaemonConfig {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QueueConfig {
@@ -82,7 +80,6 @@ impl Default for QueueConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -109,7 +106,6 @@ impl Default for ModelConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -160,7 +156,6 @@ impl Default for LogConfig {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -175,7 +170,7 @@ pub struct Config {
 
 impl Config {
     //FIXME (jc) add proper error type
-    fn read(path_list: &str) -> IoResult<Config> {
+    fn read(path_list: &str) -> RuntimeResult<Config> {
         let d = to_tree(&Config::default()).unwrap();
         let paths = parse_path_list(path_list);
         let mut read_paths = 0;
@@ -190,30 +185,31 @@ impl Config {
                 Err(err) => {
                     //ignore non-existent paths for now
                     if err.kind() != std::io::ErrorKind::NotFound {
-                        return Err(err);
+                        return Err(err.into());
                     }
                 }
             }
         }
         if read_paths == 0 {
-            return Err(std::io::ErrorKind::NotFound.into());
+            // FIXME ws
+            panic!("Config not found!");
         }
 
         let mut r = TreeResolver::with_delims("${", "}");
-        r.resolve_custom(RootedResolveStrategy, &d);
+        r.resolve_custom(RootedResolveStrategy, &d)?;
 
         let conf: Self = from_tree(&d).unwrap(); //FIXME (jc) handle errors
         Ok(conf)
     }
 
     //FIXME (jc) add proper error type
-    fn from_json(json: &str) -> Result<Config, std::io::Error> {
+    fn from_json(json: &str) -> RuntimeResult<Config> {
         let d = to_tree(&Config::default()).unwrap();
         let c: NodeRef = NodeRef::from_json(&json).unwrap(); //FIXME (jc) handle parse errors
         d.extend(c, None).unwrap(); //FIXME (jc) handle errors
 
         let mut r = TreeResolver::with_delims("${", "}");
-        r.resolve_custom(RootedResolveStrategy, &d);
+        r.resolve_custom(RootedResolveStrategy, &d)?;
 
         let conf: Self = from_tree(&d).unwrap(); //FIXME (jc) handle errors
         Ok(conf)
@@ -272,12 +268,12 @@ impl std::fmt::Display for Config {
 pub struct ConfigRef(Arc<Config>);
 
 impl ConfigRef {
-    pub fn read(path_list: &str) -> IoResult<ConfigRef> {
+    pub fn read(path_list: &str) -> RuntimeResult<ConfigRef> {
         let config = Config::read(path_list)?;
         Ok(ConfigRef(Arc::new(config)))
     }
 
-    pub fn from_json(json: &str) -> Result<ConfigRef, std::io::Error> {
+    pub fn from_json(json: &str) -> RuntimeResult<ConfigRef> {
         let config = Config::from_json(json)?;
         Ok(ConfigRef(Arc::new(config)))
     }

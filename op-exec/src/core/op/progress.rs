@@ -20,7 +20,6 @@ impl Unit {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Progress {
     value: f64,
@@ -29,7 +28,7 @@ pub struct Progress {
     unit: Unit,
     steps: Vec<Progress>,
     counter: u32,
-    file_name: Option<String>
+    file_name: Option<String>,
 }
 
 impl Progress {
@@ -41,11 +40,11 @@ impl Progress {
             unit,
             steps: Vec::new(),
             counter: 0,
-            file_name: None
+            file_name: None,
         }
     }
 
-    pub fn with_file_name(min: f64, max: f64, unit: Unit, file_name: String) -> Progress{
+    pub fn with_file_name(min: f64, max: f64, unit: Unit, file_name: String) -> Progress {
         Progress {
             file_name: Some(file_name),
             ..Progress::new(min, max, unit)
@@ -64,7 +63,7 @@ impl Progress {
                 unit: units[0],
                 steps,
                 counter: 0,
-                file_name: None
+                file_name: None,
             }
         } else {
             Progress {
@@ -74,7 +73,7 @@ impl Progress {
                 unit: Unit::Step,
                 steps,
                 counter: 0,
-                file_name: None
+                file_name: None,
             }
         }
     }
@@ -119,7 +118,10 @@ impl Progress {
         let u = self.steps[step].set_value(value);
         if u {
             if self.unit == Unit::Step {
-                self.value = self.steps.iter().fold(1., |v, s| v + s.is_done() as u32 as f64);
+                self.value = self
+                    .steps
+                    .iter()
+                    .fold(1., |v, s| v + s.is_done() as u32 as f64);
             } else {
                 self.value = self.steps.iter().fold(0., |v, s| v + s.value - s.min);
             }
@@ -131,7 +133,10 @@ impl Progress {
     pub fn set_step(&mut self, step: usize, progress: Progress) {
         self.steps[step] = progress;
         if self.unit == Unit::Step {
-            self.value = self.steps.iter().fold(1., |v, s| v + s.is_done() as u32 as f64);
+            self.value = self
+                .steps
+                .iter()
+                .fold(1., |v, s| v + s.is_done() as u32 as f64);
         } else {
             self.value = self.steps.iter().fold(0., |v, s| v + s.value - s.min);
         }
@@ -163,7 +168,7 @@ impl Progress {
         self.file_name.as_ref()
     }
 
-    pub (super) fn counter(&self) -> u32 {
+    pub(super) fn counter(&self) -> u32 {
         self.counter
     }
 }
@@ -177,7 +182,7 @@ impl Default for Progress {
             unit: Unit::Scalar,
             steps: Vec::new(),
             counter: 0,
-            file_name: None
+            file_name: None,
         }
     }
 }

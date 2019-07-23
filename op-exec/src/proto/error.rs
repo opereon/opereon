@@ -1,3 +1,5 @@
+use kg_diag::BasicDiag;
+
 //FIXME (jc)
 #[derive(Debug, Clone)]
 pub enum ProtoError {
@@ -32,15 +34,22 @@ impl From<kg_tree::opath::OpathParseError> for ProtoError {
     }
 }
 
-impl From<kg_tree::opath::OpathRuntimeError> for ProtoError {
-    fn from(err: kg_tree::opath::OpathRuntimeError) -> Self {
+impl From<kg_tree::opath::ExprErrorDetail> for ProtoError {
+    fn from(err: kg_tree::opath::ExprErrorDetail) -> Self {
         eprintln!("{:?}", err);
         unimplemented!()
     }
 }
 
-impl From<op_model::DefsParseError> for ProtoError {
-    fn from(err: op_model::DefsParseError) -> Self {
+impl From<op_model::DefsErrorDetail> for ProtoError {
+    fn from(err: op_model::DefsErrorDetail) -> Self {
+        eprintln!("{:?}", err);
+        unimplemented!()
+    }
+}
+
+impl From<BasicDiag> for ProtoError {
+    fn from(err: BasicDiag) -> Self {
         eprintln!("{:?}", err);
         unimplemented!()
     }

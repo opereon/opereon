@@ -3,7 +3,7 @@ use std::str::FromStr;
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all="kebab-case")]
+#[serde(rename_all = "kebab-case")]
 pub enum ProcKind {
     Exec,
     Check,
@@ -12,7 +12,7 @@ pub enum ProcKind {
 }
 
 impl FromStr for ProcKind {
-    type Err = DefsParseError;
+    type Err = DefsErrorDetail;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -20,7 +20,9 @@ impl FromStr for ProcKind {
             "update" => Ok(ProcKind::Update),
             "check" => Ok(ProcKind::Check),
             "probe" => Ok(ProcKind::Probe),
-            _ => perr!("unknown proc kind"), //FIXME (jc)
+            unknown => Err(DefsErrorDetail::UnknownProcKind {
+                value: unknown.to_string(),
+            }),
         }
     }
 }
@@ -30,7 +32,6 @@ impl Default for ProcKind {
         ProcKind::Exec
     }
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProcDef {
@@ -110,17 +111,17 @@ impl ScopedModelDef for ProcDef {
         self.as_scoped().scope_def()
     }
 
-    fn scope(&self) -> &Scope {
+    fn scope(&self) -> DefsResult<&Scope> {
         self.as_scoped().scope()
     }
 
-    fn scope_mut(&self) -> &ScopeMut {
+    fn scope_mut(&self) -> DefsResult<&ScopeMut> {
         self.as_scoped().scope_mut()
     }
 }
 
 impl ParsedModelDef for ProcDef {
-    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         let mut p = ProcDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: ProcKind::Exec,
@@ -140,11 +141,12 @@ impl ParsedModelDef for ProcDef {
                 } else if let Some(n) = props.get("proc") {
                     p.kind = ProcKind::from_str(&n.data().as_string())?;
                 } else {
-                    return perr!("procedure must have defined 'proc' property");
+                    return Err(DefsErrorDetail::ProcMissingProc.into());
                 }
 
                 if p.kind == ProcKind::Update {
                     if let Some(wn) = node.get_child_key("watch") {
+                        let kind = wn.data().kind();
                         match *wn.data().value() {
                             Value::Object(ref props) => {
                                 for (k, v) in props.iter() {
@@ -153,10 +155,11 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return perr!("watch definition must be an object"), //FIXME (jc)
+                            _ => return Err(DefsErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                     if let Some(wn) = node.get_child_key("watch_file") {
+                        let kind = wn.data().kind();
                         match *wn.data().value() {
                             Value::Object(ref props) => {
                                 for (k, v) in props.iter() {
@@ -165,20 +168,25 @@ impl ParsedModelDef for ProcDef {
                                 }
                             }
                             Value::Null => {}
-                            _ => return perr!("watch definition must be an object"), //FIXME (jc)
+                            _ => return Err(DefsErrorDetail::ProcWatchNonObject { kind }.into()),
                         }
                     }
                 }
 
                 p.run = Run::parse(model, &p.scoped, node)?;
             }
-            _ => return perr!("procedure definition must be an object"), //FIXME (jc)
+            _ => {
+                return Err(DefsErrorDetail::ProcNonObject {
+                    kind: node.data().kind(),
+                }
+                .into())
+            }
         }
 
-        p.id = get_expr(&p, "@.id or @.@key");
-        p.label = get_expr(&p, "@.label or @.id or @.@key");
-        p.path = get_expr(&p, "@.@file_path_abs");
-        p.dir = get_expr(&p, "@.@dir_abs");
+        p.id = get_expr(&p, "@.id or @.@key")?;
+        p.label = get_expr(&p, "@.label or @.id or @.@key")?;
+        p.path = get_expr(&p, "@.@file_path_abs")?;
+        p.dir = get_expr(&p, "@.@dir_abs")?;
 
         Ok(p)
     }

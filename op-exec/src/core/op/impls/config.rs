@@ -8,10 +8,7 @@ pub struct ConfigGetOperation {
 
 impl ConfigGetOperation {
     pub fn new(operation: OperationRef, engine: EngineRef) -> ConfigGetOperation {
-        ConfigGetOperation {
-            operation,
-            engine,
-        }
+        ConfigGetOperation { operation, engine }
     }
 }
 
@@ -25,5 +22,4 @@ impl Future for ConfigGetOperation {
     }
 }
 
-impl OperationImpl for ConfigGetOperation { }
-
+impl OperationImpl for ConfigGetOperation {}

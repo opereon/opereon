@@ -10,14 +10,14 @@ pub struct UserDef {
 }
 
 impl UserDef {
-    pub fn new(root: NodeRef, node: NodeRef) -> UserDef {
+    pub fn new(root: NodeRef, node: NodeRef) -> DefsResult<UserDef> {
         let mut u = UserDef {
             root,
             node,
             username: String::new(),
         };
-        u.username = get_expr(&u, "username");
-        u
+        u.username = get_expr(&u, "username")?;
+        Ok(u)
     }
 
     pub fn username(&self) -> &str {
@@ -43,15 +43,20 @@ impl ModelDef for UserDef {
 }
 
 impl ParsedModelDef for UserDef {
-    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> Result<Self, DefsParseError> {
+    fn parse(_model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         match *node.data().value() {
             Value::Object(ref props) => {
-                perr_assert!(props.contains_key("username"), "user definition must have 'username' property")?; //FIXME (jc)
+                if !props.contains_key("username") {
+                    return Err(DefsErrorDetail::UserMissingUsername.into());
+                }
             }
             _ => {
-                perr!("user definition must be an object")?; //FIXME (jc)
+                return Err(DefsErrorDetail::UserNonObject {
+                    kind: node.data().kind(),
+                }
+                .into());
             }
         }
-        Ok(UserDef::new(parent.root().clone(), node.clone()))
+        Ok(UserDef::new(parent.root().clone(), node.clone())?)
     }
 }

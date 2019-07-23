@@ -7,6 +7,4 @@ pub struct User {
     groups: Vec<Group>,
 }
 
-impl User {
-
-}
+impl User {}
