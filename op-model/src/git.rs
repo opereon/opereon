@@ -1,7 +1,9 @@
 use crate::Sha1Hash;
-use git2::{Commit, ErrorCode, IndexAddOption, Oid, Repository, RepositoryInitOptions, Signature, Tree, Odb};
-use kg_diag::{BasicDiag, ResultExt};
+use git2::{
+    Commit, ErrorCode, IndexAddOption, Odb, Oid, Repository, RepositoryInitOptions, Signature, Tree,
+};
 use kg_diag::Severity;
+use kg_diag::{BasicDiag, ResultExt};
 use std::path::{Path, PathBuf};
 
 pub type GitError = BasicDiag;
@@ -25,7 +27,10 @@ pub enum GitErrorDetail {
     #[display(fmt = "cannot get git index: '{err}'")]
     GetIndex { err: git2::Error },
 
-    #[display(fmt = "cannot get file '{file_display}': '{err}'", file_display="file.display()")]
+    #[display(
+        fmt = "cannot get file '{file_display}': '{err}'",
+        file_display = "file.display()"
+    )]
     GetFile { file: PathBuf, err: git2::Error },
 
     #[display(fmt = "cannot find git object: '{err}'")]
@@ -41,9 +46,7 @@ pub enum GitErrorDetail {
     UnexpectedObjectType { err: git2::Error },
 
     #[display(fmt = "git error occurred: '{err}'")]
-    Custom {
-        err: git2::Error
-    },
+    Custom { err: git2::Error },
 }
 
 /// Struct to manage git repository
@@ -56,12 +59,10 @@ impl GitManager {
     pub fn new<P: AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
         let repo: Repository = Repository::open(repo_dir.as_ref())
             .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
-        Ok(Self {
-            repo,
-        })
+        Ok(Self { repo })
     }
 
-    fn repo(&self) -> &Repository{
+    fn repo(&self) -> &Repository {
         &self.repo
     }
 
@@ -97,7 +98,10 @@ impl GitManager {
     }
 
     /// Creates new git repository
-    pub fn init_new_repository<P: AsRef<Path>>(path: P, opts: &RepositoryInitOptions) -> GitResult<()> {
+    pub fn init_new_repository<P: AsRef<Path>>(
+        path: P,
+        opts: &RepositoryInitOptions,
+    ) -> GitResult<()> {
         let _repo = Repository::init_opts(path.as_ref(), opts)
             .map_err(|err| GitErrorDetail::CreateRepository { err })
             .into_diag()?;
@@ -106,7 +110,9 @@ impl GitManager {
 
     /// Resolves revision string to git object id (Sha1Hash)
     pub fn resolve_revision_str(&self, spec: &str) -> GitResult<Sha1Hash> {
-        let obj = self.repo().revparse_single(spec)
+        let obj = self
+            .repo()
+            .revparse_single(spec)
             .map_err(|err| GitErrorDetail::RevisionNotFound { err })?;
         Ok(obj.id().into())
     }
@@ -123,15 +129,20 @@ impl GitManager {
             },
         };
 
-        let obj = obj.resolve().map_err(|err| GitErrorDetail::ResolveReference { err })?;
-        let commit = obj.peel_to_commit().map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
+        let obj = obj
+            .resolve()
+            .map_err(|err| GitErrorDetail::ResolveReference { err })?;
+        let commit = obj
+            .peel_to_commit()
+            .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
 
         Ok(Some(commit))
     }
 
     /// Get git tree for provided `oid`
     pub fn get_tree(&self, oid: &Sha1Hash) -> GitResult<Tree> {
-        let obj = self.repo()
+        let obj = self
+            .repo()
             .find_object(oid.as_oid(), None)
             .map_err(|err| GitErrorDetail::FindObject { err })?;
 
@@ -144,42 +155,55 @@ impl GitManager {
     /// Update provided repository index and return created tree Oid.
     /// Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes.
     pub fn update_index(&self) -> GitResult<Oid> {
-        let mut index = self.repo().index()
+        let mut index = self
+            .repo()
+            .index()
             .map_err(|err| GitErrorDetail::GetIndex { err })?;
 
-        index.clear().map_err(|err| GitErrorDetail::Custom { err })?;
+        index
+            .clear()
+            .map_err(|err| GitErrorDetail::Custom { err })?;
         index
             .add_all(&["*"], IndexAddOption::default(), None)
             .map_err(|err| GitErrorDetail::Custom { err })?;
 
         // Changes in index won't be saved to disk until index.write*() called.
-        let oid = index.write_tree().map_err(|err| GitErrorDetail::Custom { err })?;
+        let oid = index
+            .write_tree()
+            .map_err(|err| GitErrorDetail::Custom { err })?;
         Ok(oid)
     }
 
     /// Searches `tree` for object under `path` and returns its data.
     pub fn read_obj_data<P: AsRef<Path>>(&self, tree: &Tree, path: P) -> GitResult<Vec<u8>> {
-        let odb = self.repo().odb().map_err(|err|GitErrorDetail::Custom {err})?;
+        let odb = self
+            .repo()
+            .odb()
+            .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        let entry = tree.get_path(path.as_ref()).map_err(|err|GitErrorDetail::GetFile {
-            file: path.as_ref().to_path_buf(),
-            err
-        })?;
-        let obj = odb.read(entry.id()).map_err(|err|GitErrorDetail::GetFile {
-            file: path.as_ref().to_path_buf(),
-            err
-        })?;
+        let entry = tree
+            .get_path(path.as_ref())
+            .map_err(|err| GitErrorDetail::GetFile {
+                file: path.as_ref().to_path_buf(),
+                err,
+            })?;
+        let obj = odb
+            .read(entry.id())
+            .map_err(|err| GitErrorDetail::GetFile {
+                file: path.as_ref().to_path_buf(),
+                err,
+            })?;
 
         Ok(obj.data().to_owned())
     }
 
     pub fn odb(&self) -> GitResult<Odb> {
-        self.repo().odb().map_err(|err|GitErrorDetail::Custom {err}).into_diag()
+        self.repo()
+            .odb()
+            .map_err(|err| GitErrorDetail::Custom { err })
+            .into_diag()
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -264,4 +288,3 @@ mod tests {
         }
     }
 }
-

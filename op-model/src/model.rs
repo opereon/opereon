@@ -94,8 +94,18 @@ impl FuncCallable for LoadFileFunc {
         if args.count() == 1 {
             for path in paths.into_iter() {
                 let path = PathBuf::from(path.as_string());
-                let entry = tree.get_path(&path).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
-                let obj = odb.read(entry.id()).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
+                let entry = tree
+                    .get_path(&path)
+                    .map_err(|err| GitErrorDetail::GetFile {
+                        file: path.clone(),
+                        err,
+                    })?;
+                let obj = odb
+                    .read(entry.id())
+                    .map_err(|err| GitErrorDetail::GetFile {
+                        file: path.clone(),
+                        err,
+                    })?;
 
                 let format = path.extension().map_or(FileFormat::Text, |ext| {
                     FileFormat::from(ext.to_str().unwrap())
@@ -115,8 +125,18 @@ impl FuncCallable for LoadFileFunc {
 
             for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                 let path = PathBuf::from(p.as_string());
-                let entry = tree.get_path(&path).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
-                let obj = odb.read(entry.id()).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
+                let entry = tree
+                    .get_path(&path)
+                    .map_err(|err| GitErrorDetail::GetFile {
+                        file: path.clone(),
+                        err,
+                    })?;
+                let obj = odb
+                    .read(entry.id())
+                    .map_err(|err| GitErrorDetail::GetFile {
+                        file: path.clone(),
+                        err,
+                    })?;
 
                 let format: FileFormat = f.data().as_string().as_ref().into();
 
@@ -216,8 +236,12 @@ impl Model {
                 if let Some(inc) = config.find_include(&path, file_type) {
                     let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                    let obj = odb.read(entry.id())
-                        .map_err(|err|GitErrorDetail::GetFile {file: entry.name().unwrap().into(), err})?;
+                    let obj = odb
+                        .read(entry.id())
+                        .map_err(|err| GitErrorDetail::GetFile {
+                            file: entry.name().unwrap().into(),
+                            err,
+                        })?;
 
                     let n = NodeRef::binary(obj.data());
                     n.data_mut().set_file(Some(&file_info));
@@ -246,8 +270,8 @@ impl Model {
             } else {
                 TreeWalkResult::Ok
             }
-        }).map_err(|err|GitErrorDetail::Custom {err})?;
-
+        })
+        .map_err(|err| GitErrorDetail::Custom { err })?;
 
         if let Some(err) = walk_err {
             return Err(err);

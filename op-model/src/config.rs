@@ -266,7 +266,6 @@ pub struct ConfigResolver {
 
 impl ConfigResolver {
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
-
         let git = GitManager::new(model_dir)?;
         let odb = git.odb()?;
         let commit_tree = git.get_tree(commit_hash)?;
@@ -284,10 +283,14 @@ impl ConfigResolver {
                 }
 
                 let mut inner = || -> ModelResult<()> {
-                    let obj = odb.read(entry.id())
-                        .map_err(|err|GitErrorDetail::GetFile {file: entry.name().unwrap().into(), err})?;
-                    let content =
-                        String::from_utf8(obj.data().to_vec()).map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
+                    let obj = odb
+                        .read(entry.id())
+                        .map_err(|err| GitErrorDetail::GetFile {
+                            file: entry.name().unwrap().into(),
+                            err,
+                        })?;
+                    let content = String::from_utf8(obj.data().to_vec())
+                        .map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
 
                     // FIXME ws error handling
                     let config: Config = toml::from_str(&content).unwrap();
@@ -302,7 +305,7 @@ impl ConfigResolver {
                     TreeWalkResult::Ok
                 }
             })
-            .map_err(|err|GitErrorDetail::Custom {err})?;
+            .map_err(|err| GitErrorDetail::Custom { err })?;
 
         if let Some(err) = walk_err {
             return Err(err);

@@ -1,13 +1,11 @@
-use git2::{
-    Signature, RepositoryInitOptions
-};
+use git2::{RepositoryInitOptions, Signature};
 
 use super::*;
 use crate::core::error::RuntimeResult;
 use crate::ConfigRef;
 use kg_io::IoResult;
 use kg_utils::collections::LruCache;
-use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME, GitManager};
+use op_model::{GitManager, ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
 
