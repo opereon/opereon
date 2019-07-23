@@ -78,7 +78,7 @@ mod tests {
     fn can_deserialize_from_host_def() {
         let n = NodeRef::from_json(as_json()).unwrap();
 
-        let host_def = HostDef::new(n.clone(), n.clone());
+        let host_def = HostDef::new(n.clone(), n.clone()).unwrap();
         let host = Host::from_def(&host_def).unwrap();
 
         assert_eq!(as_host(), host);

@@ -362,20 +362,20 @@ total size is 2,099  speedup is 1.33 (DRY RUN)
         }
     }
 
-    #[test]
-    fn rsync_compare_() {
-        let config = RsyncConfig::default();
-        let mut p = RsyncParams::new(
-            "./",
-            "../op-model/test-data/model2/",
-            "../op-model/test-data/model1/",
-        );
-        p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.opereon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
-
-        let diffs = rsync_compare(&config, &p, true).unwrap();
-        println!("{}", diffs.len());
-        for d in diffs {
-            println!("{:?}", d);
-        }
-    }
+//    #[test]
+//    fn rsync_compare_() {
+//        let config = RsyncConfig::default();
+//        let mut p = RsyncParams::new(
+//            "./",
+//            "../op-model/test-data/model2/",
+//            "../op-model/test-data/model1/",
+//        );
+//        p.remote_shell("/bin/ssh ssh://localhost -i ~/.ssh/id_rsa -S /home/outsider/.opereon/run/ssh/outsider-127.0.0.1-22.sock -T -o StrictHostKeyChecking=yes");
+//
+//        let diffs = rsync_compare(&config, &p, true).unwrap();
+//        println!("{}", diffs.len());
+//        for d in diffs {
+//            println!("{:?}", d);
+//        }
+//    }
 }

@@ -467,7 +467,7 @@ mod tests {
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
         let scope = ScopeMut::new();
-        let r = resolve_env(&env, &tree, &tree, &scope);
+        let r = resolve_env(&env, &tree, &tree, &scope).unwrap();
         assert_eq!("localhost.localdomain", r.get("HOST__HOS_TNAME").unwrap())
     }
 
@@ -489,7 +489,7 @@ mod tests {
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
         let scope = ScopeMut::new();
-        let r = resolve_env(&env, &tree, &tree, &scope);
+        let r = resolve_env(&env, &tree, &tree, &scope).unwrap();
 
         assert_eq!("localhost.localdomain", r.get("HOST__HOS_TNAME").unwrap());
         assert_eq!("inner value", r.get("PROP_INN_R1").unwrap());
@@ -513,7 +513,7 @@ mod tests {
         let tree = NodeRef::from_json(tree).unwrap();
         let env = TaskEnv::parse(&tree.get_child_key("env").unwrap()).unwrap();
         let scope = ScopeMut::new();
-        let r = resolve_env(&env, &tree, &tree, &scope);
+        let r = resolve_env(&env, &tree, &tree, &scope).unwrap();
 
         assert_eq!("localhost.localdomain", r.get("HOST_HOSTNAME").unwrap());
         assert_eq!("inner value", r.get("SOME_VAR").unwrap());
