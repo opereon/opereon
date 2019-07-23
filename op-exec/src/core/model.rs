@@ -1,6 +1,5 @@
 use git2::{
-    Commit, ErrorCode, Index, IndexAddOption, ObjectType, Oid, Repository, RepositoryInitOptions,
-    Signature,
+    Signature, RepositoryInitOptions
 };
 
 use super::*;
@@ -136,39 +135,10 @@ impl ModelManager {
     pub fn commit(&mut self, message: &str) -> RuntimeResult<ModelRef> {
         self.init()?;
 
-        let git = GitManager::new(self.model_dir());
+        let git = GitManager::new(self.model_dir())?;
         let signature = Signature::now("opereon", "example@email.com").unwrap();
 
-
-
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let mut index = repo.index().expect("Cannot get index!");
-
-        let oid = Self::update_index(&mut index)?;
-        let parent = Self::find_last_commit(&repo)?;
-        let tree = repo.find_tree(oid).expect("Cannot get tree!");
-        let signature = Signature::now("opereon", "example@email.com").unwrap();
-
-        if let Some(parent) = parent {
-            let _commit = repo
-                .commit(
-                    Some("HEAD"),
-                    &signature,
-                    &signature,
-                    message,
-                    &tree,
-                    &[&parent],
-                )
-                .expect("Cannot commit model!");
-        } else {
-            let _commit = repo
-                .commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
-                .expect("Cannot commit model!");
-        };
-
-        repo.checkout_index(None, None)
-            .expect("Cannot checkout index");
+        let oid = git.commit(message, &signature)?;
 
         self.get(oid.into())
     }
@@ -201,12 +171,7 @@ impl ModelManager {
     /// Returns current model - model represented by content of the git index.
     /// This method loads model on each call.
     pub fn current(&mut self) -> RuntimeResult<ModelRef> {
-        // TODO ws error handling
-        let repo = Repository::open(self.model_dir()).expect("Cannot open repository");
-        let mut index = repo.index().expect("Cannot get index!");
-
-        let oid = Self::update_index(&mut index)?;
-
+        let oid = GitManager::new(self.model_dir())?.update_index()?;
         self.get(oid.into())
     }
 
@@ -252,7 +217,7 @@ impl ModelManager {
     }
 
     fn resolve_revision_str(&self, spec: &str) -> RuntimeResult<Sha1Hash> {
-        let mut git = GitManager::new(self.model_dir());
+        let git = GitManager::new(self.model_dir())?;
         let id = git.resolve_revision_str(spec)?;
         Ok(id)
     }
@@ -264,89 +229,5 @@ impl ModelManager {
 
     fn model_dir(&self) -> &Path {
         &self.model_dir
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use git2::build::CheckoutBuilder;
-    use git2::{DiffFindOptions, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid};
-
-    use super::*;
-
-    #[test]
-    fn checkout_to_dir() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-        let out_dir = current.join(".op/checked_out");
-
-        let commit_hash = Oid::from_str("996d94321d833a918842c69531197f9d368ec4b6")
-            .expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit = repo.find_commit(commit_hash).expect("Cannot find commit");
-        let tree = commit.tree().expect("Cannot get commit tree");
-
-        let mut builder = CheckoutBuilder::new();
-        builder.target_dir(&out_dir);
-        // cannot update current index
-        builder.update_index(false);
-        // override everything in out_dir with commit state
-        builder.force();
-
-        repo.checkout_tree(tree.as_object(), Some(&mut builder))
-            .expect("Cannot checkout tree!");
-    }
-
-    #[test]
-    fn diff() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-
-        let commit_hash1 = Oid::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8")
-            .expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit1 = repo.find_commit(commit_hash1).expect("Cannot find commit");
-        let tree1 = commit1.tree().expect("Cannot get commit tree");
-
-        let mut opts = DiffOptions::new();
-        opts.minimal(true);
-
-        let mut index = repo.index().expect("Cannot get index!");
-
-        //         TODO what about .operc [[exclude]]? Should it be equal to .gitignore?
-        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
-        // Changes in index won't be saved to disk until index.write*() called.
-        index.clear().expect("Cannot clear index");
-        index
-            .add_all(&["*"], IndexAddOption::default(), None)
-            .expect("Cannot update index");
-
-        //        index.write().expect("cannot write index");
-
-        let mut diff = repo
-            .diff_tree_to_workdir_with_index(Some(&tree1), Some(&mut opts))
-            .expect("Cannot get diff");
-
-        let mut find_opts = DiffFindOptions::new();
-        find_opts.renames(true);
-        find_opts.renames_from_rewrites(true);
-        find_opts.remove_unmodified(true);
-
-        diff.find_similar(Some(&mut find_opts))
-            .expect("Cannot find similar!");
-        println!("Diffs:");
-
-        let deltas = diff.deltas();
-        eprintln!("deltas.size_hint() = {:?}", deltas.size_hint());
-        for delta in deltas {
-            println!("======");
-            eprintln!("Change type: {:?}", delta.status());
-            let old = delta.old_file();
-            let new = delta.new_file();
-            eprintln!("old = id: {:?}, path: {:?}", old.id(), old.path());
-            eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
-        }
     }
 }

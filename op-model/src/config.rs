@@ -2,7 +2,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use toml;
 
@@ -266,16 +266,14 @@ pub struct ConfigResolver {
 
 impl ConfigResolver {
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
-        let repo = Repository::open(model_dir).expect("Cannot open repository");
-        let odb = repo.odb().expect("Cannot get git object database"); // FIXME ws error handling
 
-        // FIXME ws error handling
-        let obj = repo
-            .find_object(commit_hash.as_oid(), None)
-            .expect("cannot find object");
-        let commit_tree = obj.peel_to_tree().expect("Non-tree oid found");
+        let git = GitManager::new(model_dir)?;
+        let odb = git.odb()?;
+        let commit_tree = git.get_tree(commit_hash)?;
 
         let mut cr = ConfigResolver::new(&model_dir);
+
+        let mut walk_err = None;
 
         commit_tree
             .walk(TreeWalkMode::PreOrder, |parent_path, entry| {
@@ -284,17 +282,31 @@ impl ConfigResolver {
                 {
                     return TreeWalkResult::Ok;
                 }
-                // FIXME ws error handling
-                let obj = odb.read(entry.id()).expect("Cannot get git object!");
-                let content =
-                    String::from_utf8(obj.data().to_vec()).expect("Config file is not valid utf8!");
 
-                let config: Config = toml::from_str(&content).unwrap();
-                cr.add_file(&model_dir.join(parent_path), config);
+                let mut inner = || -> ModelResult<()> {
+                    let obj = odb.read(entry.id())
+                        .map_err(|err|GitErrorDetail::GetFile {file: entry.name().unwrap().into(), err})?;
+                    let content =
+                        String::from_utf8(obj.data().to_vec()).map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
 
-                TreeWalkResult::Ok
+                    // FIXME ws error handling
+                    let config: Config = toml::from_str(&content).unwrap();
+                    cr.add_file(&model_dir.join(parent_path), config);
+                    Ok(())
+                };
+
+                if let Err(err) = inner() {
+                    walk_err = Some(err);
+                    TreeWalkResult::Abort
+                } else {
+                    TreeWalkResult::Ok
+                }
             })
-            .expect("Error reading git tree"); // FIXME ws error handling
+            .map_err(|err|GitErrorDetail::Custom {err})?;
+
+        if let Some(err) = walk_err {
+            return Err(err);
+        }
 
         let mut configs = BTreeMap::new();
         for path in cr.configs.keys() {

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use git2::{ObjectType, Oid, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
@@ -27,11 +27,14 @@ pub enum ModelErrorDetail {
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
 
+    #[display(fmt = "Config file is not valid utf-8")]
+    ConfigUtf8Err,
+
     #[display(
         fmt = "cannot resolve interpolations: '{detail}'",
         detail = "err.detail()"
     )]
-    InterpolationsResloveErr { err: Box<dyn Diag> },
+    InterpolationsResolveErr { err: Box<dyn Diag> },
 
     #[display(
         fmt = "cannot evaluate expression: '{detail}'",
@@ -61,11 +64,11 @@ pub struct Model {
 #[derive(Debug, Clone)]
 struct LoadFileFunc {
     model_dir: PathBuf,
-    model_oid: Oid,
+    model_oid: Sha1Hash,
 }
 
 impl LoadFileFunc {
-    fn new(model_dir: PathBuf, model_oid: Oid) -> Self {
+    fn new(model_dir: PathBuf, model_oid: Sha1Hash) -> Self {
         Self {
             model_dir,
             model_oid,
@@ -77,13 +80,9 @@ impl FuncCallable for LoadFileFunc {
     fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
         args.check_count_func(&FuncId::Custom(name.to_string()), 1, 2)?;
 
-        // TODO ws error handling
-        let repo = Repository::open(&self.model_dir).expect("Cannot open repository");
-        let odb = repo.odb().expect("Cannot get git object database");
-        let obj = repo
-            .find_object(self.model_oid, None)
-            .expect("cannot find object");
-        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+        let git = GitManager::new(&self.model_dir)?;
+        let tree = git.get_tree(&self.model_oid.into())?;
+        let odb = git.odb()?;
 
         let paths = args.resolve_column(false, 0, env).map_err(|d| {
             FuncCallErrorDetail::FuncCallCustomErr {
@@ -95,13 +94,14 @@ impl FuncCallable for LoadFileFunc {
         if args.count() == 1 {
             for path in paths.into_iter() {
                 let path = PathBuf::from(path.as_string());
-                let entry = tree.get_path(&path).expect("file not found");
-                let obj = odb.read(entry.id()).expect("Cannot find object!");
+                let entry = tree.get_path(&path).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
+                let obj = odb.read(entry.id()).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
 
                 let format = path.extension().map_or(FileFormat::Text, |ext| {
                     FileFormat::from(ext.to_str().unwrap())
                 });
 
+                // FIXME ws error handling
                 let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
                 out.add(node)
             }
@@ -115,11 +115,12 @@ impl FuncCallable for LoadFileFunc {
 
             for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                 let path = PathBuf::from(p.as_string());
-                let entry = tree.get_path(&path).expect("file not found");
-                let obj = odb.read(entry.id()).expect("Cannot find object!");
+                let entry = tree.get_path(&path).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
+                let obj = odb.read(entry.id()).map_err(|err|GitErrorDetail::GetFile {file: path.clone(), err})?;
 
                 let format: FileFormat = f.data().as_string().as_ref().into();
 
+                // FIXME ws error handling
                 let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
                 out.add(node)
             }
@@ -173,13 +174,12 @@ impl Model {
             FileFormat::Binary,
         )));
 
-        let commit = m.metadata.id().as_oid();
+        let commit = m.metadata.id();
         let model_dir = m.metadata.path().to_owned();
-        // FIXME ws error handling
-        let repo = Repository::open(&model_dir).expect("Cannot open repository");
-        let odb = repo.odb().expect("Cannot get git object database");
-        let obj = repo.find_object(commit, None).expect("cannot find object");
-        let tree = obj.peel_to_tree().expect("Non-tree oid found");
+
+        let git = GitManager::new(&model_dir)?;
+        let odb = git.odb()?;
+        let tree = git.get_tree(&commit)?;
 
         let scope = ScopeMut::new();
         scope.set_func(
@@ -216,7 +216,8 @@ impl Model {
                 if let Some(inc) = config.find_include(&path, file_type) {
                     let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                    let obj = odb.read(entry.id()).expect("Cannot get git object!");
+                    let obj = odb.read(entry.id())
+                        .map_err(|err|GitErrorDetail::GetFile {file: entry.name().unwrap().into(), err})?;
 
                     let n = NodeRef::binary(obj.data());
                     n.data_mut().set_file(Some(&file_info));
@@ -245,8 +246,8 @@ impl Model {
             } else {
                 TreeWalkResult::Ok
             }
-        })
-        .expect("Error reading tree"); // FIXME ws error handling
+        }).map_err(|err|GitErrorDetail::Custom {err})?;
+
 
         if let Some(err) = walk_err {
             return Err(err);
@@ -308,7 +309,7 @@ impl Model {
         // interpolations
         let mut resolver = TreeResolver::new();
         resolver.resolve(m.root()).map_err(|err| {
-            BasicDiag::from(ModelErrorDetail::InterpolationsResloveErr { err: Box::new(err) })
+            BasicDiag::from(ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
         })?;
 
         {

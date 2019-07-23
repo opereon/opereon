@@ -97,6 +97,9 @@ pub enum DefsErrorDetail {
     )]
     OpathParseErr { err: Box<dyn Diag> },
 
+    #[display(fmt = "{err}")]
+    GlobParseErr{ err: globset::Error},
+
     #[display(
         fmt = "cannot evaluate expression: '{detail}'",
         detail = "err.detail()"
