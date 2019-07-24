@@ -22,3 +22,11 @@
 	path = kg-template
 	url = git@github.com:Kodegenix/kg-template.git
 	branch = master
+[submodule "kg-js"]
+	path = kg-js
+	url = git@github.com:kodegenix/kg-js.git
+	branch = master
+[submodule "kg-lang"]
+	path = kg-lang
+	url = git@github.com:kodegenix/kg-lang.git
+	branch = master
