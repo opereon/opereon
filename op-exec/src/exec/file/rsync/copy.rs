@@ -808,7 +808,7 @@ mod tests {
             res.unwrap();
         }*/
 
-    #[test]
+    /*#[test]
     fn rsync_copy_() {
         let config = RsyncConfig::default();
         let p = RsyncParams::new("./", "/home/outsider/Down1/", "/home/outsider/Down2/");
@@ -816,5 +816,5 @@ mod tests {
 
         let status = rsync_copy(&config, &p).unwrap();
         println!("{:?}", status);
-    }
+    }*/
 }
