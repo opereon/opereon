@@ -205,7 +205,7 @@ impl GitManager {
     }
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use git2::build::CheckoutBuilder;
     use git2::{DiffFindOptions, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid};
@@ -287,4 +287,4 @@ mod tests {
             eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
         }
     }
-}
+}*/

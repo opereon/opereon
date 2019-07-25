@@ -666,7 +666,7 @@ unsafe impl Send for ModelRef {}
 
 unsafe impl Sync for ModelRef {}
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
@@ -681,4 +681,4 @@ mod tests {
         let model = Model::read_revision(metadata).expect("Cannot read model");
         eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
     }
-}
+}*/
