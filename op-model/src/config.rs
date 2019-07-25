@@ -384,14 +384,13 @@ impl ConfigResolver {
         unreachable!();
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &Config)> {
+    pub fn iter(&self) -> impl Iterator<Item=(&PathBuf, &Config)> {
         self.configs.iter()
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     static CONFIG_STANDARD_TOML: &str = indoc!(r#"
@@ -406,25 +405,25 @@ mod tests {
     path = "**/*"
     file_type = "dir"
     item = "${map()}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_name, $item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_name, $item)}"
 
     [[include]]
     path = "**/_.{yaml,yml,toml,json}"
     file_type = "file"
     item = "${loadFile(@.@file_path, @.@file_ext)}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).extend($item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).extend($item)}"
 
     [[include]]
     path = "**/*.{yaml,yml,toml,json}"
     file_type = "file"
     item = "${loadFile(@.@file_path, @.@file_ext)}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_stem, $item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_stem, $item)}"
 
     [[include]]
     path = "**/*"
     file_type = "file"
     item = "${loadFile(@.@file_path, 'text')}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.')).set($item.@file_stem, $item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_stem, $item)}"
 
     [overrides]
     "#);
@@ -434,6 +433,7 @@ mod tests {
         let config = Config::standard();
 
         let toml = toml::to_string(&config).unwrap();
+        eprint!("toml = {}", toml);
         assert_eq!(&toml, CONFIG_STANDARD_TOML);
     }
 
