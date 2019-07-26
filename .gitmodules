@@ -1,26 +1,26 @@
 [submodule "kg-symbol"]
 	path = kg-symbol
-	url = git@github.com:Kodegenix/kg-symbol.git
+	url = git@github.com:kodegenix/kg-symbol.git
 	branch = master
 [submodule "kg-diag"]
 	path = kg-diag
-	url = git@github.com:Kodegenix/kg-diag.git
+	url = git@github.com:kodegenix/kg-diag.git
 	branch = master
 [submodule "kg-tree"]
 	path = kg-tree
-	url = git@github.com:Kodegenix/kg-tree.git
+	url = git@github.com:kodegenix/kg-tree.git
 	branch = master
 [submodule "kg-display"]
 	path = kg-display
-	url = git@github.com:Kodegenix/kg-display.git
+	url = git@github.com:kodegenix/kg-display.git
 	branch = master
 [submodule "kg-utils"]
 	path = kg-utils
-	url = git@github.com:Kodegenix/kg-utils.git
+	url = git@github.com:kodegenix/kg-utils.git
 	branch = master
 [submodule "kg-template"]
 	path = kg-template
-	url = git@github.com:Kodegenix/kg-template.git
+	url = git@github.com:kodegenix/kg-template.git
 	branch = master
 [submodule "kg-js"]
 	path = kg-js
