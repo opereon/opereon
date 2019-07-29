@@ -8,15 +8,15 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-kg-diag = "0.2.1"
+kg-diag = "0.2.3"
 kg-tree = "0.1.4"
 kg-utils = "0.3.0"
 op-exec = { version = "0.1.1", path = "../op-exec" }
 op-log = {path = "../op-log" }
 structopt = "0.2.18"
 futures = "0.1.28"
-serde = "1.0.97"
-serde_derive = "1.0.97"
+serde = "1.0.98"
+serde_derive = "1.0.98"
 serde_json = "1.0.40"
 serde_yaml = "0.8.9"
 toml = "0.5.1"
