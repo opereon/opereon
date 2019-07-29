@@ -4,6 +4,19 @@
 
 https://opereon.io/
 
+This crate contains code from crates:
+
+* https://github.com/kodegenix/kg-diag/tree/master/kg-diag-derive
+* https://github.com/kodegenix/kg-diag/tree/master/kg-diag
+* https://github.com/kodegenix/kg-display/tree/master/kg-display-derive
+* https://github.com/kodegenix/kg-display/tree/master/kg-display
+* https://github.com/kodegenix/kg-js
+* https://github.com/kodegenix/kg-lang
+* https://github.com/kodegenix/kg-symbol
+* https://github.com/kodegenix/kg-template
+* https://github.com/kodegenix/kg-tree
+* https://github.com/kodegenix/kg-utils
+
 ## Builds statuses for Rust channels
 
 | stable            | beta              | nightly           |
