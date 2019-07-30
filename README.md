@@ -1,6 +1,6 @@
 # opereon
 [![Build Status](https://travis-ci.org/opereon/opereon.svg?branch=master)](https://travis-ci.org/opereon/opereon)
-[![Coverage Status](https://coveralls.io/repos/github/opereon/opereon/badge.svg?branch=master)](https://coveralls.io/github/opereon/opereon?branch=master)
+[![codecov](https://codecov.io/gh/opereon/opereon/branch/master/graph/badge.svg)](https://codecov.io/gh/opereon/opereon)
 
 https://opereon.io/
 
