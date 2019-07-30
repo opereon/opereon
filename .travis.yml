@@ -23,6 +23,6 @@ script:
   - cargo build --verbose
   - cargo test --verbose
   - |
-    zip -0 ccov.zip `find . \( -name "opereon*.gc*" \) -print`;
+    zip -0 ccov.zip `find . \( -name "op*.gc*" \) -print`;
     ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" -o lcov.info;
     bash <(curl -s https://codecov.io/bash) -f lcov.info;
