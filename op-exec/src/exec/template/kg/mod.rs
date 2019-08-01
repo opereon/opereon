@@ -25,7 +25,7 @@ impl TemplateExecutor for TemplateResolver {
         _log: &OutputLog,
     ) -> RuntimeResult<TaskResult> {
         let template = {
-            let mut f = FileBuffer::open(src_path)?;
+            let f = FileBuffer::open(src_path)?;
             let mut r = f.char_reader();
             match self.parser.parse(&mut r) {
                 Ok(t) => t,
