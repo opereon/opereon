@@ -13,6 +13,7 @@ kg-utils = "0.3.1"
 kg-tree = "0.1.4"
 kg-template = "0.1.2"
 kg-symbol= "0.1.10"
+kg-lang = "0.1.1"
 op-model = { version = "0.1.1", path = "../op-model" }
 tokio = "0.1.22"
 tokio-process = "0.2.4"
