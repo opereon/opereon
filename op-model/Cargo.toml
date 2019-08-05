@@ -8,7 +8,7 @@ edition = "2018"
 [dependencies]
 kg-diag = "0.2.3"
 kg-utils = "0.3.1"
-kg-tree = "0.1.4"
+kg-tree = "0.1.5"
 kg-symbol = "0.1.10"
 kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
