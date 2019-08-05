@@ -119,7 +119,6 @@ impl ModelManager {
     pub fn init_model(&mut self) -> RuntimeResult<()> {
         let current_dir = fs::current_dir()?;
 
-        // TODO error handling
         Self::init_git_repo(&current_dir)?;
         Self::init_manifest(&current_dir)?;
         Self::init_operc(&current_dir)?;

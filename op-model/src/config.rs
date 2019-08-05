@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use toml;
 
 use super::*;
 
@@ -292,8 +291,9 @@ impl ConfigResolver {
                     let content = String::from_utf8(obj.data().to_vec())
                         .map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
 
-                    // FIXME ws error handling
-                    let config: Config = toml::from_str(&content).unwrap();
+                    let file_path = model_dir.join(parent_path).join(entry.name().unwrap()).to_string_lossy().to_string();
+                    let config: Config = kg_tree::serial::toml::from_str(&content)
+                        .map_err(|err| ModelErrorDetail::MalformedConfigFile {err: Box::new(err), file_path})?;
                     cr.add_file(&model_dir.join(parent_path), config);
                     Ok(())
                 };

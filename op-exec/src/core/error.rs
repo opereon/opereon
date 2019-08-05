@@ -77,8 +77,8 @@ impl From<FileError> for RuntimeError {
 
 //FIXME (jc)
 impl From<kg_diag::BasicDiag> for RuntimeError {
-    fn from(_err: BasicDiag) -> Self {
-        println!("basic diag err");
+    fn from(err: BasicDiag) -> Self {
+        println!("basic diag err: {}", err);
         RuntimeError::Custom
     }
 }
