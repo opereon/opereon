@@ -1,11 +1,11 @@
 use git2::{RepositoryInitOptions, Signature};
 
 use super::*;
-use crate::{ConfigRef};
+use crate::ConfigRef;
 use kg_utils::collections::LruCache;
-use std::path::{PathBuf, Path};
-use op_model::{Sha1Hash, ModelRef, DEFAULT_MANIFEST_FILENAME};
-use slog::{Record, Serializer, Key, Result as SlogResult};
+use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
+use slog::{Key, Record, Result as SlogResult, Serializer};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "arg")]
@@ -93,10 +93,7 @@ impl ModelManager {
             }
         }
 
-        return Err(IoError::file_not_found(
-            manifest_filename,
-            OpType::Read,
-        ));
+        return Err(IoError::file_not_found(manifest_filename, OpType::Read));
     }
 
     /// Initialize model manager.

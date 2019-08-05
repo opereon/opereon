@@ -24,15 +24,14 @@ pub enum ModelErrorDetail {
     #[display(fmt = "cannot parse config file: '{file_path}' : '{err}'")]
     MalformedConfigFile {
         file_path: String,
-        err: Box<dyn Diag>
+        err: Box<dyn Diag>,
     },
 
     #[display(fmt = "cannot parse manifest file '{file_path}': '{err}'")]
     MalformedManifest {
         file_path: String,
-        err: Box<dyn Diag>
+        err: Box<dyn Diag>,
     },
-
 
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
@@ -181,12 +180,12 @@ impl Model {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
         fs::read_to_string(&path, &mut content)?;
-        let manifest: Manifest =
-            kg_tree::serial::toml::from_str(&content)
-                .map_err(|err| ModelErrorDetail::MalformedManifest {
-                    err: Box::new(err),
-                    file_path: path.to_string_lossy().to_string()
-                })?;
+        let manifest: Manifest = kg_tree::serial::toml::from_str(&content).map_err(|err| {
+            ModelErrorDetail::MalformedManifest {
+                err: Box::new(err),
+                file_path: path.to_string_lossy().to_string(),
+            }
+        })?;
         Ok(manifest)
     }
 
