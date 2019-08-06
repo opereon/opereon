@@ -1,5 +1,5 @@
-extern crate op_exec;
-
-use kg_tree::*;
-
+#[macro_use]
+extern crate pretty_assertions;
 mod tests;
+
+use kg_diag::Diag;

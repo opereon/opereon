@@ -18,9 +18,6 @@ pub type ModelResult<T> = Result<T, ModelError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1000)]
 pub enum ModelErrorDetail {
-    #[display(fmt = "config not found")]
-    ConfigNotFound,
-
     #[display(fmt = "cannot parse config file: '{file_path}' : {err}")]
     MalformedConfigFile {
         file_path: String,

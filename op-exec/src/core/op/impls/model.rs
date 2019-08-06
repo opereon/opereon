@@ -48,8 +48,7 @@ impl Future for ModelInitOperation {
     type Error = RuntimeError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let mut e = self.engine.write();
-        e.model_manager_mut().init_model(&self.path)?;
+        ModelManager::init_model(&self.path)?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }

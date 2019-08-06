@@ -113,7 +113,7 @@ impl ModelManager {
     }
 
     /// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model<P: AsRef<Path>>(&mut self, path: P) -> RuntimeResult<()> {
+    pub fn init_model<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
         Self::init_git_repo(&path)?;
         Self::init_manifest(&path)?;
         Self::init_operc(&path)?;
