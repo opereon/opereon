@@ -1,11 +1,14 @@
 use super::*;
+use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "type", content = "arg")]
 pub enum Context {
     ConfigGet,
-    ModelInit,
+    ModelInit {
+        path: PathBuf,
+    },
     ModelCommit(String),
     ModelQuery {
         model: ModelPath,
@@ -68,7 +71,7 @@ impl Context {
     pub fn label(&self) -> &str {
         match *self {
             Context::ConfigGet => "config-get",
-            Context::ModelInit => "model-init",
+            Context::ModelInit { .. } => "model-init",
             Context::ModelCommit(..) => "model-store",
             Context::ModelQuery { .. } => "model-query",
             Context::ModelTest { .. } => "model-test",

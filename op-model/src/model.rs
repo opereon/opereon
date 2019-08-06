@@ -21,13 +21,13 @@ pub enum ModelErrorDetail {
     #[display(fmt = "config not found")]
     ConfigNotFound,
 
-    #[display(fmt = "cannot parse config file: '{file_path}' : '{err}'")]
+    #[display(fmt = "cannot parse config file: '{file_path}' : {err}")]
     MalformedConfigFile {
         file_path: String,
         err: Box<dyn Diag>,
     },
 
-    #[display(fmt = "cannot parse manifest file '{file_path}': '{err}'")]
+    #[display(fmt = "cannot parse manifest file '{file_path}': {err}")]
     MalformedManifest {
         file_path: String,
         err: Box<dyn Diag>,
@@ -40,21 +40,15 @@ pub enum ModelErrorDetail {
     ConfigUtf8Err,
 
     #[display(
-        fmt = "cannot resolve interpolations: '{detail}'",
+        fmt = "cannot resolve interpolations: {detail}",
         detail = "err.detail()"
     )]
     InterpolationsResolveErr { err: Box<dyn Diag> },
 
-    #[display(
-        fmt = "cannot evaluate expression: '{detail}'",
-        detail = "err.detail()"
-    )]
+    #[display(fmt = "cannot evaluate expression: {detail}", detail = "err.detail()")]
     ExprErr { err: Box<dyn Diag> },
 
-    #[display(
-        fmt = "cannot generate model diff: '{detail}'",
-        detail = "err.detail()"
-    )]
+    #[display(fmt = "cannot generate model diff: {detail}", detail = "err.detail()")]
     ModelDiffErr { err: Box<dyn Diag> },
 }
 
@@ -120,8 +114,7 @@ impl FuncCallable for LoadFileFunc {
                     FileFormat::from(ext.to_str().unwrap())
                 });
 
-                // FIXME ws error handling
-                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+                let node = NodeRef::from_bytes(obj.data(), format)?;
                 out.add(node)
             }
         } else {
@@ -149,8 +142,7 @@ impl FuncCallable for LoadFileFunc {
 
                 let format: FileFormat = f.data().as_string().as_ref().into();
 
-                // FIXME ws error handling
-                let node = NodeRef::from_bytes(obj.data(), format).expect("Error parsing node!");
+                let node = NodeRef::from_bytes(obj.data(), format)?;
                 out.add(node)
             }
         }

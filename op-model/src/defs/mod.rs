@@ -100,14 +100,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "{err}")]
     GlobParseErr { err: globset::Error },
 
-    #[display(
-        fmt = "cannot evaluate expression: '{detail}'",
-        detail = "err.detail()"
-    )]
+    #[display(fmt = "cannot evaluate expression: {detail}", detail = "err.detail()")]
     ExprErr { err: Box<dyn Diag> },
 
     /// FIXME ws this variant should be replaced with Diag
-    #[display(fmt = "serialization/deserialization error: '{err}'")]
+    #[display(fmt = "serialization/deserialization error: {err}")]
     SerialErr { err: kg_tree::serial::Error },
 
     //FIXME ws to be removed

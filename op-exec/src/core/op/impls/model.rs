@@ -5,7 +5,7 @@ use super::*;
 use kg_tree::opath::Opath;
 use op_model::ModelUpdate;
 use slog::Logger;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -30,11 +30,16 @@ impl std::str::FromStr for DiffMethod {
 pub struct ModelInitOperation {
     operation: OperationRef,
     engine: EngineRef,
+    path: PathBuf,
 }
 
 impl ModelInitOperation {
-    pub fn new(operation: OperationRef, engine: EngineRef) -> ModelInitOperation {
-        ModelInitOperation { operation, engine }
+    pub fn new(operation: OperationRef, engine: EngineRef, path: PathBuf) -> ModelInitOperation {
+        ModelInitOperation {
+            operation,
+            engine,
+            path,
+        }
     }
 }
 
@@ -44,8 +49,7 @@ impl Future for ModelInitOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
-        // TODO handle result
-        e.model_manager_mut().init_model().unwrap();
+        e.model_manager_mut().init_model(&self.path)?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }

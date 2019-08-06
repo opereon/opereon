@@ -271,7 +271,9 @@ fn main() {
                 args,
             }
         }
-        Command::Init => ExecContext::ModelInit,
+        Command::Init { path } => ExecContext::ModelInit {
+            path: path.canonicalize().expect("Error resolving path"),
+        },
         Command::Remote {
             expr,
             command,
