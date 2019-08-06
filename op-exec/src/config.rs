@@ -7,6 +7,27 @@ use kg_tree::serial::{from_tree, to_tree};
 use regex::{Captures, Regex};
 use slog::Level;
 
+pub type ConfigResult<T> = Result<T, BasicDiag>;
+
+#[derive(Debug, Display, Detail)]
+#[diag(code_offset = 1000)]
+pub enum ConfigErrorDetail {
+    #[display(fmt = "cannot find config in paths: {paths}")]
+    NotFound { paths: String },
+
+    #[display(fmt = "cannot parse config file '{file}': {err}")]
+    ParseFileErr { file: String, err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot parse config: {err}")]
+    ParseErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot resolve config interpolation: {err}")]
+    InterpolationErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot create config : {err}")]
+    DeserializationErr { err: kg_tree::serial::Error },
+}
+
 use super::*;
 
 pub fn resolve_env_vars(input: &str) -> Cow<str> {
@@ -107,7 +128,7 @@ impl Default for ModelConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Critical,
@@ -169,16 +190,21 @@ pub struct Config {
 }
 
 impl Config {
-    //FIXME (jc) add proper error type
-    fn read(path_list: &str) -> RuntimeResult<Config> {
-        let d = to_tree(&Config::default()).unwrap();
+    fn read(path_list: &str) -> ConfigResult<Config> {
+        let d =
+            to_tree(&Config::default()).expect("Config should always be serializable to NodeRef");
         let paths = parse_path_list(path_list);
         let mut read_paths = 0;
         let mut content = String::new();
         for path in paths {
-            match fs::read_to_string(path, &mut content) {
+            match fs::read_to_string(&path, &mut content) {
                 Ok(_) => {
-                    let c: NodeRef = NodeRef::from_toml(&content).unwrap(); //FIXME (jc) handle parse errors
+                    let c: NodeRef = NodeRef::from_toml(&content).map_err(|err| {
+                        ConfigErrorDetail::ParseFileErr {
+                            err: Box::new(err),
+                            file: path.to_string_lossy().to_string(),
+                        }
+                    })?;
                     d.extend(c, None).unwrap(); //FIXME (jc) handle errors
                     read_paths += 1;
                 }
@@ -191,27 +217,33 @@ impl Config {
             }
         }
         if read_paths == 0 {
-            // FIXME ws
-            panic!("Config not found!");
+            return Err(ConfigErrorDetail::NotFound {
+                paths: path_list.to_string(),
+            }
+            .into());
         }
 
         let mut r = TreeResolver::with_delims("${", "}");
-        r.resolve_custom(RootedResolveStrategy, &d)?;
+        r.resolve_custom(RootedResolveStrategy, &d)
+            .map_err(|err| ConfigErrorDetail::InterpolationErr { err: Box::new(err) })?;
 
-        let conf: Self = from_tree(&d).unwrap(); //FIXME (jc) handle errors
+        let conf: Self =
+            from_tree(&d).map_err(|err| ConfigErrorDetail::DeserializationErr { err })?;
         Ok(conf)
     }
 
-    //FIXME (jc) add proper error type
-    fn from_json(json: &str) -> RuntimeResult<Config> {
+    fn from_json(json: &str) -> ConfigResult<Config> {
         let d = to_tree(&Config::default()).unwrap();
-        let c: NodeRef = NodeRef::from_json(&json).unwrap(); //FIXME (jc) handle parse errors
+        let c: NodeRef = NodeRef::from_json(&json)
+            .map_err(|err| ConfigErrorDetail::ParseErr { err: Box::new(err) })?;
         d.extend(c, None).unwrap(); //FIXME (jc) handle errors
 
         let mut r = TreeResolver::with_delims("${", "}");
-        r.resolve_custom(RootedResolveStrategy, &d)?;
+        r.resolve_custom(RootedResolveStrategy, &d)
+            .map_err(|err| ConfigErrorDetail::InterpolationErr { err: Box::new(err) })?;
 
-        let conf: Self = from_tree(&d).unwrap(); //FIXME (jc) handle errors
+        let conf: Self =
+            from_tree(&d).map_err(|err| ConfigErrorDetail::DeserializationErr { err })?;
         Ok(conf)
     }
 
@@ -268,12 +300,12 @@ impl std::fmt::Display for Config {
 pub struct ConfigRef(Arc<Config>);
 
 impl ConfigRef {
-    pub fn read(path_list: &str) -> RuntimeResult<ConfigRef> {
+    pub fn read(path_list: &str) -> ConfigResult<ConfigRef> {
         let config = Config::read(path_list)?;
         Ok(ConfigRef(Arc::new(config)))
     }
 
-    pub fn from_json(json: &str) -> RuntimeResult<ConfigRef> {
+    pub fn from_json(json: &str) -> ConfigResult<ConfigRef> {
         let config = Config::from_json(json)?;
         Ok(ConfigRef(Arc::new(config)))
     }

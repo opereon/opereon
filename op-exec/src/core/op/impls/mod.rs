@@ -133,7 +133,11 @@ pub fn create_operation_impl(
             engine.clone(),
             steps.clone(),
         )?),
-        Context::ModelInit => Box::new(ModelInitOperation::new(operation.clone(), engine.clone())),
+        Context::ModelInit { ref path } => Box::new(ModelInitOperation::new(
+            operation.clone(),
+            engine.clone(),
+            path.clone(),
+        )),
         Context::FileCopyExec {
             ref curr_dir,
             ref src_path,

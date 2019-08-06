@@ -276,5 +276,9 @@ pub enum Command {
         author = "",
         raw(setting = "structopt::clap::AppSettings::ColoredHelp")
     )]
-    Init,
+    Init {
+        /// Path to new model, defaults to current working directory
+        #[structopt(name = "PATH", default_value = ".", parse(from_os_str))]
+        path: PathBuf,
+    },
 }
