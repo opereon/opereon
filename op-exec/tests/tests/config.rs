@@ -91,6 +91,24 @@ fn read_multiple_configs() {
 }
 
 #[test]
+fn read_with_interpolations() {
+    let tmp_dir = get_tmp_dir();
+    let path = tmp_dir.path().to_path_buf();
+
+    let cfg_path = path.join("config.toml");
+
+    let cfg = r##"
+        run_dir = "${'some_expression' + 2}"
+    "##;
+
+    write_file!(cfg_path, cfg);
+
+    let cfg = ConfigRef::read(cfg_path.to_str().unwrap()).expect("Cannot read config");
+
+    assert_eq!("some_expression2", cfg.run_dir().to_str().unwrap());
+}
+
+#[test]
 fn from_json() {
     let json = r##"
     {
@@ -121,7 +139,7 @@ fn config_not_found() {
 }
 
 #[test]
-fn config_parse_err() {
+fn file_config_parse_err() {
     let tmp_dir = get_tmp_dir();
     let path = tmp_dir.path().to_path_buf();
 
@@ -135,6 +153,21 @@ fn config_parse_err() {
     write_file!(cfg_path, cfg);
 
     let res = ConfigRef::read(cfg_path.to_str().unwrap());
+
+    assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseFileErr {..});
+}
+
+#[test]
+fn json_config_parse_err() {
+    let json = r##"
+    {
+        "queue": {
+            "persist_dir": &&
+        }
+    }
+    "##;
+
+    let res = ConfigRef::from_json(json);
 
     assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseErr {..});
 }

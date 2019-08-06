@@ -24,7 +24,7 @@ macro_rules! assert_detail {
             .expect(&format!("Cannot downcast to '{}'", stringify!($detail)));
 
         match det {
-            $variant => {(err, det)}
+            $variant => (err, det),
             err => panic!("Expected error {} got {:?}", stringify!($variant), err),
         }
     }};
