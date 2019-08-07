@@ -78,7 +78,8 @@ impl<'de> de::Deserialize<'de> for ValueDef {
         D: de::Deserializer<'de>,
     {
         let n = NodeRef::deserialize(deserializer)?;
-        ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error")) //FIXME (jc) error message
+        ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error"))
+        //FIXME (jc) error message
     }
 }
 

@@ -91,10 +91,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "unknown task kind: '{value}'")]
     UnknownTaskKind { value: String },
 
-    #[display(
-        fmt = "cannot parse opath expression: '{detail}'",
-        detail = "err.detail()"
-    )]
+    #[display(fmt = "cannot parse opath expression: {err}")]
     OpathParseErr { err: Box<dyn Diag> },
 
     #[display(fmt = "{err}")]

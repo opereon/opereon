@@ -22,8 +22,7 @@ macro_rules! assert_exists {
 
 #[test]
 fn search_manifest() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let manifest_path = path.join("op.toml");
 
@@ -35,8 +34,7 @@ fn search_manifest() {
 
 #[test]
 fn search_manifest_nested() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let manifest_path = path.join("op.toml");
     let nested_path = path.join("nested");
@@ -50,8 +48,7 @@ fn search_manifest_nested() {
 
 #[test]
 fn search_manifest_not_found() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let err = ModelManager::search_manifest(&path).unwrap_err();
 
@@ -60,8 +57,7 @@ fn search_manifest_not_found() {
 
 #[test]
 fn init_model() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     ModelManager::init_model(&path).unwrap();
 
@@ -72,8 +68,7 @@ fn init_model() {
 
 #[test]
 fn init_model_current() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     ModelManager::init_model(&path).unwrap();
 
