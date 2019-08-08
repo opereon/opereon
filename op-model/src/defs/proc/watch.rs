@@ -13,7 +13,7 @@ impl ModelWatch {
     pub fn parse(path: &str, mask: &str) -> DefsResult<ModelWatch> {
         Ok(ModelWatch {
             path: Opath::parse(path)
-                .map_err(|err| DefsErrorDetail::OpathParseErr { err: Box::new(err) })?,
+                .map_err(|err| DefsErrorDetail::ProcModelWatchParseErr { err: Box::new(err) })?,
             mask: ChangeKindMask::parse(mask),
         })
     }
@@ -45,7 +45,7 @@ impl FileWatch {
     pub fn parse(glob: &str, mask: &str) -> DefsResult<FileWatch> {
         let glob = GlobBuilder::new(glob)
             .build()
-            .map_err(|err| DefsErrorDetail::GlobParseErr { err })?;
+            .map_err(|err| DefsErrorDetail::ProcFileWatchParseErr { err })?;
         Ok(FileWatch {
             glob,
             mask: ChangeKindMask::parse(mask),

@@ -34,6 +34,12 @@ pub enum DefsErrorDetail {
     #[display(fmt = "watch definition must be an object, found: {kind}")]
     ProcWatchNonObject { kind: Kind },
 
+    #[display(fmt = "cannot parse model watch : {err}")]
+    ProcModelWatchParseErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot parse file watch : {err}")]
+    ProcFileWatchParseErr { err: globset::Error },
+
     #[display(fmt = "run definition must be an object or an array, found: {kind}")]
     RunInvalidType { kind: Kind },
 
@@ -96,9 +102,6 @@ pub enum DefsErrorDetail {
 
     #[display(fmt = "cannot parse opath expression: {err}")]
     OpathParseErr { err: Box<dyn Diag> },
-
-    #[display(fmt = "{err}")]
-    GlobParseErr { err: globset::Error },
 
     #[display(fmt = "cannot evaluate expression: {err}")]
     ExprErr { err: Box<dyn Diag> },
