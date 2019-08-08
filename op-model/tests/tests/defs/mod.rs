@@ -4,3 +4,4 @@ use op_model::{AsScoped, DefsErrorDetail, Model};
 
 mod host;
 mod scope;
+mod user;

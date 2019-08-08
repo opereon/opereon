@@ -88,8 +88,6 @@ impl Drain for CliDrain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use slog_kvfilter::KVFilter;
-    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn cli_drain_test() {

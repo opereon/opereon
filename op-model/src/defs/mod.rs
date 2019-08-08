@@ -85,7 +85,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "user definition must have 'username' property")]
     UserMissingUsername,
 
-    #[display(fmt = "user definition must be an object, found: {kind}")]
+    #[display(fmt = "user definition must be an object, found: '{kind}'")]
     UserNonObject { kind: Kind },
 
     #[display(fmt = "unknown proc kind: '{value}'")]
