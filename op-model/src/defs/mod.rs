@@ -76,8 +76,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "switch case definition must be an object, found: {kind}")]
     TaskCaseNonObject { kind: Kind },
 
-    #[display(fmt = "scope definition must be an object, found: {kind}")]
+    #[display(fmt = "scope definition must be an object, found: '{kind}'")]
     ScopeNonObject { kind: Kind },
+
+    #[display(fmt = "cannot get scope key '{key}' : {err}")]
+    ScopeValParseErr { key: String, err: Box<dyn Diag> },
 
     #[display(fmt = "user definition must have 'username' property")]
     UserMissingUsername,
@@ -91,16 +94,13 @@ pub enum DefsErrorDetail {
     #[display(fmt = "unknown task kind: '{value}'")]
     UnknownTaskKind { value: String },
 
-    #[display(
-        fmt = "cannot parse opath expression: '{detail}'",
-        detail = "err.detail()"
-    )]
+    #[display(fmt = "cannot parse opath expression: {err}")]
     OpathParseErr { err: Box<dyn Diag> },
 
     #[display(fmt = "{err}")]
     GlobParseErr { err: globset::Error },
 
-    #[display(fmt = "cannot evaluate expression: {detail}", detail = "err.detail()")]
+    #[display(fmt = "cannot evaluate expression: {err}")]
     ExprErr { err: Box<dyn Diag> },
 
     /// FIXME ws this variant should be replaced with Diag

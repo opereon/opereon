@@ -1,6 +1,5 @@
 use super::*;
 use op_exec::{ConfigErrorDetail, ConfigRef, LogLevel};
-use std::io::Write;
 
 const MAIN_CFG: &str = r##"
     run_dir = "/var/run/opereon1"
@@ -23,8 +22,7 @@ const SECOND_CFG: &str = r##"
 
 #[test]
 fn read_single_config() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
 
@@ -53,8 +51,7 @@ fn read_single_config() {
 
 #[test]
 fn read_multiple_configs() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg1_path = path.join("config1.toml");
     let cfg2_path = path.join("config2.toml");
@@ -92,8 +89,7 @@ fn read_multiple_configs() {
 
 #[test]
 fn read_with_interpolations() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
 
@@ -128,8 +124,7 @@ fn from_json() {
 
 #[test]
 fn config_not_found() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
 
@@ -140,8 +135,7 @@ fn config_not_found() {
 
 #[test]
 fn file_config_parse_err() {
-    let tmp_dir = get_tmp_dir();
-    let path = tmp_dir.path().to_path_buf();
+    let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
 

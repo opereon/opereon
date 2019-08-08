@@ -49,18 +49,6 @@ pub enum ModelErrorDetail {
     ModelDiffErr { err: Box<dyn Diag> },
 }
 
-#[derive(Debug, Serialize)]
-pub struct Model {
-    #[serde(flatten)]
-    scoped: Scoped,
-    metadata: Metadata,
-    hosts: Vec<HostDef>,
-    users: Vec<UserDef>,
-    procs: Vec<ProcDef>,
-    #[serde(skip)]
-    lookup: ModelLookup,
-}
-
 #[derive(Debug, Clone)]
 struct LoadFileFunc {
     model_dir: PathBuf,
@@ -152,8 +140,20 @@ impl FuncCallable for LoadFileFunc {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct Model {
+    #[serde(flatten)]
+    scoped: Scoped,
+    metadata: Metadata,
+    hosts: Vec<HostDef>,
+    users: Vec<UserDef>,
+    procs: Vec<ProcDef>,
+    #[serde(skip)]
+    lookup: ModelLookup,
+}
+
 impl Model {
-    fn empty() -> Model {
+    pub fn empty() -> Model {
         let root = NodeRef::object(Properties::new());
         Model {
             metadata: Metadata::default(),

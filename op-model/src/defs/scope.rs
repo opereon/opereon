@@ -78,7 +78,8 @@ impl<'de> de::Deserialize<'de> for ValueDef {
         D: de::Deserializer<'de>,
     {
         let n = NodeRef::deserialize(deserializer)?;
-        ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error")) //FIXME (jc) error message
+        ValueDef::parse(&n).map_err(|_err| de::Error::custom("opath parse error"))
+        //FIXME (jc) error message
     }
 }
 
@@ -99,13 +100,22 @@ impl ScopeDef {
         self.values.insert(name, value);
     }
 
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
     pub fn get_var_def(&self, name: &str) -> Option<&ValueDef> {
         self.values.get(name)
     }
 
     pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()> {
         for (name, value) in self.values.iter() {
-            let rval = value.resolve(root, current, &scope)?;
+            let rval = value.resolve(root, current, &scope).map_err(|err| {
+                DefsErrorDetail::ScopeValParseErr {
+                    key: name.to_string(),
+                    err: Box::new(err),
+                }
+            })?;
             scope.set_var(name.clone(), rval);
         }
         Ok(())
@@ -126,14 +136,19 @@ impl ParsedModelDef for ScopeDef {
             match *sn.data().value() {
                 Value::Object(ref props) => {
                     for (k, v) in props.iter() {
-                        let val = ValueDef::parse(v)?;
+                        let val = ValueDef::parse(v).map_err(|err| {
+                            DefsErrorDetail::ScopeValParseErr {
+                                key: k.to_string(),
+                                err: Box::new(err),
+                            }
+                        })?;
                         scope.set_var_def(k.clone(), val);
                     }
                 }
                 Value::Null => {}
                 _ => {
                     return Err(DefsErrorDetail::ScopeNonObject {
-                        kind: node.data().kind(),
+                        kind: sn.data().kind(),
                     }
                     .into())
                 }
