@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use std::fmt::Display;
 use tempfile::TempDir;
 
+mod node;
+pub use node::*;
+
 #[macro_export]
 macro_rules! write_file {
     ($path: expr, $content:expr) => {{
@@ -17,23 +20,10 @@ macro_rules! write_file {
 
 #[macro_export]
 macro_rules! assert_detail {
-    ($res: expr, $detail:ident, $variant: pat) => {{
-        use kg_diag::Diag;
-        let err = match $res {
-            Ok(ref val) => panic!("Error expected, got {:?}", val),
-            Err(ref err) => err,
-        };
-        let det = err
-            .detail()
-            .downcast_ref::<$detail>()
-            .expect(&format!("Cannot downcast to '{}'", stringify!($detail)));
-
-        match det {
-            $variant => (err, det),
-            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
-        }
-    }};
-    ($res: expr, $detail:ident, $variant: pat, $cond:expr) => {{
+    ($res: expr, $detail:ident, $variant: pat) => {
+        assert_detail!($res, $detail, $variant, {})
+    };
+    ($res: expr, $detail:ident, $variant: pat, $block:expr) => {{
         use kg_diag::Diag;
         let err = match $res {
             Ok(ref val) => panic!("Error expected, got {:?}", val),
@@ -46,11 +36,8 @@ macro_rules! assert_detail {
 
         match det {
             $variant => {
-                if $cond {
-                    (err, det)
-                } else {
-                    panic!("Condition not met: '{}'", stringify!($cond))
-                }
+                $block;
+                (err, det)
             }
             err => panic!("Expected error {} got {:?}", stringify!($variant), err),
         }
@@ -67,7 +54,8 @@ pub fn get_target_dir() -> PathBuf {
     target_dir
 }
 
-/// Get temporary directory located in "target/test_resources"
+/// Create temporary directory located in "target/test_resources"
+/// Returns handle to created directory
 pub fn get_tmp_dir() -> (TempDir, PathBuf) {
     let target = get_target_dir();
     let resources_dir = target.join("test_resources");
@@ -82,7 +70,9 @@ pub fn get_tmp_dir() -> (TempDir, PathBuf) {
     (dir, path)
 }
 
+/// Helper trait for pretty displaying error messages
 pub trait UnwrapDisplay<T> {
+    /// Same as `.unwrap()` but uses `Display` instead of `Debug`.
     fn unwrap_disp(self) -> T;
 }
 

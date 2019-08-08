@@ -1,6 +1,6 @@
 use super::*;
-use kg_tree::opath::Opath;
-use op_model::ValueDef;
+use kg_tree::opath::{Opath, ScopeMut};
+use op_model::{AsScoped, ParsedModelDef, ScopeDef, ValueDef};
 
 #[test]
 fn value_parse_static() {
@@ -59,8 +59,104 @@ fn value_parse_resolvable_opath_err() {
     let res = ValueDef::parse(&node);
 
     let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OpathParseErr{..});
+}
 
-    eprintln!("_err = {}", _err);
+#[test]
+fn scope_parse() {
+    // language=toml
+    let node = r#"
+        scope.object.val = ["aa", "bb"]
+        scope.value1 = "${@^.@key}"
+        scope.value2 = 2
+"#;
+    let node: NodeRef = node!(node, toml);
+    let model: Model = Model::empty();
 
-    // TODO check error message
+    let scope = ScopeDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
+
+    assert!(scope.get_var_def("object").unwrap().is_static());
+    assert!(!scope.get_var_def("value1").unwrap().is_static());
+    assert!(scope.get_var_def("value2").unwrap().is_static());
+}
+
+#[test]
+fn scope_parse_null() {
+    // language=json
+    let node = r#"{}"#;
+    let node: NodeRef = node!(node);
+    let model: Model = Model::empty();
+
+    let scope = ScopeDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
+
+    assert_eq!(0, scope.len())
+}
+
+#[test]
+fn scope_parse_non_object() {
+    // language=toml
+    let node = r#"
+        scope = "invalid scope type"
+"#;
+    let node: NodeRef = node!(node, toml);
+    let model: Model = Model::empty();
+
+    let res = ScopeDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::ScopeNonObject { kind },
+        assert_eq!("string", kind.as_str())
+    );
+}
+
+#[test]
+fn scope_opath_parse_err() {
+    // language=toml
+    let node = r#"
+        scope.dyn_variable = "${@.@}"
+"#;
+    let node: NodeRef = node!(node, toml);
+    let model: Model = Model::empty();
+
+    let res = ScopeDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParseErr{key, ..}, assert_eq!("dyn_variable", key));
+}
+
+#[test]
+fn scope_resolve() {
+    // language=toml
+    let node = r#"
+        scope.dyn_variable = "${@.@path}"
+"#;
+    let node: NodeRef = node!(node, toml);
+    let model: Model = Model::empty();
+
+    let def: ScopeDef = ScopeDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
+
+    let scope = ScopeMut::new();
+    def.resolve(&node, &node, &scope).unwrap_disp();
+
+    let val = scope.get_var("dyn_variable").unwrap();
+    let val = assert_one!(val.clone());
+
+    assert_eq!("$", val.as_string_ext());
+}
+
+#[test]
+fn scope_resolve_parse_err() {
+    // language=toml
+    let node = r#"
+        scope.dyn_variable = "${array(notExistingFunc())}"
+"#;
+    let node: NodeRef = node!(node, toml);
+    let model: Model = Model::empty();
+
+    let def: ScopeDef = ScopeDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
+
+    let scope = ScopeMut::new();
+    let res = def.resolve(&node, &node, &scope);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParseErr{key, ..}, assert_eq!("dyn_variable", key));
 }

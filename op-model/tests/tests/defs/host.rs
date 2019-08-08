@@ -85,6 +85,6 @@ fn parse_non_obj_host() {
         res,
         DefsErrorDetail,
         DefsErrorDetail::HostNonObject { kind },
-        kind == &Kind::String
+        assert_eq!(&Kind::String, kind)
     );
 }
