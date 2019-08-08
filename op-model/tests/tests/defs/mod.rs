@@ -1,6 +1,6 @@
 use super::*;
-use kg_tree::NodeRef;
-use op_model::{AsScoped, DefsErrorDetail, Model};
+use kg_tree::{NodeRef, Kind};
+use op_model::{AsScoped, DefsErrorDetail, Model, ParsedModelDef};
 
 mod host;
 mod scope;

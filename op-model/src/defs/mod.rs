@@ -9,6 +9,7 @@ pub use self::proc::*;
 pub use self::scope::*;
 pub use self::user::UserDef;
 
+// DefsError should probably be ParseDiag instead of BasicDiag. Each error should contain source file and quote
 pub type DefsError = BasicDiag;
 pub type DefsResult<T> = Result<T, DefsError>;
 
@@ -22,16 +23,16 @@ pub enum DefsErrorDetail {
     #[display(fmt = "host definition must contain 'ssh_dest' property")]
     HostMissingSshDest,
 
-    #[display(fmt = "host definition must be an object, found: {kind}")]
+    #[display(fmt = "host definition must be an object, found: '{kind}'")]
     HostNonObject { kind: Kind },
 
     #[display(fmt = "procedure must have defined 'proc' property")]
     ProcMissingProc,
 
-    #[display(fmt = "procedure definition must be an object, found: {kind}")]
+    #[display(fmt = "procedure definition must be an object, found: '{kind}'")]
     ProcNonObject { kind: Kind },
 
-    #[display(fmt = "watch definition must be an object, found: {kind}")]
+    #[display(fmt = "watch definition must be an object, found: '{kind}'")]
     ProcWatchNonObject { kind: Kind },
 
     #[display(fmt = "cannot parse model watch : {err}")]
@@ -40,7 +41,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "cannot parse file watch : {err}")]
     ProcFileWatchParseErr { err: globset::Error },
 
-    #[display(fmt = "run definition must be an object or an array, found: {kind}")]
+    #[display(fmt = "run definition must be an object or an array, found: '{kind}'")]
     RunInvalidType { kind: Kind },
 
     #[display(fmt = "'hosts' property must be a dynamic expression in step definition")]
@@ -52,7 +53,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "step definition must have 'tasks' property")]
     StepMissingTasks,
 
-    #[display(fmt = "step definition must be an object, found: {kind}")]
+    #[display(fmt = "step definition must be an object, found: '{kind}'")]
     StepNonObject { kind: Kind },
 
     #[display(fmt = "task definition must have 'task' property")]
@@ -61,16 +62,16 @@ pub enum DefsErrorDetail {
     #[display(fmt = "switch task definition must have 'cases' property")]
     TaskSwitchMissingCases,
 
-    #[display(fmt = "task definition must be an object, found: {kind}")]
+    #[display(fmt = "task definition must be an object, found: '{kind}'")]
     TaskNonObject { kind: Kind },
 
-    #[display(fmt = "output definition must be an 'object' or 'string', found: {kind}")]
+    #[display(fmt = "output definition must be an 'object' or 'string', found: '{kind}'")]
     TaskOutputInvalidType { kind: Kind },
 
     #[display(fmt = "Unexpected property type: {kind}")]
     TaskEnvUnexpectedPropType { kind: Kind },
 
-    #[display(fmt = "switch definition must be an array, found: {kind}")]
+    #[display(fmt = "switch definition must be an array, found: '{kind}'")]
     TaskSwitchNonArray { kind: Kind },
 
     #[display(fmt = "'when' property must be a dynamic expression in switch case definition")]
@@ -79,7 +80,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "switch case expression must have 'when' property")]
     TaskCaseMissingWhen,
 
-    #[display(fmt = "switch case definition must be an object, found: {kind}")]
+    #[display(fmt = "switch case definition must be an object, found: '{kind}'")]
     TaskCaseNonObject { kind: Kind },
 
     #[display(fmt = "scope definition must be an object, found: '{kind}'")]
