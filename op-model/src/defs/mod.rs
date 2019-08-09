@@ -30,10 +30,7 @@ pub enum DefsErrorDetail {
     #[display(fmt = "procedure must have defined 'proc' property")]
     ProcMissingProc,
 
-    #[display(fmt = "procedure definition must be an object, found: '{kind}'")]
-    ProcNonObject { kind: Kind },
-
-    #[display(fmt = "watch definition must be an object, found: '{kind}'")]
+    #[display(fmt = "'watch' and 'watch_file' definition must be an object, found: '{kind}'")]
     ProcWatchNonObject { kind: Kind },
 
     #[display(fmt = "cannot parse model watch : {err}")]
@@ -68,6 +65,9 @@ pub enum DefsErrorDetail {
     //vv ^^ merge these?
     #[display(fmt = "cannot parse 'output' definition : {err}")]
     OutputParseErr { err: Box<dyn Diag> },
+    //vv ^^ merge these?
+    #[display(fmt = "cannot parse 'run' definition : {err}")]
+    RunParseErr { err: Box<dyn Diag> },
 
     #[display(fmt = "cannot parse step '{step}' definition : {err}")]
     StepParseErr { step: String, err: Box<dyn Diag> },
