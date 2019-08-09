@@ -395,3 +395,89 @@ output:
     assert_eq!(TaskKind::Script, def.kind());
     assert!(def.output().is_some());
 }
+
+#[test]
+fn task_def_missing_task() {
+    // language=yaml
+    let node = r#"
+output:
+    format: json
+    expr: "@.some.expr"
+"#;
+    let node: NodeRef = node!(node, yaml);
+    let model: Model = Model::empty();
+
+    let res = TaskDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::TaskMissingTask);
+}
+
+#[test]
+fn task_def_env_parse_err() {
+    // language=yaml
+    let node = r#"
+task: command
+env: 1234
+
+"#;
+    let node: NodeRef = node!(node, yaml);
+    let model: Model = Model::empty();
+
+    let res = TaskDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::EnvParseErr{..});
+}
+
+#[test]
+fn task_def_switch_parse_err() {
+    // language=yaml
+    let node = r#"
+task: switch
+cases:
+  - when: "static prop"
+    key: val1
+  - when: "${$}"
+    key: val2
+"#;
+    let node: NodeRef = node!(node, yaml);
+    let model: Model = Model::empty();
+
+    let res = TaskDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::SwitchParseErr{..});
+}
+
+#[test]
+fn task_def_output_parse_err() {
+    // language=yaml
+    let node = r#"
+task: command
+output: 1234
+"#;
+    let node: NodeRef = node!(node, yaml);
+    let model: Model = Model::empty();
+
+    let res = TaskDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OutputParseErr{..});
+}
+
+#[test]
+fn task_def_unexpected_type() {
+    // language=yaml
+    let node = r#""unexpected string""#;
+    let node: NodeRef = node!(node, yaml);
+    let model: Model = Model::empty();
+
+    let res = TaskDef::parse(&model, model.as_scoped(), &node);
+
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::UnexpectedPropType { kind, expected },
+        {
+            assert_eq!(&Kind::String, kind);
+            assert_eq!(&vec![Kind::Object], expected);
+        }
+    );
+}

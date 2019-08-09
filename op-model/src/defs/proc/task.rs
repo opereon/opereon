@@ -117,24 +117,36 @@ impl ParsedModelDef for TaskDef {
 
                 if t.kind == TaskKind::Command || t.kind == TaskKind::Script {
                     if let Some(n) = props.get("env") {
-                        t.env = Some(TaskEnv::parse(n)?);
+                        let env = TaskEnv::parse(n)
+                            .map_err(|err| DefsErrorDetail::EnvParseErr { err: Box::new(err) })?;
+                        t.env = Some(env);
                     }
                 }
 
                 if t.kind == TaskKind::Switch {
                     if let Some(s) = props.get("cases") {
-                        t.switch = Some(Switch::parse(model, &t.scoped, s)?);
+                        let switch = Switch::parse(model, &t.scoped, s).map_err(|err| {
+                            DefsErrorDetail::SwitchParseErr { err: Box::new(err) }
+                        })?;
+                        t.switch = Some(switch);
                     } else {
                         return Err(DefsErrorDetail::TaskSwitchMissingCases.into());
                     }
                 }
 
                 if let Some(n) = props.get("output") {
-                    let out = TaskOutput::parse(n)?; // TODO
+                    let out = TaskOutput::parse(n)
+                        .map_err(|err| DefsErrorDetail::OutputParseErr { err: Box::new(err) })?;
                     t.output = Some(out);
                 }
             }
-            _ => return Err(DefsErrorDetail::TaskNonObject { kind }.into()),
+            _ => {
+                return Err(DefsErrorDetail::UnexpectedPropType {
+                    kind,
+                    expected: vec![Kind::Object],
+                }
+                .into())
+            }
         }
 
         t.id = get_expr(&t, "@.id or (@.task + '-' + @.@key)")?;

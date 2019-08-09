@@ -595,7 +595,7 @@ dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.38 (registry+https://github.com/rust-lang/crates.io-index)",
  "kg-diag 0.2.4",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -608,7 +608,7 @@ version = "0.1.1"
 dependencies = [
  "kg-diag 0.2.4",
  "kg-js 0.1.1",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -632,7 +632,7 @@ dependencies = [
  "kg-diag-derive 0.2.3",
  "kg-display 0.1.2",
  "kg-display-derive 0.1.1",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "serde 1.0.98 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.98 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "kg-tree"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "backtrace 0.3.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -955,7 +955,7 @@ dependencies = [
  "chrono 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "kg-diag 0.2.4",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "op-exec 0.1.1",
  "op-log 0.1.0",
@@ -986,7 +986,7 @@ dependencies = [
  "kg-lang 0.1.1",
  "kg-symbol 0.1.10",
  "kg-template 0.1.3",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1039,7 +1039,7 @@ dependencies = [
  "kg-display 0.1.2",
  "kg-display-derive 0.1.1",
  "kg-symbol 0.1.10",
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "kg-utils 0.3.1",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1062,7 +1062,7 @@ dependencies = [
 name = "op-test-helpers"
 version = "0.1.0"
 dependencies = [
- "kg-tree 0.1.5",
+ "kg-tree 0.1.6",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

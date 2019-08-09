@@ -63,14 +63,20 @@ pub enum DefsErrorDetail {
     #[display(fmt = "switch task definition must have 'cases' property")]
     TaskSwitchMissingCases,
 
-    #[display(fmt = "task definition must be an object, found: '{kind}'")]
-    TaskNonObject { kind: Kind },
-
     #[display(
         fmt = "Unexpected property type: '{kind}', expected one of: '{expected}'",
         expected = "ListDisplay(expected)"
     )]
     UnexpectedPropType { kind: Kind, expected: Vec<Kind> },
+
+    #[display(fmt = "cannot parse 'env' definition : {err}")]
+    EnvParseErr { err: Box<dyn Diag> },
+    //vv ^^ merge these?
+    #[display(fmt = "cannot parse 'switch' definition : {err}")]
+    SwitchParseErr { err: Box<dyn Diag> },
+    //vv ^^ merge these?
+    #[display(fmt = "cannot parse 'output' definition : {err}")]
+    OutputParseErr { err: Box<dyn Diag> },
 
     #[display(fmt = "cannot parse opath property '{prop}' : {err}")]
     EnvPropParseErr {
