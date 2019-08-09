@@ -1,6 +1,5 @@
 use super::*;
-use op_model::{UserDef, AsScoped, ParsedModelDef};
-
+use op_model::{AsScoped, ParsedModelDef, UserDef};
 
 #[test]
 fn new_empty() {
@@ -49,7 +48,8 @@ fn parse_without_username() {
 
     let res = UserDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::UserMissingUsername);
+    let (_err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::UserMissingUsername);
 }
 
 #[test]
@@ -61,5 +61,10 @@ fn parse_non_object() {
 
     let res = UserDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::UserNonObject{kind}, assert_eq!("string", kind.as_str()));
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::UserNonObject { kind },
+        assert_eq!("string", kind.as_str())
+    );
 }

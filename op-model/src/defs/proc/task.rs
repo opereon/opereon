@@ -130,7 +130,8 @@ impl ParsedModelDef for TaskDef {
                 }
 
                 if let Some(n) = props.get("output") {
-                    t.output = Some(TaskOutput::parse(n)?);
+                    let out = TaskOutput::parse(n)?; // TODO
+                    t.output = Some(out);
                 }
             }
             _ => return Err(DefsErrorDetail::TaskNonObject { kind }.into()),
@@ -190,7 +191,7 @@ pub struct TaskOutput {
 }
 
 impl TaskOutput {
-    fn parse(node: &NodeRef) -> DefsResult<TaskOutput> {
+    pub fn parse(node: &NodeRef) -> DefsResult<TaskOutput> {
         match *node.data().value() {
             Value::Object(_) => match kg_tree::serial::from_tree::<TaskOutput>(node) {
                 Ok(out) => Ok(out),
@@ -203,8 +204,9 @@ impl TaskOutput {
                     ..Default::default()
                 })
             }
-            _ => Err(DefsErrorDetail::TaskOutputInvalidType {
+            _ => Err(DefsErrorDetail::UnexpectedPropType {
                 kind: node.data().kind(),
+                expected: vec![Kind::Object, Kind::String],
             }
             .into()),
         }
@@ -261,8 +263,12 @@ impl TaskEnv {
                 let mut envs = LinkedHashMap::with_capacity(props.len());
 
                 for (k, node) in props.iter() {
-                    let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsErrorDetail::SerialErr { err })?;
+                    let expr: Opath = serial::from_tree(node).map_err(|err| {
+                        DefsErrorDetail::EnvPropParseErr {
+                            prop: k.to_string(),
+                            err,
+                        }
+                    })?;
                     envs.insert(k.to_string(), expr);
                 }
                 TaskEnv::Map(envs)
@@ -270,9 +276,13 @@ impl TaskEnv {
             Value::Array(ref elems) => {
                 let mut envs = Vec::with_capacity(elems.len());
 
-                for node in elems.iter() {
-                    let expr: Opath = serial::from_tree(node)
-                        .map_err(|err| DefsErrorDetail::SerialErr { err })?;
+                for (idx, node) in elems.iter().enumerate() {
+                    let expr: Opath = serial::from_tree(node).map_err(|err| {
+                        DefsErrorDetail::EnvPropParseErr {
+                            prop: idx.to_string(),
+                            err,
+                        }
+                    })?;
                     envs.push(expr)
                 }
                 TaskEnv::List(envs)
@@ -280,8 +290,9 @@ impl TaskEnv {
             Value::String(ref key) => TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
                 .map_err(|err| DefsErrorDetail::OpathParseErr { err: Box::new(err) })?]),
             _ => {
-                return Err(DefsErrorDetail::TaskEnvUnexpectedPropType {
+                return Err(DefsErrorDetail::UnexpectedPropType {
                     kind: n.data().kind(),
+                    expected: vec![Kind::Object, Kind::Array, Kind::String],
                 }
                 .into())
             }
@@ -347,7 +358,12 @@ impl ParsedModelDef for Case {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let when = if let Some(n) = props.get("when") {
-                match ValueDef::parse(n)? {
+                let val = ValueDef::parse(n).map_err(|err| DefsErrorDetail::PropParseErr {
+                    prop: String::from("when"),
+                    err: Box::new(err),
+                })?;
+
+                match val {
                     ValueDef::Resolvable(e) => e,
                     _ => return Err(DefsErrorDetail::TaskCaseStaticWhen.into()),
                 }

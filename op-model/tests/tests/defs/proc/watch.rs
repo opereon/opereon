@@ -1,7 +1,7 @@
 use super::*;
-use op_model::{ModelWatch, FileWatch};
-use kg_tree::opath::Opath;
 use globset::GlobBuilder;
+use kg_tree::opath::Opath;
+use op_model::{FileWatch, ModelWatch};
 
 #[test]
 fn model_watch_parse() {
@@ -15,7 +15,8 @@ fn model_watch_parse() {
 fn model_watch_parse_err() {
     let res = ModelWatch::parse("@.@", "+");
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
+    let (_err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
 }
 
 #[test]
@@ -31,5 +32,6 @@ fn file_watch_parse() {
 fn file_watch_parse_err() {
     let res = FileWatch::parse("[Z-A]", "+");
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
+    let (_err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
 }

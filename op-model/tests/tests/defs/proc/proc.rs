@@ -1,7 +1,7 @@
 use super::*;
+use kg_diag::BasicDiag;
 use op_model::{ProcDef, ProcKind};
 use std::str::FromStr;
-use kg_diag::BasicDiag;
 
 #[test]
 fn proc_kind_from_str() {
@@ -10,8 +10,13 @@ fn proc_kind_from_str() {
     assert_eq!(ProcKind::Update, ProcKind::from_str("update").unwrap_disp());
     assert_eq!(ProcKind::Probe, ProcKind::from_str("probe").unwrap_disp());
 
-    let res:Result<_, BasicDiag> = ProcKind::from_str("kitty").map_err(|err| {err.into()});
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::UnknownProcKind{value}, assert_eq!("kitty", value));
+    let res: Result<_, BasicDiag> = ProcKind::from_str("kitty").map_err(|err| err.into());
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::UnknownProcKind { value },
+        assert_eq!("kitty", value)
+    );
 }
 
 //#[test]

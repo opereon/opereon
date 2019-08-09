@@ -1,6 +1,7 @@
 use super::*;
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, Diag};
+use kg_display::ListDisplay;
 use std::any::TypeId;
 use std::cell::{Cell, RefCell};
 
@@ -65,11 +66,18 @@ pub enum DefsErrorDetail {
     #[display(fmt = "task definition must be an object, found: '{kind}'")]
     TaskNonObject { kind: Kind },
 
-    #[display(fmt = "output definition must be an 'object' or 'string', found: '{kind}'")]
-    TaskOutputInvalidType { kind: Kind },
+    #[display(
+        fmt = "Unexpected property type: '{kind}', expected one of: '{expected}'",
+        expected = "ListDisplay(expected)"
+    )]
+    UnexpectedPropType { kind: Kind, expected: Vec<Kind> },
 
-    #[display(fmt = "Unexpected property type: {kind}")]
-    TaskEnvUnexpectedPropType { kind: Kind },
+    #[display(fmt = "cannot parse opath property '{prop}' : {err}")]
+    EnvPropParseErr {
+        prop: String,
+        /// FIXME ws this value should be replaced with Diag
+        err: kg_tree::serial::Error,
+    },
 
     #[display(fmt = "switch definition must be an array, found: '{kind}'")]
     TaskSwitchNonArray { kind: Kind },
@@ -104,12 +112,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "cannot parse opath expression: {err}")]
     OpathParseErr { err: Box<dyn Diag> },
 
+    #[display(fmt = "cannot parse property '{prop}' : {err}")]
+    PropParseErr { prop: String, err: Box<dyn Diag> },
+
     #[display(fmt = "cannot evaluate expression: {err}")]
     ExprErr { err: Box<dyn Diag> },
-
-    /// FIXME ws this variant should be replaced with Diag
-    #[display(fmt = "serialization/deserialization error: {err}")]
-    SerialErr { err: kg_tree::serial::Error },
 
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
