@@ -42,20 +42,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "cannot parse file watch : {err}")]
     ProcFileWatchParseErr { err: globset::Error },
 
-    #[display(fmt = "run definition must be an object or an array, found: '{kind}'")]
-    RunInvalidType { kind: Kind },
-
     #[display(fmt = "'hosts' property must be a dynamic expression in step definition")]
     StepStaticHosts,
 
-    #[display(fmt = "invalid type of 'tasks' property in step definition")]
-    StepInvalidTasksType { kind: Kind },
-
     #[display(fmt = "step definition must have 'tasks' property")]
     StepMissingTasks,
-
-    #[display(fmt = "step definition must be an object, found: '{kind}'")]
-    StepNonObject { kind: Kind },
 
     #[display(fmt = "task definition must have 'task' property")]
     TaskMissingTask,
@@ -77,6 +68,9 @@ pub enum DefsErrorDetail {
     //vv ^^ merge these?
     #[display(fmt = "cannot parse 'output' definition : {err}")]
     OutputParseErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot parse step '{step}' definition : {err}")]
+    StepParseErr { step: String, err: Box<dyn Diag> },
 
     #[display(fmt = "cannot parse opath property '{prop}' : {err}")]
     EnvPropParseErr {

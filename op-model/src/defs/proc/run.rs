@@ -25,21 +25,37 @@ impl ParsedModelDef for Run {
             let kind = rn.data().kind();
             match *rn.data().value() {
                 Value::Array(ref elems) => {
-                    for v in elems.iter() {
-                        let mut step = Step::parse(model, parent, v)?;
+                    for (idx, v) in elems.iter().enumerate() {
+                        let mut step = Step::parse(model, parent, v).map_err(|err| {
+                            DefsErrorDetail::StepParseErr {
+                                step: idx.to_string(),
+                                err: Box::new(err),
+                            }
+                        })?;
                         step.index = run.steps.len();
                         run.steps.push(step);
                     }
                 }
                 Value::Object(ref props) => {
-                    for v in props.values() {
-                        let mut step = Step::parse(model, parent, v)?;
+                    for (idx, (k, v)) in props.iter().enumerate() {
+                        let mut step = Step::parse(model, parent, v).map_err(|err| {
+                            DefsErrorDetail::StepParseErr {
+                                step: format!("{} ({})", idx, k),
+                                err: Box::new(err),
+                            }
+                        })?;
                         step.index = run.steps.len();
                         run.steps.push(step);
                     }
                 }
                 Value::Null => {}
-                _ => return Err(DefsErrorDetail::RunInvalidType { kind }.into()),
+                _ => {
+                    return Err(DefsErrorDetail::UnexpectedPropType {
+                        kind,
+                        expected: vec![Kind::Array, Kind::Object],
+                    }
+                    .into())
+                }
             }
         }
         Ok(run)
@@ -65,7 +81,7 @@ impl Step {
         model: &'a Model,
         proc: &ProcDef,
     ) -> DefsResult<Vec<Cow<'a, HostDef>>> {
-        self.hosts.as_ref().map_or(
+        self.hosts().map_or(
             Ok(model.hosts().iter().map(|h| Cow::Borrowed(h)).collect()),
             |hosts_expr| {
                 let hs = hosts_expr
@@ -86,6 +102,10 @@ impl Step {
 
     pub fn tasks(&self) -> &[TaskDef] {
         &self.tasks
+    }
+
+    pub fn hosts(&self) -> Option<&Opath> {
+        self.hosts.as_ref()
     }
 
     pub fn index(&self) -> usize {
@@ -118,7 +138,13 @@ impl ParsedModelDef for Step {
                         .values()
                         .map(|t| TaskDef::parse(model, parent, t))
                         .collect::<Result<Vec<_>, _>>()?,
-                    _ => return Err(DefsErrorDetail::StepInvalidTasksType { kind }.into()),
+                    _ => {
+                        return Err(DefsErrorDetail::UnexpectedPropType {
+                            kind,
+                            expected: vec![Kind::Array, Kind::Object],
+                        }
+                        .into())
+                    }
                 }
             } else {
                 return Err(DefsErrorDetail::StepMissingTasks.into());
@@ -130,8 +156,9 @@ impl ParsedModelDef for Step {
                 tasks,
             })
         } else {
-            return Err(DefsErrorDetail::StepNonObject {
+            return Err(DefsErrorDetail::UnexpectedPropType {
                 kind: node.data().kind(),
+                expected: vec![Kind::Object],
             }
             .into());
         }
