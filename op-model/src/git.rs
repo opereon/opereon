@@ -5,6 +5,7 @@ use git2::{
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, ResultExt};
 use std::path::{Path, PathBuf};
+use serde::export::fmt::Debug;
 
 pub type GitError = BasicDiag;
 pub type GitResult<T> = Result<T, GitError>;
@@ -51,11 +52,12 @@ pub enum GitErrorDetail {
 
 /// Struct to manage git repository
 pub struct GitManager {
-    /// Contains opened repository or `None`
+    /// Contains opened repository
     repo: Repository,
 }
 
 impl GitManager {
+    /// Open existing git repository and return `GitManager`
     pub fn new<P: AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
         let repo: Repository = Repository::open(repo_dir.as_ref())
             .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
@@ -75,8 +77,8 @@ impl GitManager {
         let parent = self.find_last_commit()?;
         let tree = self.get_tree(&oid.into())?;
 
-        if let Some(parent) = parent {
-            let _commit = repo
+        let commit = if let Some(parent) = parent {
+            repo
                 .commit(
                     Some("HEAD"),
                     signature,
@@ -85,19 +87,19 @@ impl GitManager {
                     &tree,
                     &[&parent],
                 )
-                .map_err(|err| GitErrorDetail::Commit { err })?;
+                .map_err(|err| GitErrorDetail::Commit { err })?
         } else {
-            let _commit = repo
+            repo
                 .commit(Some("HEAD"), signature, signature, message, &tree, &[])
-                .map_err(|err| GitErrorDetail::Commit { err })?;
+                .map_err(|err| GitErrorDetail::Commit { err })?
         };
 
         repo.checkout_index(None, None)
             .map_err(|err| GitErrorDetail::Custom { err })?;
-        Ok(oid.into())
+        Ok(commit.into())
     }
 
-    /// Creates new git repository
+    /// Creates new git repository and makes initial commit.
     pub fn init_new_repository<P: AsRef<Path>>(
         path: P,
         opts: &RepositoryInitOptions,
@@ -163,8 +165,10 @@ impl GitManager {
         index
             .clear()
             .map_err(|err| GitErrorDetail::Custom { err })?;
+        let opts = IndexAddOption::default();
+//        opts.insert(IndexAddOption::CHECK_PATHSPEC);
         index
-            .add_all(&["*"], IndexAddOption::default(), None)
+            .update_all(&["*"], None)
             .map_err(|err| GitErrorDetail::Custom { err })?;
 
         // Changes in index won't be saved to disk until index.write*() called.
@@ -205,6 +209,11 @@ impl GitManager {
     }
 }
 
+impl Debug for GitManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "GitManager")
+    }
+}
 /*#[cfg(test)]
 mod tests {
     use git2::build::CheckoutBuilder;
