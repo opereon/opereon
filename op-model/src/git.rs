@@ -168,7 +168,7 @@ impl GitManager {
         let opts = IndexAddOption::default();
 //        opts.insert(IndexAddOption::CHECK_PATHSPEC);
         index
-            .update_all(&["*"], None)
+            .add_all(&["*"], opts, None)
             .map_err(|err| GitErrorDetail::Custom { err })?;
 
         // Changes in index won't be saved to disk until index.write*() called.
