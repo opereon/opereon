@@ -187,7 +187,7 @@ impl Model {
         Ok(manifest)
     }
 
-    fn read_revision(metadata: Metadata) -> ModelResult<Model> {
+    pub fn read_revision(metadata: Metadata) -> ModelResult<Model> {
         let manifest = Model::load_manifest(metadata.path())?;
 
         kg_tree::set_base_path(metadata.path());
@@ -205,21 +205,31 @@ impl Model {
             FileFormat::Binary,
         )));
 
-        let commit = m.metadata.id();
-        let model_dir = m.metadata.path().to_owned();
+        let scope = ScopeMut::new();
+
+        m.eval_includes(&cr, &scope)?;
+        m.set_defines(&manifest);
+        m.eval_overrides(&cr, &scope)?;
+        m.eval_interpolations()?;
+
+        return Ok(m);
+    }
+
+    fn eval_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
+        let model = self;
+        let commit = model.metadata.id();
+        let model_dir = model.metadata.path().to_owned();
+
+        scope.set_func(
+            "loadFile".into(),
+            Box::new(LoadFileFunc::new(model_dir.clone(), commit)),
+        );
 
         let git = GitManager::new(&model_dir)?;
         let odb = git.odb()?;
         let tree = git.get_tree(&commit)?;
 
-        let scope = ScopeMut::new();
-        scope.set_func(
-            "loadFile".into(),
-            Box::new(LoadFileFunc::new(model_dir, commit)),
-        );
-
         let mut walk_err = None;
-
         tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
             let entry_name = entry.name().unwrap();
 
@@ -234,13 +244,13 @@ impl Model {
 
             if file_type == FileType::File
                 && (entry_name == DEFAULT_MANIFEST_FILENAME
-                    || entry_name == DEFAULT_CONFIG_FILENAME)
+                || entry_name == DEFAULT_CONFIG_FILENAME)
             {
                 return TreeWalkResult::Ok;
             }
 
             let path = PathBuf::from_str(parent_path).unwrap().join(entry_name);
-            let path_abs = m.metadata.path().join(&path);
+            let path_abs = model_dir.join(&path);
             let config = cr.resolve(&path_abs);
 
             let inner = || -> ModelResult<()> {
@@ -259,7 +269,7 @@ impl Model {
 
                     let item = inc
                         .item()
-                        .apply_one_ext(m.root(), &n, scope.as_ref())
+                        .apply_one_ext(model.root(), &n, scope.as_ref())
                         .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
 
                     if item.data().file().is_none() {
@@ -269,7 +279,7 @@ impl Model {
                     scope.set_var("item".into(), NodeSet::One(item));
 
                     inc.mapping()
-                        .apply_ext(m.root(), m.root(), scope.as_ref())
+                        .apply_ext(model.root(), model.root(), scope.as_ref())
                         .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                 }
                 Ok(())
@@ -282,41 +292,56 @@ impl Model {
                 TreeWalkResult::Ok
             }
         })
-        .map_err(|err| GitErrorDetail::Custom { err })?;
-
+            .map_err(|err| GitErrorDetail::Custom { err })?;
         if let Some(err) = walk_err {
             return Err(err);
         }
+        Ok(())
+    }
 
-        // defines
+    fn eval_interpolations(&mut self) -> ModelResult<()> {
+        let model = self;
+        let mut resolver = TreeResolver::new();
+        resolver.resolve(model.root()).map_err(|err| {
+            BasicDiag::from(ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
+        })?;
         {
-            let defs = manifest.defines().to_node();
-            if manifest.defines().is_user_defined() {
-                defs.data_mut().set_file(Some(&FileInfo::new(
-                    &m.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
-                    FileType::File,
-                    FileFormat::Toml,
-                )));
+            let scope = model.scoped.scope_mut()?;
+
+            // definitions (hosts, users, processors)
+            //FIXME (jc) error handling
+            let mut hosts = Vec::new();
+            for h in scope.get_var("$hosts").unwrap().iter() {
+                match HostDef::parse(&model, &model.scoped, h) {
+                    Ok(host) => hosts.push(host),
+                    Err(_err) => eprintln!("err"),
+                }
             }
+            model.hosts = hosts;
 
-            let scope_def = m.scoped.scope_def_mut();
+            let mut users = Vec::new();
+            for u in scope.get_var("$users").unwrap().iter() {
+                match UserDef::parse(&model, &model.scoped, u) {
+                    Ok(user) => users.push(user),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            model.users = users;
 
-            scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
-            scope_def.set_var_def(
-                "$hosts".into(),
-                ValueDef::Resolvable(manifest.defines().hosts().clone()),
-            );
-            scope_def.set_var_def(
-                "$users".into(),
-                ValueDef::Resolvable(manifest.defines().users().clone()),
-            );
-            scope_def.set_var_def(
-                "$procs".into(),
-                ValueDef::Resolvable(manifest.defines().procs().clone()),
-            );
+            let mut procs = Vec::new();
+            for p in scope.get_var("$procs").unwrap().iter() {
+                match ProcDef::parse(&model, &model.scoped, p) {
+                    Ok(p) => procs.push(p),
+                    Err(_err) => eprintln!("err"),
+                }
+            }
+            model.procs = procs;
         }
+        Ok(())
+    }
 
-        // overrides
+    fn eval_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()>{
+        let model = self;
         for (path, config) in cr.iter() {
             if !config.overrides().is_empty() {
                 let path = if path.as_os_str().is_empty() {
@@ -326,61 +351,49 @@ impl Model {
                 };
 
                 let current = path
-                    .apply_one_ext(m.root(), m.root(), scope.as_ref())
+                    .apply_one_ext(model.root(), model.root(), scope.as_ref())
                     .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
 
                 for (p, e) in config.overrides().iter() {
                     let res = p
-                        .apply_ext(m.root(), &current, scope.as_ref())
+                        .apply_ext(model.root(), &current, scope.as_ref())
                         .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                     for n in res.into_iter() {
-                        e.apply_ext(m.root(), &n, scope.as_ref())
+                        e.apply_ext(model.root(), &n, scope.as_ref())
                             .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
                     }
                 }
             }
         }
+        Ok(())
+    }
 
-        // interpolations
-        let mut resolver = TreeResolver::new();
-        resolver.resolve(m.root()).map_err(|err| {
-            BasicDiag::from(ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
-        })?;
-
-        {
-            let scope = m.scoped.scope_mut()?;
-
-            // definitions (hosts, users, processors)
-            //FIXME (jc) error handling
-            let mut hosts = Vec::new();
-            for h in scope.get_var("$hosts").unwrap().iter() {
-                match HostDef::parse(&m, &m.scoped, h) {
-                    Ok(host) => hosts.push(host),
-                    Err(_err) => eprintln!("err"),
-                }
-            }
-            m.hosts = hosts;
-
-            let mut users = Vec::new();
-            for u in scope.get_var("$users").unwrap().iter() {
-                match UserDef::parse(&m, &m.scoped, u) {
-                    Ok(user) => users.push(user),
-                    Err(_err) => eprintln!("err"),
-                }
-            }
-            m.users = users;
-
-            let mut procs = Vec::new();
-            for p in scope.get_var("$procs").unwrap().iter() {
-                match ProcDef::parse(&m, &m.scoped, p) {
-                    Ok(p) => procs.push(p),
-                    Err(_err) => eprintln!("err"),
-                }
-            }
-            m.procs = procs;
+    fn set_defines(&mut self, manifest: &Manifest) {
+        let model = self;
+        let defs = manifest.defines().to_node();
+        if manifest.defines().is_user_defined() {
+            defs.data_mut().set_file(Some(&FileInfo::new(
+                &model.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
+                FileType::File,
+                FileFormat::Toml,
+            )));
         }
 
-        return Ok(m);
+        let scope_def = model.scoped.scope_def_mut();
+
+        scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
+        scope_def.set_var_def(
+            "$hosts".into(),
+            ValueDef::Resolvable(manifest.defines().hosts().clone()),
+        );
+        scope_def.set_var_def(
+            "$users".into(),
+            ValueDef::Resolvable(manifest.defines().users().clone()),
+        );
+        scope_def.set_var_def(
+            "$procs".into(),
+            ValueDef::Resolvable(manifest.defines().procs().clone()),
+        );
     }
 
     pub fn metadata(&self) -> &Metadata {
