@@ -1,12 +1,12 @@
 use crate::Sha1Hash;
+use git2::build::CheckoutBuilder;
 use git2::{
     Commit, ErrorCode, IndexAddOption, Odb, Oid, Repository, RepositoryInitOptions, Signature, Tree,
 };
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, ResultExt};
-use std::path::{Path, PathBuf};
 use serde::export::fmt::Debug;
-use git2::build::CheckoutBuilder;
+use std::path::{Path, PathBuf};
 
 pub type GitError = BasicDiag;
 pub type GitResult<T> = Result<T, GitError>;
@@ -48,10 +48,7 @@ pub enum GitErrorDetail {
     UnexpectedObjectType { err: git2::Error },
 
     #[display(fmt = "cannot set config key '{key}': '{err}'")]
-    SetConfig {
-        key: String,
-        err: git2::Error
-    },
+    SetConfig { key: String, err: git2::Error },
 
     #[display(fmt = "git error occurred: '{err}'")]
     Custom { err: git2::Error },
@@ -78,8 +75,10 @@ impl GitManager {
     /// Refresh index, commit current changes and checkout to this commit.
     /// Returns oid of created commit
     pub fn commit(&self, message: &str) -> GitResult<Sha1Hash> {
-        let sig = self.repo().signature().
-            map_err(|err| GitErrorDetail::Custom {err})?;
+        let sig = self
+            .repo()
+            .signature()
+            .map_err(|err| GitErrorDetail::Custom { err })?;
 
         self.commit_sign(message, &sig)
     }
@@ -92,19 +91,17 @@ impl GitManager {
         let tree = self.get_tree(&oid.into())?;
 
         let commit = if let Some(parent) = parent {
-            repo
-                .commit(
-                    Some("HEAD"),
-                    signature,
-                    signature,
-                    message,
-                    &tree,
-                    &[&parent],
-                )
-                .map_err(|err| GitErrorDetail::Commit { err })?
+            repo.commit(
+                Some("HEAD"),
+                signature,
+                signature,
+                message,
+                &tree,
+                &[&parent],
+            )
+            .map_err(|err| GitErrorDetail::Commit { err })?
         } else {
-            repo
-                .commit(Some("HEAD"), signature, signature, message, &tree, &[])
+            repo.commit(Some("HEAD"), signature, signature, message, &tree, &[])
                 .map_err(|err| GitErrorDetail::Commit { err })?
         };
 
@@ -124,15 +121,17 @@ impl GitManager {
             .into_diag()?;
         let mut config = repo.config().unwrap();
         // TODO parametrize
-        config.set_str("user.name", "opereon")
+        config
+            .set_str("user.name", "opereon")
             .map_err(|err| GitErrorDetail::SetConfig {
                 key: "user.name".to_string(),
-                err
+                err,
             })?;
-        config.set_str("user.email", "opereon")
+        config
+            .set_str("user.email", "opereon")
             .map_err(|err| GitErrorDetail::SetConfig {
                 key: "user.email".to_string(),
-                err
+                err,
             })?;
         Ok(())
     }
@@ -200,7 +199,9 @@ impl GitManager {
         let oid = index
             .write_tree()
             .map_err(|err| GitErrorDetail::Custom { err })?;
-        index.write().map_err(|err| GitErrorDetail::Custom { err })?;
+        index
+            .write()
+            .map_err(|err| GitErrorDetail::Custom { err })?;
         Ok(oid)
     }
 

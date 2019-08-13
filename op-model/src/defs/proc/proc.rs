@@ -174,12 +174,12 @@ impl ParsedModelDef for ProcDef {
                 }
 
                 p.run = Run::parse(model, &p.scoped, node)
-                    .map_err(|err| DefsErrorDetail::RunParseErr{err: Box::new(err)})?;
+                    .map_err(|err| DefsErrorDetail::RunParseErr { err: Box::new(err) })?;
             }
             _ => {
                 return Err(DefsErrorDetail::UnexpectedPropType {
                     kind: node.data().kind(),
-                    expected: vec![Kind::Object]
+                    expected: vec![Kind::Object],
                 }
                 .into())
             }

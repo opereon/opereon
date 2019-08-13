@@ -1,9 +1,9 @@
 use super::*;
 use kg_diag::{BasicDiag, FileType};
-use op_model::{ProcDef, ProcKind};
-use std::str::FromStr;
-use std::path::PathBuf;
 use kg_tree::FileInfo;
+use op_model::{ProcDef, ProcKind};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 #[test]
 fn proc_kind_from_str() {
@@ -105,7 +105,8 @@ watch:
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
+    let (_err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
 }
 
 #[test]
@@ -121,7 +122,8 @@ watch_file:
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
+    let (_err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
 }
 
 #[test]
@@ -180,7 +182,12 @@ proc: lala
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::UnknownProcKind{value}, assert_eq!("lala", value));
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::UnknownProcKind { value },
+        assert_eq!("lala", value)
+    );
 }
 
 #[test]
@@ -195,7 +202,12 @@ watch: some-string
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcWatchNonObject{kind}, assert_eq!(&Kind::String, kind));
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::ProcWatchNonObject { kind },
+        assert_eq!(&Kind::String, kind)
+    );
 }
 
 #[test]
@@ -210,7 +222,12 @@ watch_file: some-string
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcWatchNonObject{kind}, assert_eq!(&Kind::String, kind));
+    let (_err, _detail) = assert_detail!(
+        res,
+        DefsErrorDetail,
+        DefsErrorDetail::ProcWatchNonObject { kind },
+        assert_eq!(&Kind::String, kind)
+    );
 }
 
 #[test]

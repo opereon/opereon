@@ -1,12 +1,8 @@
 use super::*;
-use op_model::{GitManager, Sha1Hash};
-use std::path::{Path};
-use git2::{Repository, Signature, RepositoryInitOptions};
+use git2::{Repository, RepositoryInitOptions, Signature};
 use op_model::GitErrorDetail;
-
-fn init_repo<P: AsRef<Path>>(path: P) -> Repository {
-    Repository::init(path).expect("Cannot init git repository!")
-}
+use op_model::{GitManager, Sha1Hash};
+use std::path::Path;
 
 #[test]
 fn new_git_manager_empty_repo() {
@@ -42,21 +38,6 @@ fn init_err() {
     let res = GitManager::init_new_repository(&dir, &opts);
 
     let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::CreateRepository{..});
-}
-
-
-pub fn initial_commit(path: &Path) -> Sha1Hash{
-    let repo= Repository::open(path).unwrap();
-    let sig = repo.signature().unwrap();
-
-    let tree_id = {
-        let mut index = repo.index().unwrap();
-        index.add_all(&["*"], git2::IndexAddOption::default(), None).unwrap();
-        index.write_tree().unwrap()
-    };
-
-    let tree = repo.find_tree(tree_id).unwrap();
-    repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[]).unwrap().into()
 }
 
 #[test]
@@ -109,15 +90,15 @@ fn update_index_empty_repo() {
     let index = repo.index().unwrap();
 
     assert_eq!(2, index.iter().count());
-    let example = index.iter().find(|ie|{
-        String::from_utf8_lossy(&ie.path) == "example_file.txt"
-    });
-    let gitignore = index.iter().find(|ie|{
-        String::from_utf8_lossy(&ie.path) == ".gitignore"
-    });
-    let ignored = index.iter().find(|ie|{
-        String::from_utf8_lossy(&ie.path) == "ignored_file.txt"
-    });
+    let example = index
+        .iter()
+        .find(|ie| String::from_utf8_lossy(&ie.path) == "example_file.txt");
+    let gitignore = index
+        .iter()
+        .find(|ie| String::from_utf8_lossy(&ie.path) == ".gitignore");
+    let ignored = index
+        .iter()
+        .find(|ie| String::from_utf8_lossy(&ie.path) == "ignored_file.txt");
     assert!(example.is_some());
     assert!(gitignore.is_some());
     assert!(ignored.is_none());

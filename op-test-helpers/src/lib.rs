@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 use std::fmt::Display;
 use tempfile::TempDir;
@@ -80,10 +80,12 @@ pub fn get_resources_dir() -> PathBuf {
 
 pub fn copy_resource<P: AsRef<Path>>(resource: P, target: P) {
     let r = get_resources_dir().join(resource.as_ref());
-    let res = copy_dir::copy_dir(r, target)
-        .expect(&format!("Cannot copy test resource {}", resource.as_ref().display()));
+    let res = copy_dir::copy_dir(r, target).expect(&format!(
+        "Cannot copy test resource {}",
+        resource.as_ref().display()
+    ));
     if !res.is_empty() {
-        for err in res{
+        for err in res {
             eprintln!("err = {:?}", err);
         }
         panic!("Cannot copy test resource!")

@@ -1,4 +1,4 @@
-use git2::{RepositoryInitOptions};
+use git2::RepositoryInitOptions;
 
 use super::*;
 use crate::ConfigRef;

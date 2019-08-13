@@ -1,6 +1,6 @@
 use super::*;
-use op_model::{Model, ModelErrorDetail};
 use kg_diag::io::IoError;
+use op_model::{Model, ModelErrorDetail};
 
 #[test]
 fn load_manifest() {
@@ -22,14 +22,20 @@ custom_prop = "@.custom.expr"
 
     let manifest = Model::load_manifest(&dir).unwrap_disp();
 
-    assert_eq!(&["author@example.com".to_string()], manifest.info().authors());
+    assert_eq!(
+        &["author@example.com".to_string()],
+        manifest.info().authors()
+    );
     assert_eq!("Opereon model", manifest.info().description());
 
     assert_eq!("$.users", manifest.defines().users().to_string());
     assert_eq!("$.hosts", manifest.defines().hosts().to_string());
     assert_eq!("$.(proc, probe)", manifest.defines().procs().to_string());
-    assert_eq!("@.custom.expr", manifest.defines().custom()["custom_prop"].to_string());
-//    assert_eq!(false, manifest.defines().is_user_defined());
+    assert_eq!(
+        "@.custom.expr",
+        manifest.defines().custom()["custom_prop"].to_string()
+    );
+    //    assert_eq!(false, manifest.defines().is_user_defined());
 }
 
 #[test]
@@ -54,6 +60,6 @@ info = "unexpected string"
     write_file!(dir.join("op.toml"), content);
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::MalformedManifest{..});
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::MalformedManifest{..});
 }
-
