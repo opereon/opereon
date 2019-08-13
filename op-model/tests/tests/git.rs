@@ -145,3 +145,33 @@ fn resolve_revision_str() {
 
     assert_eq!(commit, res);
 }
+
+#[test]
+fn read_obj_data() {
+    let (_tmp, dir) = get_tmp_dir();
+    init_repo(&dir);
+    write_file!(dir.join("example_file.txt"), "example content");
+    let commit = initial_commit(&dir);
+    let git = GitManager::new(dir).unwrap_disp();
+
+    let tree = git.get_tree(&commit).unwrap_disp();
+
+    let content = git.read_obj_data(&tree, "example_file.txt").unwrap_disp();
+
+    assert_eq!(String::from_utf8_lossy(&content), "example content");
+}
+
+#[test]
+fn read_obj_data_not_found() {
+    let (_tmp, dir) = get_tmp_dir();
+    init_repo(&dir);
+    write_file!(dir.join("example_file.txt"), "example content");
+    let commit = initial_commit(&dir);
+    let git = GitManager::new(dir).unwrap_disp();
+
+    let tree = git.get_tree(&commit).unwrap_disp();
+
+    let res = git.read_obj_data(&tree, "non_existing_file.txt");
+
+    let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::GetFile{..});
+}
