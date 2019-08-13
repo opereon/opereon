@@ -1,4 +1,4 @@
-use git2::{RepositoryInitOptions, Signature};
+use git2::{RepositoryInitOptions};
 
 use super::*;
 use crate::ConfigRef;
@@ -125,9 +125,8 @@ impl ModelManager {
         self.init()?;
 
         let git = GitManager::new(self.model_dir())?;
-        let signature = Signature::now("opereon", "example@email.com").unwrap();
 
-        let oid = git.commit(message, &signature)?;
+        let oid = git.commit(message)?;
 
         self.get(oid.into())
     }
