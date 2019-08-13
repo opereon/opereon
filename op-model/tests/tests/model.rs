@@ -1,6 +1,5 @@
 use super::*;
-use kg_diag::io::IoError;
-use op_model::{Model, ModelErrorDetail};
+use op_model::{Model, ModelErrorDetail, Metadata};
 
 #[test]
 fn load_manifest() {
@@ -47,7 +46,7 @@ fn load_manifest_utf8_err() {
 
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) = assert_detail!(res, IoError, IoError::IoPath{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ManifestReadErr{..});
 }
 
 #[test]
@@ -62,4 +61,18 @@ info = "unexpected string"
 
     let (_err, _detail) =
         assert_detail!(res, ModelErrorDetail, ModelErrorDetail::MalformedManifest{..});
+}
+#[test]
+fn read_cr_err_no_repo() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ConfigReadErr{..});
 }

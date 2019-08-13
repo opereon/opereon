@@ -24,8 +24,11 @@ pub enum ModelErrorDetail {
         err: Box<dyn Diag>,
     },
 
-    #[display(fmt = "cannot get config, git error occurred : {err}")]
+    #[display(fmt = "git error occurred : {err}")]
     ConfigGitErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot load model config : {err}")]
+    ConfigReadErr { err: Box<dyn Diag> },
 
     #[display(fmt = "cannot parse manifest file '{file_path}': {err}")]
     MalformedManifest {
@@ -33,10 +36,13 @@ pub enum ModelErrorDetail {
         err: Box<dyn Diag>,
     },
 
+    #[display(fmt = "cannot read manifest file: {err}")]
+    ManifestReadErr { err: Box<dyn Diag> },
+
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
 
-    #[display(fmt = "Config file '{file_path}' is not valid utf-8")]
+    #[display(fmt = "config file '{file_path}' is not valid utf-8")]
     ConfigUtf8Err { file_path: String },
 
     #[display(
@@ -177,7 +183,11 @@ impl Model {
     pub fn load_manifest(model_dir: &Path) -> ModelResult<Manifest> {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
-        fs::read_to_string(&path, &mut content)?;
+        fs::read_to_string(&path, &mut content)
+            .into_diag()
+            .map_err(|err| ModelErrorDetail::ManifestReadErr {
+                err: Box::new(err)
+            })?;
         let manifest: Manifest = kg_tree::serial::toml::from_str(&content).map_err(|err| {
             ModelErrorDetail::MalformedManifest {
                 err: Box::new(err),
@@ -197,7 +207,10 @@ impl Model {
             ..Model::empty()
         };
 
-        let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())?;
+        let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())
+            .map_err(|err| ModelErrorDetail::ConfigReadErr {
+                err: Box::new(err)
+            })?;
 
         m.root().data_mut().set_file(Some(&FileInfo::new(
             m.metadata.path(),
