@@ -207,15 +207,16 @@ impl Model {
 
         let scope = ScopeMut::new();
 
-        m.eval_includes(&cr, &scope)?;
+        m.resolve_includes(&cr, &scope)?;
         m.set_defines(&manifest);
-        m.eval_overrides(&cr, &scope)?;
-        m.eval_interpolations()?;
+        m.resolve_overrides(&cr, &scope)?;
+        m.resolve_interpolations()?;
 
         return Ok(m);
     }
 
-    fn eval_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
+    /// Walk through each entry in model directory, resolve matching `Includes` and apply changes to model tree
+    fn resolve_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
         let model = self;
         let commit = model.metadata.id();
         let model_dir = model.metadata.path().to_owned();
@@ -299,7 +300,8 @@ impl Model {
         Ok(())
     }
 
-    fn eval_interpolations(&mut self) -> ModelResult<()> {
+    /// Resolve each interpolation and apply changes to model tree
+    fn resolve_interpolations(&mut self) -> ModelResult<()> {
         let model = self;
         let mut resolver = TreeResolver::new();
         resolver.resolve(model.root()).map_err(|err| {
@@ -340,7 +342,8 @@ impl Model {
         Ok(())
     }
 
-    fn eval_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()>{
+    /// Resolve each `override` an apply changes to model tree.
+    fn resolve_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()>{
         let model = self;
         for (path, config) in cr.iter() {
             if !config.overrides().is_empty() {
@@ -368,6 +371,8 @@ impl Model {
         Ok(())
     }
 
+    /// Add `$defines`, `$hosts`, `$users`, `$procs` variables to model scope.
+    /// Variables are computed from `Defines` defined in `Manifest`.
     fn set_defines(&mut self, manifest: &Manifest) {
         let model = self;
         let defs = manifest.defines().to_node();
