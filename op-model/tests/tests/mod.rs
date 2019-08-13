@@ -20,3 +20,6 @@ macro_rules! node {
 }
 
 mod defs;
+mod model;
+mod config;
+mod git;

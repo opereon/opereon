@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use std::fmt::Display;
 use tempfile::TempDir;
@@ -13,7 +13,7 @@ macro_rules! write_file {
         use std::io::Write;
         let mut f = std::fs::File::create(&$path)
             .expect(&format!("Cannot create file: '{}'", $path.display()));
-        f.write_all($content.as_bytes())
+        f.write_all($content.as_ref())
             .expect(&format!("Cannot write file: '{}'", $path.display()))
     }};
 }
@@ -68,6 +68,26 @@ pub fn get_tmp_dir() -> (TempDir, PathBuf) {
     let dir = tempfile::tempdir_in(resources_dir).expect("Cannot create temporary dir!");
     let path = dir.path().to_path_buf();
     (dir, path)
+}
+
+/// Returns test resources directory located in `CARGO_MANIFEST_DIR/tests/resources/`.
+pub fn get_resources_dir() -> PathBuf {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/resources/");
+    assert!(d.exists());
+    d
+}
+
+pub fn copy_resource<P: AsRef<Path>>(resource: P, target: P) {
+    let r = get_resources_dir().join(resource.as_ref());
+    let res = copy_dir::copy_dir(r, target)
+        .expect(&format!("Cannot copy test resource {}", resource.as_ref().display()));
+    if !res.is_empty() {
+        for err in res{
+            eprintln!("err = {:?}", err);
+        }
+        panic!("Cannot copy test resource!")
+    }
 }
 
 /// Helper trait for pretty displaying error messages

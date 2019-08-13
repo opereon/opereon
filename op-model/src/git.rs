@@ -5,6 +5,8 @@ use git2::{
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, ResultExt};
 use std::path::{Path, PathBuf};
+use serde::export::fmt::Debug;
+use git2::build::CheckoutBuilder;
 
 pub type GitError = BasicDiag;
 pub type GitResult<T> = Result<T, GitError>;
@@ -45,17 +47,24 @@ pub enum GitErrorDetail {
     #[display(fmt = "unexpected git object type: '{err}'")]
     UnexpectedObjectType { err: git2::Error },
 
+    #[display(fmt = "cannot set config key '{key}': '{err}'")]
+    SetConfig {
+        key: String,
+        err: git2::Error
+    },
+
     #[display(fmt = "git error occurred: '{err}'")]
     Custom { err: git2::Error },
 }
 
 /// Struct to manage git repository
 pub struct GitManager {
-    /// Contains opened repository or `None`
+    /// Contains opened repository
     repo: Repository,
 }
 
 impl GitManager {
+    /// Open existing git repository and return `GitManager`
     pub fn new<P: AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
         let repo: Repository = Repository::open(repo_dir.as_ref())
             .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
@@ -68,15 +77,22 @@ impl GitManager {
 
     /// Refresh index, commit current changes and checkout to this commit.
     /// Returns oid of created commit
-    pub fn commit(&self, message: &str, signature: &Signature) -> GitResult<Sha1Hash> {
+    pub fn commit(&self, message: &str) -> GitResult<Sha1Hash> {
+        let sig = self.repo().signature().
+            map_err(|err| GitErrorDetail::Custom {err})?;
+
+        self.commit_sign(message, &sig)
+    }
+
+    pub fn commit_sign(&self, message: &str, signature: &Signature) -> GitResult<Sha1Hash> {
         let repo = self.repo();
 
         let oid = self.update_index()?;
         let parent = self.find_last_commit()?;
         let tree = self.get_tree(&oid.into())?;
 
-        if let Some(parent) = parent {
-            let _commit = repo
+        let commit = if let Some(parent) = parent {
+            repo
                 .commit(
                     Some("HEAD"),
                     signature,
@@ -85,26 +101,39 @@ impl GitManager {
                     &tree,
                     &[&parent],
                 )
-                .map_err(|err| GitErrorDetail::Commit { err })?;
+                .map_err(|err| GitErrorDetail::Commit { err })?
         } else {
-            let _commit = repo
+            repo
                 .commit(Some("HEAD"), signature, signature, message, &tree, &[])
-                .map_err(|err| GitErrorDetail::Commit { err })?;
+                .map_err(|err| GitErrorDetail::Commit { err })?
         };
 
-        repo.checkout_index(None, None)
+        let mut opts = CheckoutBuilder::new();
+        repo.checkout_index(None, Some(&mut opts))
             .map_err(|err| GitErrorDetail::Custom { err })?;
-        Ok(oid.into())
+        Ok(commit.into())
     }
 
-    /// Creates new git repository
+    /// Creates new git repository and makes initial commit.
     pub fn init_new_repository<P: AsRef<Path>>(
         path: P,
         opts: &RepositoryInitOptions,
     ) -> GitResult<()> {
-        let _repo = Repository::init_opts(path.as_ref(), opts)
+        let repo = Repository::init_opts(path.as_ref(), opts)
             .map_err(|err| GitErrorDetail::CreateRepository { err })
             .into_diag()?;
+        let mut config = repo.config().unwrap();
+        // TODO parametrize
+        config.set_str("user.name", "opereon")
+            .map_err(|err| GitErrorDetail::SetConfig {
+                key: "user.name".to_string(),
+                err
+            })?;
+        config.set_str("user.email", "opereon")
+            .map_err(|err| GitErrorDetail::SetConfig {
+                key: "user.email".to_string(),
+                err
+            })?;
         Ok(())
     }
 
@@ -163,14 +192,15 @@ impl GitManager {
         index
             .clear()
             .map_err(|err| GitErrorDetail::Custom { err })?;
+        let opts = IndexAddOption::default();
         index
-            .add_all(&["*"], IndexAddOption::default(), None)
+            .add_all(&["*"], opts, None)
             .map_err(|err| GitErrorDetail::Custom { err })?;
-
         // Changes in index won't be saved to disk until index.write*() called.
         let oid = index
             .write_tree()
             .map_err(|err| GitErrorDetail::Custom { err })?;
+        index.write().map_err(|err| GitErrorDetail::Custom { err })?;
         Ok(oid)
     }
 
@@ -205,86 +235,8 @@ impl GitManager {
     }
 }
 
-/*#[cfg(test)]
-mod tests {
-    use git2::build::CheckoutBuilder;
-    use git2::{DiffFindOptions, DiffFormat, DiffOptions, Index, IndexAddOption, ObjectType, Oid};
-
-    use super::*;
-
-    #[test]
-    fn checkout_to_dir() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-        let out_dir = current.join(".op/checked_out");
-
-        let commit_hash = Oid::from_str("996d94321d833a918842c69531197f9d368ec4b6")
-            .expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit = repo.find_commit(commit_hash).expect("Cannot find commit");
-        let tree = commit.tree().expect("Cannot get commit tree");
-
-        let mut builder = CheckoutBuilder::new();
-        builder.target_dir(&out_dir);
-        // cannot update current index
-        builder.update_index(false);
-        // override everything in out_dir with commit state
-        builder.force();
-
-        repo.checkout_tree(tree.as_object(), Some(&mut builder))
-            .expect("Cannot checkout tree!");
+impl Debug for GitManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "GitManager")
     }
-
-    #[test]
-    fn diff() {
-        let current = PathBuf::from("/home/wiktor/Desktop/opereon/resources/model");
-
-        let commit_hash1 = Oid::from_str("6f09d0ad3908daa16992656cb33d4ed075e554a8")
-            .expect("Cannot parse commit hash");
-
-        let repo = Repository::open(&current).expect("Cannot open repository");
-
-        let commit1 = repo.find_commit(commit_hash1).expect("Cannot find commit");
-        let tree1 = commit1.tree().expect("Cannot get commit tree");
-
-        let mut opts = DiffOptions::new();
-        opts.minimal(true);
-
-        let mut index = repo.index().expect("Cannot get index!");
-
-        //         TODO what about .operc [[exclude]]? Should it be equal to .gitignore?
-        // Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes
-        // Changes in index won't be saved to disk until index.write*() called.
-        index.clear().expect("Cannot clear index");
-        index
-            .add_all(&["*"], IndexAddOption::default(), None)
-            .expect("Cannot update index");
-
-        //        index.write().expect("cannot write index");
-
-        let mut diff = repo
-            .diff_tree_to_workdir_with_index(Some(&tree1), Some(&mut opts))
-            .expect("Cannot get diff");
-
-        let mut find_opts = DiffFindOptions::new();
-        find_opts.renames(true);
-        find_opts.renames_from_rewrites(true);
-        find_opts.remove_unmodified(true);
-
-        diff.find_similar(Some(&mut find_opts))
-            .expect("Cannot find similar!");
-        println!("Diffs:");
-
-        let deltas = diff.deltas();
-        eprintln!("deltas.size_hint() = {:?}", deltas.size_hint());
-        for delta in deltas {
-            println!("======");
-            eprintln!("Change type: {:?}", delta.status());
-            let old = delta.old_file();
-            let new = delta.new_file();
-            eprintln!("old = id: {:?}, path: {:?}", old.id(), old.path());
-            eprintln!("new = id: {:?}, path: {:?}", new.id(), new.path());
-        }
-    }
-}*/
+}

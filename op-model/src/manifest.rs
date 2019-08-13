@@ -74,6 +74,15 @@ pub struct ManifestInfo {
     description: String,
 }
 
+impl ManifestInfo {
+    pub fn authors(&self) -> &[String] {
+        &self.authors
+    }
+    pub fn description(&self) -> &String {
+        &self.description
+    }
+}
+
 impl Default for ManifestInfo {
     fn default() -> Self {
         ManifestInfo {
