@@ -7,6 +7,8 @@ use tempfile::TempDir;
 mod node;
 pub use node::*;
 
+pub use copy_dir;
+
 #[macro_export]
 macro_rules! write_file {
     ($path: expr, $content:expr) => {{
@@ -44,6 +46,37 @@ macro_rules! assert_detail {
     }};
 }
 
+/// Returns test resources directory located in `CARGO_MANIFEST_DIR/tests/resources/`.
+#[macro_export]
+macro_rules! resources_dir {
+    () => {{
+        let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("tests/resources");
+        if !d.exists() {
+            panic!("Resources dir not exists! {}", d.display())
+        }
+        d
+    }};
+}
+
+/// Copy resources from `CARGO_MANIFEST_DIR/tests/resources/{resource}` to `target`.
+#[macro_export]
+macro_rules! copy_resource {
+    ($resource: expr, $target:expr) => {{
+        let r = resources_dir!().join(&$resource);
+        let res = op_test_helpers::copy_dir::copy_dir(&r, &$target).expect(&format!(
+            "Cannot copy test resource '{:?}' to '{:?}'",
+            r, $target
+        ));
+        if !res.is_empty() {
+            for err in res {
+                eprintln!("err = {:?}", err);
+            }
+            panic!("Cannot copy test resource!")
+        }
+    }};
+}
+
 /// Get absolute path to the "target" directory ("build" dir)
 pub fn get_target_dir() -> PathBuf {
     let bin = std::env::current_exe().expect("exe path");
@@ -70,28 +103,6 @@ pub fn get_tmp_dir() -> (TempDir, PathBuf) {
     (dir, path)
 }
 
-/// Returns test resources directory located in `CARGO_MANIFEST_DIR/tests/resources/`.
-pub fn get_resources_dir() -> PathBuf {
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("tests/resources/");
-    assert!(d.exists());
-    d
-}
-
-pub fn copy_resource<P: AsRef<Path>>(resource: P, target: P) {
-    let r = get_resources_dir().join(resource.as_ref());
-    let res = copy_dir::copy_dir(r, target).expect(&format!(
-        "Cannot copy test resource {}",
-        resource.as_ref().display()
-    ));
-    if !res.is_empty() {
-        for err in res {
-            eprintln!("err = {:?}", err);
-        }
-        panic!("Cannot copy test resource!")
-    }
-}
-
 /// Helper trait for pretty displaying error messages
 pub trait UnwrapDisplay<T> {
     /// Same as `.unwrap()` but uses `Display` instead of `Debug`.
@@ -107,5 +118,28 @@ where
             Ok(val) => val,
             Err(err) => panic!("called `Result::unwrap()` on an `Err`:\n{}", err),
         }
+    }
+}
+
+/// Helper trait for `to_string` conversions
+pub trait ToStringExt {
+    fn to_string_ext(&self) -> String;
+}
+
+impl ToStringExt for &Path {
+    fn to_string_ext(&self) -> String {
+        self.to_str().unwrap().to_string()
+    }
+}
+
+impl ToStringExt for PathBuf {
+    fn to_string_ext(&self) -> String {
+        self.to_str().unwrap().to_string()
+    }
+}
+
+impl ToStringExt for Vec<u8> {
+    fn to_string_ext(&self) -> String {
+        String::from_utf8_lossy(&self).to_string()
     }
 }

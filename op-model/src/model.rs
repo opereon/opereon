@@ -24,6 +24,9 @@ pub enum ModelErrorDetail {
         err: Box<dyn Diag>,
     },
 
+    #[display(fmt = "cannot get config, git error occurred : {err}")]
+    ConfigGitErr { err: Box<dyn Diag> },
+
     #[display(fmt = "cannot parse manifest file '{file_path}': {err}")]
     MalformedManifest {
         file_path: String,
@@ -33,8 +36,8 @@ pub enum ModelErrorDetail {
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
 
-    #[display(fmt = "Config file is not valid utf-8")]
-    ConfigUtf8Err,
+    #[display(fmt = "Config file '{file_path}' is not valid utf-8")]
+    ConfigUtf8Err { file_path: String },
 
     #[display(
         fmt = "cannot resolve interpolations: {detail}",
@@ -47,6 +50,12 @@ pub enum ModelErrorDetail {
 
     #[display(fmt = "cannot generate model diff: {detail}", detail = "err.detail()")]
     ModelDiffErr { err: Box<dyn Diag> },
+}
+
+impl ModelErrorDetail {
+    pub fn config_git_err(err: BasicDiag) -> ModelError {
+        ModelErrorDetail::ConfigGitErr { err: Box::new(err) }.into()
+    }
 }
 
 #[derive(Debug, Clone)]

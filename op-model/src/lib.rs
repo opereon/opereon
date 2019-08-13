@@ -22,7 +22,7 @@ use kg_tree::opath::*;
 use kg_tree::*;
 use kg_utils::collections::LinkedHashMap;
 
-use self::config::*;
+pub use self::config::*;
 use self::defs::Scoped;
 pub use self::defs::*;
 pub use self::git::*;

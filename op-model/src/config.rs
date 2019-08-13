@@ -265,9 +265,11 @@ pub struct ConfigResolver {
 
 impl ConfigResolver {
     pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
-        let git = GitManager::new(model_dir)?;
-        let odb = git.odb()?;
-        let commit_tree = git.get_tree(commit_hash)?;
+        let git = GitManager::new(model_dir).map_err(ModelErrorDetail::config_git_err)?;
+        let odb = git.odb().map_err(ModelErrorDetail::config_git_err)?;
+        let commit_tree = git
+            .get_tree(commit_hash)
+            .map_err(ModelErrorDetail::config_git_err)?;
 
         let mut cr = ConfigResolver::new(&model_dir);
 
@@ -284,18 +286,27 @@ impl ConfigResolver {
                 let mut inner = || -> ModelResult<()> {
                     let obj = odb
                         .read(entry.id())
-                        .map_err(|err| GitErrorDetail::GetFile {
-                            file: entry.name().unwrap().into(),
-                            err,
-                        })?;
-                    let content = String::from_utf8(obj.data().to_vec())
-                        .map_err(|_err| ModelErrorDetail::ConfigUtf8Err)?;
+                        .map_err(|err| {
+                            GitErrorDetail::GetFile {
+                                file: entry.name().unwrap().into(),
+                                err,
+                            }
+                            .into()
+                        })
+                        .map_err(ModelErrorDetail::config_git_err)?;
 
                     let file_path = model_dir
                         .join(parent_path)
                         .join(entry.name().unwrap())
                         .to_string_lossy()
                         .to_string();
+
+                    let content = String::from_utf8(obj.data().to_vec()).map_err(|_err| {
+                        ModelErrorDetail::ConfigUtf8Err {
+                            file_path: file_path.clone(),
+                        }
+                    })?;
+
                     let config: Config =
                         kg_tree::serial::toml::from_str(&content).map_err(|err| {
                             ModelErrorDetail::MalformedConfigFile {
@@ -314,7 +325,8 @@ impl ConfigResolver {
                     TreeWalkResult::Ok
                 }
             })
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+            .map_err(|err| GitErrorDetail::Custom { err }.into())
+            .map_err(ModelErrorDetail::config_git_err)?;
 
         if let Some(err) = walk_err {
             return Err(err);

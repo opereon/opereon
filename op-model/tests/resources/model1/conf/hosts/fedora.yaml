@@ -1,0 +1,5 @@
+ifaces:
+  ens33:
+    ip4: 127.0.0.1
+packages: [mc, vim-enhanced2]
+

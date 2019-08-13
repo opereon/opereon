@@ -1,8 +1,7 @@
 use super::*;
 use git2::{Repository, RepositoryInitOptions, Signature};
 use op_model::GitErrorDetail;
-use op_model::{GitManager, Sha1Hash};
-use std::path::Path;
+use op_model::GitManager;
 
 #[test]
 fn new_git_manager_empty_repo() {
@@ -92,13 +91,13 @@ fn update_index_empty_repo() {
     assert_eq!(2, index.iter().count());
     let example = index
         .iter()
-        .find(|ie| String::from_utf8_lossy(&ie.path) == "example_file.txt");
+        .find(|ie| ie.path.to_string_ext() == "example_file.txt");
     let gitignore = index
         .iter()
-        .find(|ie| String::from_utf8_lossy(&ie.path) == ".gitignore");
+        .find(|ie| ie.path.to_string_ext() == ".gitignore");
     let ignored = index
         .iter()
-        .find(|ie| String::from_utf8_lossy(&ie.path) == "ignored_file.txt");
+        .find(|ie| ie.path.to_string_ext() == "ignored_file.txt");
     assert!(example.is_some());
     assert!(gitignore.is_some());
     assert!(ignored.is_none());
@@ -139,7 +138,7 @@ fn read_obj_data() {
 
     let content = git.read_obj_data(&tree, "example_file.txt").unwrap_disp();
 
-    assert_eq!(String::from_utf8_lossy(&content), "example content");
+    assert_eq!(content.to_string_ext(), "example content");
 }
 
 #[test]
