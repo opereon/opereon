@@ -1,23 +1,24 @@
 use super::*;
 use op_exec::{ConfigErrorDetail, ConfigRef, LogLevel};
 
+// language=toml
 const MAIN_CFG: &str = r##"
-    run_dir = "/var/run/opereon1"
-    data_dir = "/var/lib/opereon1"
+run_dir = "/var/run/opereon1"
+data_dir = "/var/lib/opereon1"
 
-    [daemon]
-    socket_path = "/var/run/opereon1/op.sock"
-    pid_file_path = "/var/run/opereon1/op.pid"
+[daemon]
+socket_path = "/var/run/opereon1/op.sock"
+pid_file_path = "/var/run/opereon1/op.pid"
 
-    [log]
-    level = "warning"
-    log_path = "/var/log/opereon1/opereon.log"
-
+[log]
+level = "warning"
+log_path = "/var/log/opereon1/opereon.log"
     "##;
 
+// language=toml
 const SECOND_CFG: &str = r##"
-    [queue]
-    persist_dir = "/var/run/opereon1/queue"
+[queue]
+persist_dir = "/var/run/opereon1/queue"
     "##;
 
 #[test]
@@ -92,7 +93,7 @@ fn read_with_interpolations() {
     let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
-
+    // language=toml
     let cfg = r##"
         run_dir = "${'some_expression' + 2}"
     "##;
@@ -106,6 +107,7 @@ fn read_with_interpolations() {
 
 #[test]
 fn from_json() {
+    // language=json
     let json = r##"
     {
         "queue": {
@@ -138,7 +140,7 @@ fn file_config_parse_err() {
     let (_tmp_dir, path) = get_tmp_dir();
 
     let cfg_path = path.join("config.toml");
-
+    // language=toml
     let cfg = r#"
         maflormed = %
         run_dir = "/var/run/opereon1"
@@ -153,6 +155,7 @@ fn file_config_parse_err() {
 
 #[test]
 fn json_config_parse_err() {
+    // language=json
     let json = r##"
     {
         "queue": {

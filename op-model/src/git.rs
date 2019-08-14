@@ -30,7 +30,7 @@ pub enum GitErrorDetail {
     GetIndex { err: git2::Error },
 
     #[display(
-        fmt = "cannot get file '{file_display}': '{err}'",
+        fmt = "cannot get git file '{file_display}': '{err}'",
         file_display = "file.display()"
     )]
     GetFile { file: PathBuf, err: git2::Error },

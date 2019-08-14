@@ -42,6 +42,15 @@ pub enum ModelErrorDetail {
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
 
+    #[display(fmt = "cannot resolve includes: {err}")]
+    IncludesResolveErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot resolve overrides: {err}")]
+    OverridesResolveErr { err: Box<dyn Diag> },
+
+    #[display(fmt = "cannot parse defs: {err}")]
+    DefsParseErr { err: Box<dyn Diag> },
+
     #[display(fmt = "config file '{file_path}' is not valid utf-8")]
     ConfigUtf8Err { file_path: String },
 
@@ -185,9 +194,7 @@ impl Model {
         let mut content = String::new();
         fs::read_to_string(&path, &mut content)
             .into_diag()
-            .map_err(|err| ModelErrorDetail::ManifestReadErr {
-                err: Box::new(err)
-            })?;
+            .map_err(|err| ModelErrorDetail::ManifestReadErr { err: Box::new(err) })?;
         let manifest: Manifest = kg_tree::serial::toml::from_str(&content).map_err(|err| {
             ModelErrorDetail::MalformedManifest {
                 err: Box::new(err),
@@ -208,9 +215,7 @@ impl Model {
         };
 
         let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())
-            .map_err(|err| ModelErrorDetail::ConfigReadErr {
-                err: Box::new(err)
-            })?;
+            .map_err(|err| ModelErrorDetail::ConfigReadErr { err: Box::new(err) })?;
 
         m.root().data_mut().set_file(Some(&FileInfo::new(
             m.metadata.path(),
@@ -220,10 +225,24 @@ impl Model {
 
         let scope = ScopeMut::new();
 
-        m.resolve_includes(&cr, &scope)?;
+        // TODO
+        // Error messages from following functions are not very detailed.
+        // Consider more detailed errors. See test cases 'tests/model.rs'
+        m.resolve_includes(&cr, &scope)
+            .map_err(|err| ModelErrorDetail::IncludesResolveErr { err: Box::new(err) })?;
         m.set_defines(&manifest);
-        m.resolve_overrides(&cr, &scope)?;
-        m.resolve_interpolations()?;
+        m.resolve_overrides(&cr, &scope)
+            .map_err(|err| ModelErrorDetail::OverridesResolveErr { err: Box::new(err) })?;
+
+        // resolve interpolations
+        let mut resolver = TreeResolver::new();
+        resolver
+            .resolve(m.root())
+            .map_err(|err| ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
+            .into_diag()?;
+
+        m.parse_defs()
+            .map_err(|err| ModelErrorDetail::DefsParseErr { err: Box::new(err) })?;
 
         return Ok(m);
     }
@@ -256,9 +275,9 @@ impl Model {
                 }
             };
 
-            if file_type == FileType::File
+            if file_type.is_file()
                 && (entry_name == DEFAULT_MANIFEST_FILENAME
-                || entry_name == DEFAULT_CONFIG_FILENAME)
+                    || entry_name == DEFAULT_CONFIG_FILENAME)
             {
                 return TreeWalkResult::Ok;
             }
@@ -306,49 +325,38 @@ impl Model {
                 TreeWalkResult::Ok
             }
         })
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+        .map_err(|err| GitErrorDetail::Custom { err })?;
         if let Some(err) = walk_err {
             return Err(err);
         }
         Ok(())
     }
 
-    /// Resolve each interpolation and apply changes to model tree
-    fn resolve_interpolations(&mut self) -> ModelResult<()> {
+    /// Parse `hosts`, `users` and `procs` definitions
+    fn parse_defs(&mut self) -> ModelResult<()> {
         let model = self;
-        let mut resolver = TreeResolver::new();
-        resolver.resolve(model.root()).map_err(|err| {
-            BasicDiag::from(ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
-        })?;
         {
             let scope = model.scoped.scope_mut()?;
 
             // definitions (hosts, users, processors)
-            //FIXME (jc) error handling
             let mut hosts = Vec::new();
             for h in scope.get_var("$hosts").unwrap().iter() {
-                match HostDef::parse(&model, &model.scoped, h) {
-                    Ok(host) => hosts.push(host),
-                    Err(_err) => eprintln!("err"),
-                }
+                let host = HostDef::parse(&model, &model.scoped, h)?;
+                hosts.push(host);
             }
             model.hosts = hosts;
 
             let mut users = Vec::new();
             for u in scope.get_var("$users").unwrap().iter() {
-                match UserDef::parse(&model, &model.scoped, u) {
-                    Ok(user) => users.push(user),
-                    Err(_err) => eprintln!("err"),
-                }
+                let user = UserDef::parse(&model, &model.scoped, u)?;
+                users.push(user);
             }
             model.users = users;
 
             let mut procs = Vec::new();
             for p in scope.get_var("$procs").unwrap().iter() {
-                match ProcDef::parse(&model, &model.scoped, p) {
-                    Ok(p) => procs.push(p),
-                    Err(_err) => eprintln!("err"),
-                }
+                let proc = ProcDef::parse(&model, &model.scoped, p)?;
+                procs.push(proc);
             }
             model.procs = procs;
         }
@@ -356,7 +364,7 @@ impl Model {
     }
 
     /// Resolve each `override` an apply changes to model tree.
-    fn resolve_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()>{
+    fn resolve_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
         let model = self;
         for (path, config) in cr.iter() {
             if !config.overrides().is_empty() {

@@ -21,6 +21,13 @@ macro_rules! write_file {
 }
 
 #[macro_export]
+macro_rules! remove_file {
+    ($path: expr) => {{
+        std::fs::remove_file($path).expect(&format!("Cannot remove file: '{}'", $path.display()))
+    }};
+}
+
+#[macro_export]
 macro_rules! assert_detail {
     ($res: expr, $detail:ident, $variant: pat) => {
         assert_detail!($res, $detail, $variant, {})
@@ -41,7 +48,12 @@ macro_rules! assert_detail {
                 $block;
                 (err, det)
             }
-            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+            err => panic!(
+                "Expected error {} got {:?} : \n{}",
+                stringify!($variant),
+                err,
+                err
+            ),
         }
     }};
 }

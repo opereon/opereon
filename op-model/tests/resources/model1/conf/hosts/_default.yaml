@@ -1,5 +1,5 @@
 hostname: <% @key %>
-domain: kodegenix.pl
+domain: domain.com
 fqdn: <% hostname + '.' + domain %>
 ssh_dest:
   hostname: <% array(@^.**{0}.ip4)[0] %>

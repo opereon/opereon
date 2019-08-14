@@ -1,5 +1,5 @@
 use super::*;
-use op_model::{Model, ModelErrorDetail, Metadata};
+use op_model::{Metadata, Model, ModelErrorDetail};
 
 #[test]
 fn load_manifest() {
@@ -46,7 +46,8 @@ fn load_manifest_utf8_err() {
 
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ManifestReadErr{..});
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ManifestReadErr{..});
 }
 
 #[test]
@@ -62,6 +63,7 @@ info = "unexpected string"
     let (_err, _detail) =
         assert_detail!(res, ModelErrorDetail, ModelErrorDetail::MalformedManifest{..});
 }
+
 #[test]
 fn read_cr_err_no_repo() {
     let (_tmp, dir) = get_tmp_dir();
@@ -75,4 +77,242 @@ fn read_cr_err_no_repo() {
 
     let (_err, _detail) =
         assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ConfigReadErr{..});
+}
+
+#[test]
+fn read_include_item_expr_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=toml
+    let content = r#"
+inherit_includes = false
+[overrides]
+"@.*" = "@.extend(loadFile('conf/users/_default.yaml'), 0)"
+
+[[exclude]]
+path = "_default.*"
+
+[[include]]
+path = "**/example.yaml"
+file_type = "file"
+item = "unknownFunc()"
+mapping = "$.find(array($item.@file_path_components[:-2]).join('.', '\"')).extend($item)"
+"#;
+    write_file!(dir.join("conf/users/.operc"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::IncludesResolveErr{..});
+}
+
+#[test]
+fn read_include_mapping_expr_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=toml
+    let content = r#"
+inherit_includes = false
+[overrides]
+"@.*" = "@.extend(loadFile('conf/users/_default.yaml'), 0)"
+
+[[exclude]]
+path = "_default.*"
+
+[[include]]
+path = "**/example.yaml"
+file_type = "file"
+item = "loadFile(@file_path, @file_ext)"
+mapping = "unknownFunc()"
+"#;
+    write_file!(dir.join("conf/users/.operc"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::IncludesResolveErr{..});
+}
+
+#[test]
+fn read_override_val_expr_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=toml
+    let content = r#"
+[overrides]
+"@.*" = "@.extend(unknownFunc(), 0)"
+
+[[exclude]]
+path = "_default.*"
+"#;
+    write_file!(dir.join("conf/users/.operc"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::OverridesResolveErr{..});
+}
+
+#[test]
+fn read_override_key_expr_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=toml
+    let content = r#"
+[overrides]
+"unknownFunc(@)" = "@.extend(loadFile('conf/users/_default.yaml'), 0)"
+
+[[exclude]]
+path = "_default.*"
+"#;
+    write_file!(dir.join("conf/users/.operc"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::OverridesResolveErr{..});
+}
+
+#[test]
+fn read_interpolation_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=yaml
+    let content = r#"
+username: <% unknownFunc(@) %>
+"#;
+    write_file!(dir.join("conf/users/_default.yaml"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) =
+        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::InterpolationsResolveErr{..});
+}
+
+#[test]
+fn read_host_def_parse_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=yaml
+    let content = r#"
+hostname: some.hostname
+#ssh_dest:
+#  port: 22
+#  username: root
+#  auth:
+#    method: public-key
+#    identity_file: ~/.ssh/id_rsa
+"#;
+    remove_file!(dir.join("conf/hosts/.operc"));
+    remove_file!(dir.join("conf/hosts/_default.yaml"));
+    write_file!(dir.join("conf/hosts/fedora.yaml"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+}
+
+#[test]
+fn read_user_def_parse_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=yaml
+    let content = r#"
+# username: example_user
+some_prop: "value"
+"#;
+    remove_file!(dir.join("conf/users/.operc"));
+    remove_file!(dir.join("conf/users/_default.yaml"));
+    remove_file!(dir.join("conf/users/example2.toml"));
+    write_file!(dir.join("conf/users/example.yaml"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+}
+
+#[test]
+fn read_proc_def_parse_err() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    // language=yaml
+    let content = r#"
+updates:
+  proc: unknown_proc_kind
+  label: update /etc/hosts
+"#;
+    write_file!(dir.join("proc/hosts_file/_.yaml"), content);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let res = Model::read_revision(meta);
+
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+}
+
+#[test]
+fn read() {
+    let (_tmp, dir) = get_tmp_dir();
+    let dir = dir.join("model");
+    copy_resource!("model1", &dir);
+    init_repo(&dir);
+    let commit = initial_commit(&dir);
+    let mut meta = Metadata::default();
+    meta.set_path(dir.clone());
+    meta.set_id(commit);
+
+    let model = Model::read_revision(meta).unwrap_disp();
+
+    assert_eq!(1, model.hosts().len());
+    assert_eq!("fedora.domain.com", model.hosts()[0].hostname());
+
+    assert_eq!(2, model.users().len());
+    assert_eq!("example", model.users()[0].username());
+    assert_eq!("example2", model.users()[1].username());
 }
