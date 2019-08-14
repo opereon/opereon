@@ -1,3 +1,4 @@
+//#![deny(warnings)]
 #![feature(box_syntax, specialization, raw)]
 
 #[cfg(test)]
