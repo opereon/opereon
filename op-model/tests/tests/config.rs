@@ -14,10 +14,11 @@ fn resolver_scan_revision() {
     let cr: ConfigResolver = ConfigResolver::scan_revision(&dir, &commit).unwrap_disp();
 
     let cfgs: Vec<(&PathBuf, &Config)> = cr.iter().collect();
-    assert_eq!(3, cfgs.len());
+    assert_eq!(4, cfgs.len());
     assert_eq!("", cfgs[0].0.to_string_lossy());
     assert_eq!("conf/hosts", cfgs[1].0.to_string_ext());
     assert_eq!("conf/users", cfgs[2].0.to_string_ext());
+    assert_eq!("proc/hosts_file", cfgs[3].0.to_string_ext());
 }
 
 #[test]
