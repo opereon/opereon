@@ -9,6 +9,7 @@ use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
+use super::load_file::LoadFileFunc;
 use super::*;
 use kg_diag::{BasicDiag, Diag, Severity};
 
@@ -70,97 +71,6 @@ pub enum ModelErrorDetail {
 impl ModelErrorDetail {
     pub fn config_git_err(err: BasicDiag) -> ModelError {
         ModelErrorDetail::ConfigGitErr { err: Box::new(err) }.into()
-    }
-}
-
-#[derive(Debug, Clone)]
-struct LoadFileFunc {
-    model_dir: PathBuf,
-    model_oid: Sha1Hash,
-}
-
-impl LoadFileFunc {
-    fn new(model_dir: PathBuf, model_oid: Sha1Hash) -> Self {
-        Self {
-            model_dir,
-            model_oid,
-        }
-    }
-}
-
-impl FuncCallable for LoadFileFunc {
-    fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
-        args.check_count_func(&FuncId::Custom(name.to_string()), 1, 2)?;
-
-        let git = GitManager::new(&self.model_dir)?;
-        let tree = git.get_tree(&self.model_oid.into())?;
-        let odb = git.odb()?;
-
-        let paths = args.resolve_column(false, 0, env).map_err(|d| {
-            FuncCallErrorDetail::FuncCallCustomErr {
-                id: FuncId::Custom(name.to_string()),
-                err: Box::new(d),
-            }
-        })?;
-
-        if args.count() == 1 {
-            for path in paths.into_iter() {
-                let path = PathBuf::from(path.as_string());
-                let entry = tree
-                    .get_path(&path)
-                    .map_err(|err| GitErrorDetail::GetFile {
-                        file: path.clone(),
-                        err,
-                    })?;
-                let obj = odb
-                    .read(entry.id())
-                    .map_err(|err| GitErrorDetail::GetFile {
-                        file: path.clone(),
-                        err,
-                    })?;
-
-                let format = path.extension().map_or(FileFormat::Text, |ext| {
-                    FileFormat::from(ext.to_str().unwrap())
-                });
-
-                let node = NodeRef::from_bytes(obj.data(), format)?;
-                out.add(node)
-            }
-        } else {
-            let formats = args.resolve_column(false, 1, env).map_err(|d| {
-                FuncCallErrorDetail::FuncCallCustomErr {
-                    id: FuncId::Custom(name.to_string()),
-                    err: Box::new(d),
-                }
-            })?;
-
-            for (p, f) in paths.into_iter().zip(formats.into_iter()) {
-                let path = PathBuf::from(p.as_string());
-                let entry = tree
-                    .get_path(&path)
-                    .map_err(|err| GitErrorDetail::GetFile {
-                        file: path.clone(),
-                        err,
-                    })?;
-                let obj = odb
-                    .read(entry.id())
-                    .map_err(|err| GitErrorDetail::GetFile {
-                        file: path.clone(),
-                        err,
-                    })?;
-
-                let format: FileFormat = f.data().as_string().as_ref().into();
-
-                let node = NodeRef::from_bytes(obj.data(), format)?;
-                out.add(node)
-            }
-        }
-
-        Ok(())
-    }
-
-    fn clone(&self) -> Box<dyn FuncCallable> {
-        Box::new(std::clone::Clone::clone(self))
     }
 }
 

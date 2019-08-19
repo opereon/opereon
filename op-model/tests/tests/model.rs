@@ -1,5 +1,5 @@
 use super::*;
-use op_model::{Metadata, Model, ModelErrorDetail};
+use op_model::{Metadata, Model, ModelErrorDetail, ModelErrorDetail::*};
 
 #[test]
 fn load_manifest() {
@@ -46,8 +46,7 @@ fn load_manifest_utf8_err() {
 
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ManifestReadErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ManifestReadErr{..});
 }
 
 #[test]
@@ -60,8 +59,7 @@ info = "unexpected string"
     write_file!(dir.join("op.toml"), content);
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::MalformedManifest{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, MalformedManifest{..});
 }
 
 #[test]
@@ -75,8 +73,7 @@ fn read_cr_err_no_repo() {
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ConfigReadErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigReadErr{..});
 }
 
 #[test]
@@ -108,8 +105,7 @@ mapping = "$.find(array($item.@file_path_components[:-2]).join('.', '\"')).exten
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::IncludesResolveErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolveErr{..});
 }
 
 #[test]
@@ -141,8 +137,7 @@ mapping = "unknownFunc()"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::IncludesResolveErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolveErr{..});
 }
 
 #[test]
@@ -167,8 +162,7 @@ path = "_default.*"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::OverridesResolveErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolveErr{..});
 }
 
 #[test]
@@ -193,8 +187,7 @@ path = "_default.*"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::OverridesResolveErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolveErr{..});
 }
 
 #[test]
@@ -215,8 +208,7 @@ username: <% unknownFunc(@) %>
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::InterpolationsResolveErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, InterpolationsResolveErr{..});
 }
 
 #[test]
@@ -245,7 +237,7 @@ hostname: some.hostname
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
 }
 
 #[test]
@@ -270,7 +262,7 @@ some_prop: "value"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
 }
 
 #[test]
@@ -293,7 +285,7 @@ updates:
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::DefsParseErr{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
 }
 
 #[test]

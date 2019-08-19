@@ -1,7 +1,8 @@
 use crate::Sha1Hash;
 use git2::build::CheckoutBuilder;
 use git2::{
-    Commit, ErrorCode, IndexAddOption, Odb, Oid, Repository, RepositoryInitOptions, Signature, Tree,
+    Commit, ErrorCode, IndexAddOption, Odb, Oid, Repository, RepositoryInitOptions, Signature,
+    Tree, TreeEntry,
 };
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, ResultExt};
@@ -14,43 +15,43 @@ pub type GitResult<T> = Result<T, GitError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1100)]
 pub enum GitErrorDetail {
-    #[display(fmt = "cannot open git repository: '{err}'")]
+    #[display(fmt = "cannot open git repository: {err}")]
     OpenRepository { err: git2::Error },
 
-    #[display(fmt = "cannot create git repository: '{err}'")]
+    #[display(fmt = "cannot create git repository: {err}")]
     CreateRepository { err: git2::Error },
 
-    #[display(fmt = "cannot get git object database: '{err}'")]
+    #[display(fmt = "cannot get git object database: {err}")]
     GetDatabase { err: git2::Error },
 
-    #[display(fmt = "cannot create commit: '{err}'")]
+    #[display(fmt = "cannot create commit: {err}")]
     Commit { err: git2::Error },
 
-    #[display(fmt = "cannot get git index: '{err}'")]
+    #[display(fmt = "cannot get git index: {err}")]
     GetIndex { err: git2::Error },
 
     #[display(
-        fmt = "cannot get git file '{file_display}': '{err}'",
+        fmt = "cannot get git file '{file_display}': {err}",
         file_display = "file.display()"
     )]
     GetFile { file: PathBuf, err: git2::Error },
 
-    #[display(fmt = "cannot find git object: '{err}'")]
+    #[display(fmt = "cannot find git object: {err}")]
     FindObject { err: git2::Error },
 
-    #[display(fmt = "cannot resolve git reference: '{err}'")]
+    #[display(fmt = "cannot resolve git reference: {err}")]
     ResolveReference { err: git2::Error },
 
-    #[display(fmt = "cannot find revision: '{err}'")]
+    #[display(fmt = "cannot find revision: {err}")]
     RevisionNotFound { err: git2::Error },
 
-    #[display(fmt = "unexpected git object type: '{err}'")]
+    #[display(fmt = "unexpected git object type: {err}")]
     UnexpectedObjectType { err: git2::Error },
 
-    #[display(fmt = "cannot set config key '{key}': '{err}'")]
+    #[display(fmt = "cannot set config key '{key}': {err}")]
     SetConfig { key: String, err: git2::Error },
 
-    #[display(fmt = "git error occurred: '{err}'")]
+    #[display(fmt = "git error occurred: {err}")]
     Custom { err: git2::Error },
 }
 
@@ -212,12 +213,7 @@ impl GitManager {
             .odb()
             .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        let entry = tree
-            .get_path(path.as_ref())
-            .map_err(|err| GitErrorDetail::GetFile {
-                file: path.as_ref().to_path_buf(),
-                err,
-            })?;
+        let entry = tree.get_path_ext(path.as_ref())?;
         let obj = odb
             .read(entry.id())
             .map_err(|err| GitErrorDetail::GetFile {
@@ -239,5 +235,20 @@ impl GitManager {
 impl Debug for GitManager {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "GitManager")
+    }
+}
+
+pub trait TreeExt {
+    fn get_path_ext(&self, path: &Path) -> GitResult<TreeEntry>;
+}
+
+impl TreeExt for Tree<'_> {
+    fn get_path_ext(&self, path: &Path) -> Result<TreeEntry, BasicDiag> {
+        self.get_path(path)
+            .map_err(|err| GitErrorDetail::GetFile {
+                file: path.to_owned(),
+                err,
+            })
+            .into_diag()
     }
 }

@@ -5,6 +5,9 @@ use std::path::Path;
 
 /// Creates `NodeRef`
 macro_rules! node {
+    () => {{
+        node!("{}", "json")
+    }};
     ($json:expr) => {{
         NodeRef::from_json($json).unwrap_disp()
     }};
@@ -18,7 +21,7 @@ macro_rules! node {
         node!($str, "json")
     }};
     ($str:expr, $format:expr) => {{
-        NodeRef::from_str($str.into(), $format.into()).unwrap_disp()
+        kg_tree::NodeRef::from_str($str.into(), $format.into()).unwrap_disp()
     }};
 }
 
@@ -47,4 +50,5 @@ pub fn initial_commit(path: &Path) -> Sha1Hash {
 mod config;
 mod defs;
 mod git;
+mod load_file;
 mod model;
