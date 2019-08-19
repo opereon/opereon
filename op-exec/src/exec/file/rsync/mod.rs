@@ -28,7 +28,7 @@ pub enum ParseError {
 
 #[derive(Debug)]
 pub enum RsyncError {
-    IoError(std::io::Error),
+    IoErrorDetail(std::io::Error),
     RsyncProcessTerminated,
     ParseError(ParseError),
     SshError(SshError),
@@ -48,7 +48,7 @@ impl From<ParseError> for RsyncError {
 
 impl From<std::io::Error> for RsyncError {
     fn from(err: std::io::Error) -> Self {
-        RsyncError::IoError(err)
+        RsyncError::IoErrorDetail(err)
     }
 }
 

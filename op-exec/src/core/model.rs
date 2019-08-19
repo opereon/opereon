@@ -93,7 +93,7 @@ impl ModelManager {
             }
         }
 
-        return Err(IoError::file_not_found(manifest_filename, OpType::Read));
+        return Err(IoErrorDetail::file_not_found(manifest_filename, OpType::Read));
     }
 
     /// Initialize model manager.

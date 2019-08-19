@@ -41,8 +41,8 @@ impl From<std::fmt::Error> for CommandError {
     }
 }
 
-impl From<kg_diag::IoError> for CommandError {
-    fn from(err: kg_diag::IoError) -> Self {
+impl From<kg_diag::IoErrorDetail> for CommandError {
+    fn from(err: kg_diag::IoErrorDetail) -> Self {
         eprintln!("io error: {:?}", err);
         CommandError::Undef
     }
@@ -63,7 +63,7 @@ pub enum SourceRef<'a> {
 }
 
 impl<'a> SourceRef<'a> {
-    pub fn read(&self) -> Result<String, kg_diag::IoError> {
+    pub fn read(&self) -> Result<String, kg_diag::IoErrorDetail> {
         match *self {
             SourceRef::Path(path) => {
                 let mut s = String::new();
@@ -74,7 +74,7 @@ impl<'a> SourceRef<'a> {
         }
     }
 
-    pub fn read_to(&self, buf: &mut String) -> Result<(), kg_diag::IoError> {
+    pub fn read_to(&self, buf: &mut String) -> Result<(), kg_diag::IoErrorDetail> {
         match *self {
             SourceRef::Path(path) => {
                 fs::read_to_string(path, buf)?;
@@ -204,7 +204,7 @@ fn prepare_script<W: Write>(
     env: Option<&EnvVars>,
     cwd: Option<&Path>,
     mut out: W,
-) -> Result<(), IoError> {
+) -> Result<(), IoErrorDetail> {
     let mut rng = rand::thread_rng();
 
     let script = script.read()?;

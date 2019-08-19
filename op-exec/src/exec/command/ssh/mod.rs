@@ -19,7 +19,7 @@ mod operations;
 
 #[derive(Debug)]
 pub enum SshError {
-    IoError(kg_diag::IoError),
+    IoErrorDetail(kg_diag::IoErrorDetail),
     SshOpen(String),
     SshProcessTerminated,
     SshClosed,
@@ -27,15 +27,15 @@ pub enum SshError {
 }
 
 //FIXME (jc)
-impl From<kg_diag::IoError> for SshError {
-    fn from(err: kg_diag::IoError) -> Self {
-        SshError::IoError(err)
+impl From<kg_diag::IoErrorDetail> for SshError {
+    fn from(err: kg_diag::IoErrorDetail) -> Self {
+        SshError::IoErrorDetail(err)
     }
 }
 
 impl From<std::io::Error> for SshError {
     fn from(err: std::io::Error) -> Self {
-        SshError::IoError(err.into())
+        SshError::IoErrorDetail(err.into())
     }
 }
 

@@ -36,8 +36,8 @@ impl From<std::io::Error> for RuntimeError {
 }
 
 //FIXME (jc)
-impl From<kg_diag::IoError> for RuntimeError {
-    fn from(err: kg_diag::IoError) -> Self {
+impl From<kg_diag::IoErrorDetail> for RuntimeError {
+    fn from(err: kg_diag::IoErrorDetail) -> Self {
         println!("kg_io err: {}", err);
         RuntimeError::Io
     }
