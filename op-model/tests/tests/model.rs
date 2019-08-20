@@ -1,7 +1,8 @@
 use super::*;
 use kg_diag::IoErrorDetail;
+use kg_tree::opath::FuncCallErrorDetail;
+use op_model::DefsErrorDetail;
 use op_model::{GitErrorDetail, Metadata, Model, ModelErrorDetail, ModelErrorDetail::*};
-
 #[test]
 fn load_manifest() {
     let (_tmp, dir) = get_tmp_dir();
@@ -109,7 +110,9 @@ mapping = "$.find(array($item.@file_path_components[:-2]).join('.', '\"')).exten
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolveErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolve{..});
+
+    let _cause = assert_cause!(err, ModelErrorDetail);
 }
 
 #[test]
@@ -141,7 +144,8 @@ mapping = "unknownFunc()"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolveErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolve{..});
+    let _cause = assert_cause!(err, ModelErrorDetail);
 }
 
 #[test]
@@ -166,7 +170,8 @@ path = "_default.*"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolveErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolve{..});
+    let _cause = assert_cause!(err, ModelErrorDetail);
 }
 
 #[test]
@@ -191,7 +196,8 @@ path = "_default.*"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolveErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolve{..});
+    let _cause = assert_cause!(err, ModelErrorDetail);
 }
 
 #[test]
@@ -212,7 +218,8 @@ username: <% unknownFunc(@) %>
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, InterpolationsResolveErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, InterpolationsResolve);
+    let _cause = assert_cause!(err, FuncCallErrorDetail);
 }
 
 #[test]
@@ -241,7 +248,8 @@ hostname: some.hostname
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
+    let _cause = assert_cause!(err, DefsErrorDetail);
 }
 
 #[test]
@@ -266,7 +274,8 @@ some_prop: "value"
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
+    let _cause = assert_cause!(err, DefsErrorDetail);
 }
 
 #[test]
@@ -289,7 +298,8 @@ updates:
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParseErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
+    let _cause = assert_cause!(err, DefsErrorDetail);
 }
 
 #[test]

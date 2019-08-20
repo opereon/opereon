@@ -11,7 +11,7 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use super::load_file::LoadFileFunc;
 use super::*;
-use kg_diag::{BasicDiag, Diag, Severity};
+use kg_diag::{BasicDiag, Severity};
 
 pub type ModelError = BasicDiag;
 pub type ModelResult<T> = Result<T, ModelError>;
@@ -31,32 +31,26 @@ pub enum ModelErrorDetail {
     #[display(fmt = "cannot read manifest file")]
     ManifestRead,
 
-    #[display(fmt = "cannot find manifest file")]
-    ManifestNotFount,
+    #[display(fmt = "cannot resolve includes")]
+    IncludesResolve,
 
-    #[display(fmt = "cannot resolve includes: {err}")]
-    IncludesResolveErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot resolve overrides")]
+    OverridesResolve,
 
-    #[display(fmt = "cannot resolve overrides: {err}")]
-    OverridesResolveErr { err: Box<dyn Diag> },
-
-    #[display(fmt = "cannot parse defs: {err}")]
-    DefsParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse defs")]
+    DefsParse,
 
     #[display(fmt = "config file '{file_path}' is not valid utf-8")]
     ConfigUtf8 { file_path: String },
 
-    #[display(
-        fmt = "cannot resolve interpolations: {detail}",
-        detail = "err.detail()"
-    )]
-    InterpolationsResolveErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot resolve interpolations")]
+    InterpolationsResolve,
 
-    #[display(fmt = "cannot evaluate expression: {detail}", detail = "err.detail()")]
-    ExprErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot evaluate expression")]
+    Expr,
 
-    #[display(fmt = "cannot generate model diff: {detail}", detail = "err.detail()")]
-    ModelDiffErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot generate model diff")]
+    ModelDiff,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,20 +118,19 @@ impl Model {
         // Error messages from following functions are not very detailed.
         // Consider more detailed errors. See test cases 'tests/model.rs'
         m.resolve_includes(&cr, &scope)
-            .map_err(|err| ModelErrorDetail::IncludesResolveErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ModelErrorDetail::IncludesResolve)?;
         m.set_defines(&manifest);
         m.resolve_overrides(&cr, &scope)
-            .map_err(|err| ModelErrorDetail::OverridesResolveErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ModelErrorDetail::OverridesResolve)?;
 
         // resolve interpolations
         let mut resolver = TreeResolver::new();
         resolver
             .resolve(m.root())
-            .map_err(|err| ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
-            .into_diag_res()?;
+            .map_err_as_cause(|| ModelErrorDetail::InterpolationsResolve)?;
 
         m.parse_defs()
-            .map_err(|err| ModelErrorDetail::DefsParseErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ModelErrorDetail::DefsParse)?;
 
         return Ok(m);
     }
@@ -198,7 +191,7 @@ impl Model {
                     let item = inc
                         .item()
                         .apply_one_ext(model.root(), &n, scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
+                        .map_err_as_cause(|| ModelErrorDetail::Expr)?;
 
                     if item.data().file().is_none() {
                         item.data_mut().set_file(Some(&file_info));
@@ -208,7 +201,7 @@ impl Model {
 
                     inc.mapping()
                         .apply_ext(model.root(), model.root(), scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
+                        .map_err_as_cause(|| ModelErrorDetail::Expr)?;
                 }
                 Ok(())
             };
@@ -271,15 +264,15 @@ impl Model {
 
                 let current = path
                     .apply_one_ext(model.root(), model.root(), scope.as_ref())
-                    .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
+                    .map_err_as_cause(|| ModelErrorDetail::Expr)?;
 
                 for (p, e) in config.overrides().iter() {
                     let res = p
                         .apply_ext(model.root(), &current, scope.as_ref())
-                        .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
+                        .map_err_as_cause(|| ModelErrorDetail::Expr)?;
                     for n in res.into_iter() {
                         e.apply_ext(model.root(), &n, scope.as_ref())
-                            .map_err(|err| ModelErrorDetail::ExprErr { err: Box::new(err) })?;
+                            .map_err_as_cause(|| ModelErrorDetail::Expr)?;
                     }
                 }
             }

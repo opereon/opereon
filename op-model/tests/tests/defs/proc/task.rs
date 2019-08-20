@@ -84,7 +84,8 @@ when: "${@.@}"
 
     let res = Case::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::PropParseErr{prop, ..}, assert_eq!("when", prop));
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::PropParse{prop, ..}, assert_eq!("when", prop));
+    assert_cause!(err);
 }
 
 #[test]
@@ -253,7 +254,8 @@ fn task_env_parse_string_err() {
 
     let res = TaskEnv::parse(&node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OpathParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OpathParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -425,7 +427,8 @@ env: 1234
 
     let res = TaskDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::EnvParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::EnvParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -444,7 +447,8 @@ cases:
 
     let res = TaskDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::SwitchParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::SwitchParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -459,7 +463,8 @@ output: 1234
 
     let res = TaskDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OutputParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OutputParse{..});
+    assert_cause!(err);
 }
 
 #[test]

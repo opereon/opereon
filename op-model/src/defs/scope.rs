@@ -14,12 +14,9 @@ impl ValueDef {
             Value::String(ref s) => {
                 let expr = s.trim();
                 if expr.starts_with("${") && expr.ends_with('}') {
-                    match Opath::parse(&expr[2..expr.len() - 1]) {
-                        Ok(expr) => Ok(ValueDef::Resolvable(expr)),
-                        Err(err) => {
-                            Err(DefsErrorDetail::OpathParseErr { err: Box::new(err) }.into())
-                        }
-                    }
+                    let expr = Opath::parse(&expr[2..expr.len() - 1])
+                        .map_err_as_cause(|| DefsErrorDetail::OpathParse)?;
+                    Ok(ValueDef::Resolvable(expr))
                 } else {
                     Ok(ValueDef::Static(node.clone()))
                 }
@@ -110,10 +107,9 @@ impl ScopeDef {
 
     pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> DefsResult<()> {
         for (name, value) in self.values.iter() {
-            let rval = value.resolve(root, current, &scope).map_err(|err| {
-                DefsErrorDetail::ScopeValParseErr {
+            let rval = value.resolve(root, current, &scope).map_err_as_cause(|| {
+                DefsErrorDetail::ScopeValParse {
                     key: name.to_string(),
-                    err: Box::new(err),
                 }
             })?;
             scope.set_var(name.clone(), rval);
@@ -136,11 +132,8 @@ impl ParsedModelDef for ScopeDef {
             match *sn.data().value() {
                 Value::Object(ref props) => {
                     for (k, v) in props.iter() {
-                        let val = ValueDef::parse(v).map_err(|err| {
-                            DefsErrorDetail::ScopeValParseErr {
-                                key: k.to_string(),
-                                err: Box::new(err),
-                            }
+                        let val = ValueDef::parse(v).map_err_as_cause(|| {
+                            DefsErrorDetail::ScopeValParse { key: k.to_string() }
                         })?;
                         scope.set_var_def(k.clone(), val);
                     }

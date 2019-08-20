@@ -117,17 +117,16 @@ impl ParsedModelDef for TaskDef {
 
                 if t.kind == TaskKind::Command || t.kind == TaskKind::Script {
                     if let Some(n) = props.get("env") {
-                        let env = TaskEnv::parse(n)
-                            .map_err(|err| DefsErrorDetail::EnvParseErr { err: Box::new(err) })?;
+                        let env =
+                            TaskEnv::parse(n).map_err_as_cause(|| DefsErrorDetail::EnvParse)?;
                         t.env = Some(env);
                     }
                 }
 
                 if t.kind == TaskKind::Switch {
                     if let Some(s) = props.get("cases") {
-                        let switch = Switch::parse(model, &t.scoped, s).map_err(|err| {
-                            DefsErrorDetail::SwitchParseErr { err: Box::new(err) }
-                        })?;
+                        let switch = Switch::parse(model, &t.scoped, s)
+                            .map_err_as_cause(|| DefsErrorDetail::SwitchParse)?;
                         t.switch = Some(switch);
                     } else {
                         return Err(DefsErrorDetail::TaskSwitchMissingCases.into());
@@ -135,8 +134,8 @@ impl ParsedModelDef for TaskDef {
                 }
 
                 if let Some(n) = props.get("output") {
-                    let out = TaskOutput::parse(n)
-                        .map_err(|err| DefsErrorDetail::OutputParseErr { err: Box::new(err) })?;
+                    let out =
+                        TaskOutput::parse(n).map_err_as_cause(|| DefsErrorDetail::OutputParse)?;
                     t.output = Some(out);
                 }
             }
@@ -300,7 +299,7 @@ impl TaskEnv {
                 TaskEnv::List(envs)
             }
             Value::String(ref key) => TaskEnv::List(vec![Opath::parse_opt_delims(&key, "${", "}")
-                .map_err(|err| DefsErrorDetail::OpathParseErr { err: Box::new(err) })?]),
+                .map_err_as_cause(|| DefsErrorDetail::OpathParse)?]),
             _ => {
                 return Err(DefsErrorDetail::UnexpectedPropType {
                     kind: n.data().kind(),
@@ -370,9 +369,8 @@ impl ParsedModelDef for Case {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
         if let Value::Object(ref props) = *node.data().value() {
             let when = if let Some(n) = props.get("when") {
-                let val = ValueDef::parse(n).map_err(|err| DefsErrorDetail::PropParseErr {
+                let val = ValueDef::parse(n).map_err_as_cause(|| DefsErrorDetail::PropParse {
                     prop: String::from("when"),
-                    err: Box::new(err),
                 })?;
 
                 match val {

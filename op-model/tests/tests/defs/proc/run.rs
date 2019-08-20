@@ -218,7 +218,8 @@ run:
 
     let res = Run::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParseErr{step, ..}, assert_eq!("1 (step_1)", step));
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParse{step, ..}, assert_eq!("1 (step_1)", step));
+    assert_cause!(err);
 }
 
 #[test]
@@ -236,7 +237,8 @@ run:
 
     let res = Run::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParseErr{step, ..}, assert_eq!("1", step));
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParse{step, ..}, assert_eq!("1", step));
+    assert_cause!(err);
 }
 
 #[test]

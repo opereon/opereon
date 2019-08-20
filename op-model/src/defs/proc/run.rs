@@ -26,10 +26,9 @@ impl ParsedModelDef for Run {
             match *rn.data().value() {
                 Value::Array(ref elems) => {
                     for (idx, v) in elems.iter().enumerate() {
-                        let mut step = Step::parse(model, parent, v).map_err(|err| {
-                            DefsErrorDetail::StepParseErr {
+                        let mut step = Step::parse(model, parent, v).map_err_as_cause(|| {
+                            DefsErrorDetail::StepParse {
                                 step: idx.to_string(),
-                                err: Box::new(err),
                             }
                         })?;
                         step.index = run.steps.len();
@@ -38,10 +37,9 @@ impl ParsedModelDef for Run {
                 }
                 Value::Object(ref props) => {
                     for (idx, (k, v)) in props.iter().enumerate() {
-                        let mut step = Step::parse(model, parent, v).map_err(|err| {
-                            DefsErrorDetail::StepParseErr {
+                        let mut step = Step::parse(model, parent, v).map_err_as_cause(|| {
+                            DefsErrorDetail::StepParse {
                                 step: format!("{} ({})", idx, k),
-                                err: Box::new(err),
                             }
                         })?;
                         step.index = run.steps.len();

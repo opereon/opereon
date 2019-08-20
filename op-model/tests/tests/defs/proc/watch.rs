@@ -15,8 +15,9 @@ fn model_watch_parse() {
 fn model_watch_parse_err() {
     let res = ModelWatch::parse("@.@", "+");
 
-    let (_err, _detail) =
-        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
+    let (err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -33,5 +34,5 @@ fn file_watch_parse_err() {
     let res = FileWatch::parse("[Z-A]", "+");
 
     let (_err, _detail) =
-        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParse{..});
 }

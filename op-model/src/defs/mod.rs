@@ -33,11 +33,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "'watch' and 'watch_file' definition must be an object, found: '{kind}'")]
     ProcWatchNonObject { kind: Kind },
 
-    #[display(fmt = "cannot parse model watch : {err}")]
-    ProcModelWatchParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse model watch")]
+    ProcModelWatchParse,
 
     #[display(fmt = "cannot parse file watch : {err}")]
-    ProcFileWatchParseErr { err: globset::Error },
+    ProcFileWatchParse { err: globset::Error },
 
     #[display(fmt = "'hosts' property must be a dynamic expression in step definition")]
     StepStaticHosts,
@@ -57,20 +57,20 @@ pub enum DefsErrorDetail {
     )]
     UnexpectedPropType { kind: Kind, expected: Vec<Kind> },
 
-    #[display(fmt = "cannot parse 'env' definition : {err}")]
-    EnvParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse 'env' definition")]
+    EnvParse,
     //vv ^^ merge these?
-    #[display(fmt = "cannot parse 'switch' definition : {err}")]
-    SwitchParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse 'switch' definition")]
+    SwitchParse,
     //vv ^^ merge these?
-    #[display(fmt = "cannot parse 'output' definition : {err}")]
-    OutputParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse 'output' definition")]
+    OutputParse,
     //vv ^^ merge these?
-    #[display(fmt = "cannot parse 'run' definition : {err}")]
-    RunParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse 'run' definition")]
+    RunParse,
 
-    #[display(fmt = "cannot parse step '{step}' definition : {err}")]
-    StepParseErr { step: String, err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse step '{step}' definition")]
+    StepParse { step: String },
 
     #[display(fmt = "cannot parse opath property '{prop}' : {err}")]
     EnvPropParseErr {
@@ -94,8 +94,8 @@ pub enum DefsErrorDetail {
     #[display(fmt = "scope definition must be an object, found: '{kind}'")]
     ScopeNonObject { kind: Kind },
 
-    #[display(fmt = "cannot get scope key '{key}' : {err}")]
-    ScopeValParseErr { key: String, err: Box<dyn Diag> },
+    #[display(fmt = "cannot get scope key '{key}'")]
+    ScopeValParse { key: String },
 
     #[display(fmt = "user definition must have 'username' property")]
     UserMissingUsername,
@@ -109,11 +109,11 @@ pub enum DefsErrorDetail {
     #[display(fmt = "unknown task kind: '{value}'")]
     UnknownTaskKind { value: String },
 
-    #[display(fmt = "cannot parse opath expression: {err}")]
-    OpathParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse opath expression")]
+    OpathParse,
 
-    #[display(fmt = "cannot parse property '{prop}' : {err}")]
-    PropParseErr { prop: String, err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse property '{prop}'")]
+    PropParse { prop: String },
 
     #[display(fmt = "cannot evaluate expression: {err}")]
     ExprErr { err: Box<dyn Diag> },

@@ -58,7 +58,8 @@ fn value_parse_resolvable_opath_err() {
 
     let res = ValueDef::parse(&node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OpathParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::OpathParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -121,7 +122,8 @@ fn scope_opath_parse_err() {
 
     let res = ScopeDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParseErr{key, ..}, assert_eq!("dyn_variable", key));
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParse{key, ..}, assert_eq!("dyn_variable", key));
+    assert_cause!(err);
 }
 
 #[test]
@@ -158,5 +160,6 @@ fn scope_resolve_parse_err() {
     let scope = ScopeMut::new();
     let res = def.resolve(&node, &node, &scope);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParseErr{key, ..}, assert_eq!("dyn_variable", key));
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ScopeValParse{key, ..}, assert_eq!("dyn_variable", key));
+    assert_cause!(err);
 }

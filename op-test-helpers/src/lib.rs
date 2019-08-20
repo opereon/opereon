@@ -60,6 +60,9 @@ macro_rules! assert_detail {
 
 #[macro_export]
 macro_rules! assert_cause {
+    ($err: expr) => {{
+        $err.cause().expect("Missing cause!")
+    }};
     ($err: expr, $detail:path) => {{
         let cause = $err.cause().expect("Missing cause!");
         cause

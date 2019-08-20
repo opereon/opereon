@@ -174,7 +174,7 @@ impl ParsedModelDef for ProcDef {
                 }
 
                 p.run = Run::parse(model, &p.scoped, node)
-                    .map_err(|err| DefsErrorDetail::RunParseErr { err: Box::new(err) })?;
+                    .map_err_as_cause(|| DefsErrorDetail::RunParse)?;
             }
             _ => {
                 return Err(DefsErrorDetail::UnexpectedPropType {

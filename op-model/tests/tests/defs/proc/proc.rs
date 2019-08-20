@@ -105,8 +105,9 @@ watch:
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) =
-        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParseErr{..});
+    let (err, _detail) =
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcModelWatchParse{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -123,7 +124,7 @@ watch_file:
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
     let (_err, _detail) =
-        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParseErr{..});
+        assert_detail!(res, DefsErrorDetail, DefsErrorDetail::ProcFileWatchParse{..});
 }
 
 #[test]
@@ -146,7 +147,8 @@ run:
 
     let res = ProcDef::parse(&model, model.as_scoped(), &node);
 
-    let (_err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::RunParseErr{..});
+    let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::RunParse{..});
+    assert_cause!(err);
 }
 
 #[test]
