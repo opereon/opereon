@@ -1,6 +1,6 @@
 use super::*;
+use kg_diag::BasicDiag;
 use kg_diag::Severity;
-use kg_diag::{BasicDiag, Diag};
 use kg_display::ListDisplay;
 use std::any::TypeId;
 use std::cell::{Cell, RefCell};
@@ -115,12 +115,8 @@ pub enum DefsErrorDetail {
     #[display(fmt = "cannot parse property '{prop}'")]
     PropParse { prop: String },
 
-    #[display(fmt = "cannot evaluate expression: {err}")]
-    ExprErr { err: Box<dyn Diag> },
-
-    //FIXME ws to be removed
-    #[display(fmt = "Error in line '{a0}'")]
-    Undef(u32),
+    #[display(fmt = "cannot evaluate expression")]
+    ExprErr,
 }
 
 mod host;
@@ -169,7 +165,7 @@ fn get_expr<T: Primitive>(def: &dyn ModelDef, expr: &str) -> DefsResult<T> {
     let expr = Opath::parse(expr).unwrap();
     let res = expr
         .apply(def.root(), def.node())
-        .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
+        .map_err_as_cause(|| DefsErrorDetail::ExprErr)?;
     match res.into_one() {
         Some(n) => Ok(T::get(&n)),
         None => Ok(T::empty()),

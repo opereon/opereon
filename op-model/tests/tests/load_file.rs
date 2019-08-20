@@ -1,12 +1,7 @@
 use super::*;
 use kg_tree::opath::{FuncCallErrorDetail, FuncCallErrorDetail::*, FuncId, Opath, ScopeMut};
-use kg_tree::{TreeErrorDetail, TreeErrorDetail::*};
-use op_model::{GitErrorDetail, GitErrorDetail::*, LoadFileFunc};
+use op_model::{LoadFileFunc};
 use std::str::FromStr;
-
-fn as_err_result<E>(diag: E) -> Result<(), E> {
-    Err(diag)
-}
 
 #[test]
 fn non_existing_file() {
@@ -24,12 +19,11 @@ fn non_existing_file() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (_err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustomErr { id, err }, {
+    let (err, _detail) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
             assert_eq!(&FuncId::from("loadFile"), id);
-            let res = as_err_result(err);
-            let (_err, _detail) = assert_detail!(res, GitErrorDetail, GetFile{..});
         });
+    assert_cause!(err);
 }
 
 #[test]
@@ -45,12 +39,11 @@ fn non_existing_repo() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (_err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustomErr { id, err }, {
+    let (err, _detail) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
             assert_eq!(&FuncId::from("loadFile"), id);
-            let res = as_err_result(err);
-            let (_err, _detail) = assert_detail!(res, GitErrorDetail, OpenRepository{..});
         });
+    assert_cause!(err);
 }
 
 #[test]
@@ -90,12 +83,11 @@ fn bad_commit_oid() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (_err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustomErr { id, err }, {
+    let (err, _detail) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
             assert_eq!(&FuncId::from("loadFile"), id);
-            let res = as_err_result(err);
-            let (_err, _detail) = assert_detail!(res, GitErrorDetail, FindObject{..});
         });
+    assert_cause!(err);
 }
 
 #[test]
@@ -111,12 +103,11 @@ fn arg_resolve_err() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (_err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustomErr { id, err }, {
+    let (err, _detail) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
             assert_eq!(&FuncId::from("loadFile"), id);
-            let res = as_err_result(err);
-            let (_err, _detail) = assert_detail!(res, FuncCallErrorDetail, UnknownFunc{..});
         });
+    assert_cause!(err);
 }
 
 #[test]
@@ -195,10 +186,9 @@ fn node_parse_err() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (_err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustomErr { id, err }, {
+    let (err, _detail) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
             assert_eq!(&FuncId::from("loadFile"), id);
-            let res = as_err_result(err);
-            let (_err, _detail) = assert_detail!(res, TreeErrorDetail, DeserializationErr{..});
         });
+    assert_cause!(err);
 }

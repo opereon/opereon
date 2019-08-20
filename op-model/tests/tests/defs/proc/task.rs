@@ -332,6 +332,25 @@ fn task_output_parse_illegal_type() {
 }
 
 #[test]
+fn task_output_parse_obj_invalid_type() {
+    // language=json
+    let node = r#"
+{
+  "format": {
+      "unexpected object": ""
+  }
+}
+"#;
+    let node: NodeRef = node!(node, json);
+
+    let res = TaskOutput::parse(&node);
+
+    use kg_tree::serial::Error;
+
+    let (_err, _detail) = assert_detail!(res, Error, Error::DeserializationError(_));
+}
+
+#[test]
 fn task_def_command_parse() {
     // language=yaml
     let node = r#"

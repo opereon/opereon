@@ -150,7 +150,8 @@ fn file_config_parse_err() {
 
     let res = ConfigRef::read(cfg_path.to_str().unwrap());
 
-    assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseFileErr {..});
+    let (err, _detail) = assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseFile{..});
+    assert_cause!(err);
 }
 
 #[test]
@@ -166,5 +167,6 @@ fn json_config_parse_err() {
 
     let res = ConfigRef::from_json(json);
 
-    assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseErr {..});
+    let (err, _detail) = assert_detail!(res, ConfigErrorDetail, ConfigErrorDetail::ParseConf {..});
+    assert_cause!(err);
 }

@@ -30,7 +30,7 @@ impl ValueDef {
             ValueDef::Static(ref n) => Ok(n.clone().into()),
             ValueDef::Resolvable(ref expr) => expr
                 .apply_ext(root, current, scope)
-                .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) }.into()),
+                .map_err_as_cause(|| DefsErrorDetail::ExprErr),
         }
     }
 

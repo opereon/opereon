@@ -84,7 +84,7 @@ impl Step {
             |hosts_expr| {
                 let hs = hosts_expr
                     .apply_ext(proc.root(), proc.node(), proc.scope()?)
-                    .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
+                    .map_err_as_cause(|| DefsErrorDetail::ExprErr)?;
                 let mut res = Vec::with_capacity(hs.len());
                 for h in hs.iter() {
                     let host: Cow<HostDef> = match model.get_host(h) {

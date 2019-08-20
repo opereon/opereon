@@ -15,17 +15,17 @@ pub enum ConfigErrorDetail {
     #[display(fmt = "cannot find config in paths: {paths}")]
     NotFound { paths: String },
 
-    #[display(fmt = "cannot parse config file '{file}': {err}")]
-    ParseFileErr { file: String, err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse config file '{file}'")]
+    ParseFile { file: String},
 
-    #[display(fmt = "cannot parse config: {err}")]
-    ParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse config")]
+    ParseConf,
 
-    #[display(fmt = "cannot resolve config interpolation: {err}")]
-    InterpolationErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot resolve config interpolation")]
+    InterpolationErr,
 
-    #[display(fmt = "cannot create config : {err}")]
-    DeserializationErr { err: kg_tree::serial::Error },
+    #[display(fmt = "cannot create config")]
+    DeserializationErr,
 }
 
 use super::*;
@@ -199,12 +199,10 @@ impl Config {
         for path in paths {
             match fs::read_to_string(&path, &mut content) {
                 Ok(_) => {
-                    let c: NodeRef = NodeRef::from_toml(&content).map_err(|err| {
-                        ConfigErrorDetail::ParseFileErr {
-                            err: Box::new(err),
+                    let c: NodeRef = NodeRef::from_toml(&content)
+                        .map_err_as_cause(||ConfigErrorDetail::ParseFile {
                             file: path.to_string_lossy().to_string(),
-                        }
-                    })?;
+                        })?;
                     d.extend(c, None).unwrap(); //FIXME (jc) handle errors
                     read_paths += 1;
                 }
@@ -225,25 +223,27 @@ impl Config {
 
         let mut r = TreeResolver::with_delims("${", "}");
         r.resolve_custom(RootedResolveStrategy, &d)
-            .map_err(|err| ConfigErrorDetail::InterpolationErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ConfigErrorDetail::InterpolationErr)?;
 
-        let conf: Self =
-            from_tree(&d).map_err(|err| ConfigErrorDetail::DeserializationErr { err })?;
+        let conf: Self = from_tree(&d)
+                .into_diag_res()
+                .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
         Ok(conf)
     }
 
     fn from_json(json: &str) -> ConfigResult<Config> {
         let d = to_tree(&Config::default()).unwrap();
         let c: NodeRef = NodeRef::from_json(&json)
-            .map_err(|err| ConfigErrorDetail::ParseErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ConfigErrorDetail::ParseConf)?;
         d.extend(c, None).unwrap(); //FIXME (jc) handle errors
 
         let mut r = TreeResolver::with_delims("${", "}");
         r.resolve_custom(RootedResolveStrategy, &d)
-            .map_err(|err| ConfigErrorDetail::InterpolationErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ConfigErrorDetail::InterpolationErr)?;
 
-        let conf: Self =
-            from_tree(&d).map_err(|err| ConfigErrorDetail::DeserializationErr { err })?;
+        let conf: Self = from_tree(&d)
+                .into_diag_res()
+                .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
         Ok(conf)
     }
 

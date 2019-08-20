@@ -204,10 +204,10 @@ pub struct TaskOutput {
 impl TaskOutput {
     pub fn parse(node: &NodeRef) -> DefsResult<TaskOutput> {
         match *node.data().value() {
-            Value::Object(_) => match kg_tree::serial::from_tree::<TaskOutput>(node) {
-                Ok(out) => Ok(out),
-                Err(_err) => Err(DefsErrorDetail::Undef(line!()).into()), //FIXME (jc)
-            },
+            Value::Object(_) => {
+                let out = kg_tree::serial::from_tree::<TaskOutput>(node)?;
+                Ok(out)
+            }
             Value::String(ref s) => {
                 let format = FileFormat::from(s);
                 Ok(TaskOutput {
@@ -244,7 +244,7 @@ impl TaskOutput {
                 let scope = ScopeMut::child(scope.clone().into());
                 scope.set_var("$output".into(), output);
                 expr.apply_ext(root, current, &scope)
-                    .map_err(|err| DefsErrorDetail::ExprErr { err: Box::new(err) })?;
+                    .map_err_as_cause(|| DefsErrorDetail::ExprErr)?;
             }
         }
         Ok(())

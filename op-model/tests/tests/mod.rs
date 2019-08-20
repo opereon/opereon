@@ -1,6 +1,5 @@
 use super::*;
 use git2::Repository;
-use kg_diag::Diag;
 use op_model::Sha1Hash;
 use std::path::Path;
 /// Creates `NodeRef`

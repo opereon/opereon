@@ -61,9 +61,11 @@ macro_rules! assert_detail {
 #[macro_export]
 macro_rules! assert_cause {
     ($err: expr) => {{
+        use kg_diag::Diag;
         $err.cause().expect("Missing cause!")
     }};
     ($err: expr, $detail:path) => {{
+        use kg_diag::Diag;
         let cause = $err.cause().expect("Missing cause!");
         cause
             .detail()
