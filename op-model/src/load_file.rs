@@ -47,7 +47,7 @@ impl FuncCallable for LoadFileFunc {
                         file: path.clone(),
                         err,
                     })
-                    .into_diag()
+                    .into_diag_res()
                     .map_err(|err| FuncCallErrorDetail::custom_func(&func_id, err))?;
 
                 let format = path.extension().map_or(FileFormat::Text, |ext| {
@@ -74,7 +74,7 @@ impl FuncCallable for LoadFileFunc {
                         file: path.clone(),
                         err,
                     })
-                    .into_diag()
+                    .into_diag_res()
                     .map_err(|err| FuncCallErrorDetail::custom_func(&func_id, err))?;
 
                 let format: FileFormat = f.data().as_string().as_ref().into();

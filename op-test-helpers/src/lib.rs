@@ -58,6 +58,17 @@ macro_rules! assert_detail {
     }};
 }
 
+#[macro_export]
+macro_rules! assert_cause {
+    ($err: expr, $detail:path) => {{
+        let cause = $err.cause().expect("Missing cause!");
+        cause
+            .detail()
+            .downcast_ref::<$detail>()
+            .expect(&format!("Cannot downcast to '{}'", stringify!($detail)))
+    }};
+}
+
 /// Returns test resources directory located in `CARGO_MANIFEST_DIR/tests/resources/`.
 #[macro_export]
 macro_rules! resources_dir {

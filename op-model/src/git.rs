@@ -5,7 +5,7 @@ use git2::{
     Tree, TreeEntry,
 };
 use kg_diag::Severity;
-use kg_diag::{BasicDiag, ResultExt};
+use kg_diag::{BasicDiag, IntoDiagRes};
 use serde::export::fmt::Debug;
 use std::path::{Path, PathBuf};
 
@@ -119,7 +119,7 @@ impl GitManager {
     ) -> GitResult<()> {
         let repo = Repository::init_opts(path.as_ref(), opts)
             .map_err(|err| GitErrorDetail::CreateRepository { err })
-            .into_diag()?;
+            .into_diag_res()?;
         let mut config = repo.config().unwrap();
         // TODO parametrize
         config
@@ -153,7 +153,7 @@ impl GitManager {
             Err(err) => match err.code() {
                 ErrorCode::UnbornBranch => return Ok(None),
                 _ => {
-                    return Err(GitErrorDetail::FindObject { err }).into_diag();
+                    return Err(GitErrorDetail::FindObject { err }).into_diag_res();
                 }
             },
         };
@@ -228,7 +228,7 @@ impl GitManager {
         self.repo()
             .odb()
             .map_err(|err| GitErrorDetail::Custom { err })
-            .into_diag()
+            .into_diag_res()
     }
 }
 
@@ -249,6 +249,6 @@ impl TreeExt for Tree<'_> {
                 file: path.to_owned(),
                 err,
             })
-            .into_diag()
+            .into_diag_res()
     }
 }

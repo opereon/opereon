@@ -1,5 +1,6 @@
 use super::*;
-use op_model::{Metadata, Model, ModelErrorDetail, ModelErrorDetail::*};
+use kg_diag::IoErrorDetail;
+use op_model::{GitErrorDetail, Metadata, Model, ModelErrorDetail, ModelErrorDetail::*};
 
 #[test]
 fn load_manifest() {
@@ -46,7 +47,8 @@ fn load_manifest_utf8_err() {
 
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ManifestReadErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, ManifestRead{..});
+    let _cause = assert_cause!(err, IoErrorDetail);
 }
 
 #[test]
@@ -59,7 +61,8 @@ info = "unexpected string"
     write_file!(dir.join("op.toml"), content);
     let res = Model::load_manifest(&dir);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, MalformedManifest{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, MalformedManifest{..});
+    let _cause = assert_cause!(err, kg_tree::serial::Error);
 }
 
 #[test]
@@ -73,7 +76,8 @@ fn read_cr_err_no_repo() {
 
     let res = Model::read_revision(meta);
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigReadErr{..});
+    let (err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigRead{..});
+    let _cause = assert_cause!(err, GitErrorDetail);
 }
 
 #[test]

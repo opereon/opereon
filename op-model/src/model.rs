@@ -19,26 +19,17 @@ pub type ModelResult<T> = Result<T, ModelError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1000)]
 pub enum ModelErrorDetail {
-    #[display(fmt = "cannot parse config file: '{file_path}' : {err}")]
-    MalformedConfigFile {
-        file_path: String,
-        err: Box<dyn Diag>,
-    },
+    #[display(fmt = "cannot parse config file: '{file_path}'")]
+    MalformedConfigFile { file_path: String },
 
-    #[display(fmt = "git error occurred : {err}")]
-    ConfigGitErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot load model config")]
+    ConfigRead,
 
-    #[display(fmt = "cannot load model config : {err}")]
-    ConfigReadErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse manifest file '{file_path}'")]
+    MalformedManifest { file_path: String },
 
-    #[display(fmt = "cannot parse manifest file '{file_path}': {err}")]
-    MalformedManifest {
-        file_path: String,
-        err: Box<dyn Diag>,
-    },
-
-    #[display(fmt = "cannot read manifest file: {err}")]
-    ManifestReadErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot read manifest file")]
+    ManifestRead,
 
     #[display(fmt = "cannot find manifest file")]
     ManifestNotFount,
@@ -53,7 +44,7 @@ pub enum ModelErrorDetail {
     DefsParseErr { err: Box<dyn Diag> },
 
     #[display(fmt = "config file '{file_path}' is not valid utf-8")]
-    ConfigUtf8Err { file_path: String },
+    ConfigUtf8 { file_path: String },
 
     #[display(
         fmt = "cannot resolve interpolations: {detail}",
@@ -66,12 +57,6 @@ pub enum ModelErrorDetail {
 
     #[display(fmt = "cannot generate model diff: {detail}", detail = "err.detail()")]
     ModelDiffErr { err: Box<dyn Diag> },
-}
-
-impl ModelErrorDetail {
-    pub fn config_git_err(err: BasicDiag) -> ModelError {
-        ModelErrorDetail::ConfigGitErr { err: Box::new(err) }.into()
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -103,14 +88,14 @@ impl Model {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
         fs::read_to_string(&path, &mut content)
-            .into_diag()
-            .map_err(|err| ModelErrorDetail::ManifestReadErr { err: Box::new(err) })?;
-        let manifest: Manifest = kg_tree::serial::toml::from_str(&content).map_err(|err| {
-            ModelErrorDetail::MalformedManifest {
-                err: Box::new(err),
-                file_path: path.to_string_lossy().to_string(),
-            }
-        })?;
+            .into_diag_res()
+            .map_err_as_cause(|| ModelErrorDetail::ManifestRead)?;
+        let manifest: Manifest =
+            kg_tree::serial::toml::from_str(&content).map_err_as_cause(|| {
+                ModelErrorDetail::MalformedManifest {
+                    file_path: path.to_string_lossy().to_string(),
+                }
+            })?;
         Ok(manifest)
     }
 
@@ -125,7 +110,7 @@ impl Model {
         };
 
         let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())
-            .map_err(|err| ModelErrorDetail::ConfigReadErr { err: Box::new(err) })?;
+            .map_err_as_cause(|| ModelErrorDetail::ConfigRead)?;
 
         m.root().data_mut().set_file(Some(&FileInfo::new(
             m.metadata.path(),
@@ -149,7 +134,7 @@ impl Model {
         resolver
             .resolve(m.root())
             .map_err(|err| ModelErrorDetail::InterpolationsResolveErr { err: Box::new(err) })
-            .into_diag()?;
+            .into_diag_res()?;
 
         m.parse_defs()
             .map_err(|err| ModelErrorDetail::DefsParseErr { err: Box::new(err) })?;

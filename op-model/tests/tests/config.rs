@@ -1,6 +1,6 @@
 use super::*;
-use op_model::ModelErrorDetail;
 use op_model::{Config, ConfigResolver};
+use op_model::{GitErrorDetail, ModelErrorDetail, ModelErrorDetail::*};
 use std::path::PathBuf;
 
 #[test]
@@ -26,7 +26,7 @@ fn resolver_scan_bad_git_path() {
     let (_tmp, dir) = get_tmp_dir();
     let res = ConfigResolver::scan_revision(&dir, &Sha1Hash::nil());
 
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ConfigGitErr{..});
+    let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::OpenRepository{..});
 }
 
 #[test]
@@ -37,6 +37,22 @@ fn resolver_scan_non_utf8() {
     let commit = initial_commit(&dir);
 
     let res = ConfigResolver::scan_revision(&dir, &commit);
-    let (_err, _detail) =
-        assert_detail!(res, ModelErrorDetail, ModelErrorDetail::ConfigUtf8Err{..});
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigUtf8{..});
+}
+
+#[test]
+fn resolver_malformed_config() {
+    let (_tmp, dir) = get_tmp_dir();
+
+    // language=toml
+    let content = r#"
+exclude="unexpected string"
+"#;
+
+    write_file!(dir.join(".operc"), content);
+    init_repo(&dir);
+    let commit = initial_commit(&dir);
+
+    let res = ConfigResolver::scan_revision(&dir, &commit);
+    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, MalformedConfigFile{..});
 }
