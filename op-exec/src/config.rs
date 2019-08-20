@@ -16,7 +16,7 @@ pub enum ConfigErrorDetail {
     NotFound { paths: String },
 
     #[display(fmt = "cannot parse config file '{file}'")]
-    ParseFile { file: String},
+    ParseFile { file: String },
 
     #[display(fmt = "cannot parse config")]
     ParseConf,
@@ -199,10 +199,11 @@ impl Config {
         for path in paths {
             match fs::read_to_string(&path, &mut content) {
                 Ok(_) => {
-                    let c: NodeRef = NodeRef::from_toml(&content)
-                        .map_err_as_cause(||ConfigErrorDetail::ParseFile {
+                    let c: NodeRef = NodeRef::from_toml(&content).map_err_as_cause(|| {
+                        ConfigErrorDetail::ParseFile {
                             file: path.to_string_lossy().to_string(),
-                        })?;
+                        }
+                    })?;
                     d.extend(c, None).unwrap(); //FIXME (jc) handle errors
                     read_paths += 1;
                 }
@@ -226,15 +227,15 @@ impl Config {
             .map_err_as_cause(|| ConfigErrorDetail::InterpolationErr)?;
 
         let conf: Self = from_tree(&d)
-                .into_diag_res()
-                .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
+            .into_diag_res()
+            .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
         Ok(conf)
     }
 
     fn from_json(json: &str) -> ConfigResult<Config> {
         let d = to_tree(&Config::default()).unwrap();
-        let c: NodeRef = NodeRef::from_json(&json)
-            .map_err_as_cause(|| ConfigErrorDetail::ParseConf)?;
+        let c: NodeRef =
+            NodeRef::from_json(&json).map_err_as_cause(|| ConfigErrorDetail::ParseConf)?;
         d.extend(c, None).unwrap(); //FIXME (jc) handle errors
 
         let mut r = TreeResolver::with_delims("${", "}");
@@ -242,8 +243,8 @@ impl Config {
             .map_err_as_cause(|| ConfigErrorDetail::InterpolationErr)?;
 
         let conf: Self = from_tree(&d)
-                .into_diag_res()
-                .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
+            .into_diag_res()
+            .map_err_as_cause(|| ConfigErrorDetail::DeserializationErr)?;
         Ok(conf)
     }
 

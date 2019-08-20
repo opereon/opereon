@@ -1,6 +1,6 @@
 use super::*;
 use kg_tree::opath::{FuncCallErrorDetail, FuncCallErrorDetail::*, FuncId, Opath, ScopeMut};
-use op_model::{LoadFileFunc};
+use op_model::LoadFileFunc;
 use std::str::FromStr;
 
 #[test]
@@ -19,10 +19,9 @@ fn non_existing_file() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
-            assert_eq!(&FuncId::from("loadFile"), id);
-        });
+    let (err, _detail) = assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
+        assert_eq!(&FuncId::from("loadFile"), id);
+    });
     assert_cause!(err);
 }
 
@@ -39,10 +38,9 @@ fn non_existing_repo() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
-            assert_eq!(&FuncId::from("loadFile"), id);
-        });
+    let (err, _detail) = assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
+        assert_eq!(&FuncId::from("loadFile"), id);
+    });
     assert_cause!(err);
 }
 
@@ -83,10 +81,9 @@ fn bad_commit_oid() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
-            assert_eq!(&FuncId::from("loadFile"), id);
-        });
+    let (err, _detail) = assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
+        assert_eq!(&FuncId::from("loadFile"), id);
+    });
     assert_cause!(err);
 }
 
@@ -103,10 +100,9 @@ fn arg_resolve_err() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
-            assert_eq!(&FuncId::from("loadFile"), id);
-        });
+    let (err, _detail) = assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
+        assert_eq!(&FuncId::from("loadFile"), id);
+    });
     assert_cause!(err);
 }
 
@@ -186,9 +182,8 @@ fn node_parse_err() {
 
     let res = opath.apply_one_ext(&node, &node, scope.as_ref());
 
-    let (err, _detail) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
-            assert_eq!(&FuncId::from("loadFile"), id);
-        });
+    let (err, _detail) = assert_detail!(res, FuncCallErrorDetail, FuncCallCustom { id }, {
+        assert_eq!(&FuncId::from("loadFile"), id);
+    });
     assert_cause!(err);
 }
