@@ -112,7 +112,7 @@ impl CommandExecutor for LocalExecutor {
                     run_as: Option<&str>,
                     output: &mut Write,
                     stdout: Stdio,
-                    stderr: Stdio) -> Result<ActionResult, CommandError>
+                    stderr: Stdio) -> CommandResult<ActionResult>
     {
         let status = self.exec_command_impl(cmd, args, cwd, run_as, output, stdout, stderr)?;
         Ok(ActionResult::new(Outcome::Empty, status.code(), None))
@@ -127,7 +127,7 @@ impl CommandExecutor for LocalExecutor {
                    run_as: Option<&str>,
                    output: &mut Write,
                    stdout: Stdio,
-                   stderr: Stdio) -> Result<ActionResult, CommandError>
+                   stderr: Stdio) -> CommandResult<ActionResult>
     {
         let model = engine.write().model_manager_mut().get(runtime.action().model_id())?;
         let model = model.read();

@@ -271,7 +271,7 @@ impl FileCopyOperation {
         }
     }
 
-    fn prepare_params(&self) -> Result<RsyncParams, CommandError> {
+    fn prepare_params(&self) -> CommandResult<RsyncParams> {
         let ssh_session = self
             .engine
             .write()
@@ -290,9 +290,9 @@ impl FileCopyOperation {
         Ok(params)
     }
 
-    fn spawn_std_watchers(&self) -> Result<(PipeWriter, PipeWriter), CommandError> {
-        let (stdout, stdout_writer) = pipe()?;
-        let (stderr, stderr_writer) = pipe()?;
+    fn spawn_std_watchers(&self) -> CommandResult<(PipeWriter, PipeWriter)> {
+        let (stdout, stdout_writer) = pipe().map_err_to_diag()?;
+        let (stderr, stderr_writer) = pipe().map_err_to_diag()?;
 
         let operation = self.operation.clone();
 
