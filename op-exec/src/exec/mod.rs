@@ -40,7 +40,7 @@ impl<T: Read + Write + Seek + 'static> ReadWriteSeek for T {}
 #[derive(Clone)]
 pub struct OutputLog(Arc<Mutex<Box<dyn ReadWriteSeek>>>);
 
-pub fn execute_io<F: FnMut() -> std::io::Result<()>>(func: F) -> Result<(), BasicDiag> {
+pub fn execute_io<F: FnMut() -> std::io::Result<()>>(mut func: F) -> Result<(), BasicDiag> {
     func().map_err_to_diag()
 }
 

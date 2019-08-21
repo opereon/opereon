@@ -156,7 +156,9 @@ impl SshSession {
             self.opened.set(true);
             Ok(())
         } else {
-            return SshErrorDetail::ssh_process(String::from_utf8_lossy(&output.stderr).to_string());
+            return SshErrorDetail::ssh_process(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            );
         }
     }
 
@@ -199,7 +201,9 @@ impl SshSession {
         if output.status.success() {
             Ok(())
         } else {
-            return SshErrorDetail::ssh_process(String::from_utf8_lossy(&output.stderr).to_string());
+            return SshErrorDetail::ssh_process(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            );
         }
     }
 
@@ -304,12 +308,13 @@ impl SshSession {
         let mut buf = Cursor::new(Vec::new());
         prepare_script(script, args, env, cwd, &mut buf)?;
         buf.seek(SeekFrom::Start(0)).map_err_to_diag()?;
-        log.log_stdin(&mut buf).map_err_to_diag()?;
+        log.log_stdin(&mut buf)?;
 
         w_in.write_all(buf.get_ref()).map_err_to_diag()?;
         std::mem::drop(w_in);
 
-        Ok(ssh_cmd.spawn()?)
+        let res = ssh_cmd.spawn().map_err(SshErrorDetail::ssh_spawn_err)?;
+        Ok(res)
     }
 
     fn run_script_async(
@@ -354,12 +359,14 @@ impl SshSession {
 
         let mut buf = Cursor::new(Vec::new());
         prepare_script(script, args, env, cwd, &mut buf)?;
-        buf.seek(SeekFrom::Start(0))?;
+        buf.seek(SeekFrom::Start(0)).map_err_to_diag()?;
 
-        w_in.write_all(buf.get_ref())?;
+        w_in.write_all(buf.get_ref()).map_err_to_diag()?;
         std::mem::drop(w_in);
-
-        Ok(ssh_cmd.spawn_async()?)
+        let res = ssh_cmd
+            .spawn_async()
+            .map_err(SshErrorDetail::ssh_spawn_err)?;
+        Ok(res)
     }
 }
 
@@ -371,7 +378,7 @@ impl CommandExecutor for SshSession {
         args: &[String],
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError> {
+    ) -> CommandResult<TaskResult> {
         let child = self.run_command(cmd, args, Stdio::piped(), Stdio::piped(), log)?;
         execute(child, out_format, None, log)
     }
@@ -386,7 +393,7 @@ impl CommandExecutor for SshSession {
         run_as: Option<&str>,
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError> {
+    ) -> CommandResult<TaskResult> {
         let child = self.run_script(
             script,
             args,
@@ -430,7 +437,7 @@ impl CommandExecutor for SshSessionRef {
         args: &[String],
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError> {
+    ) -> CommandResult<TaskResult> {
         self.read().exec_command(engine, cmd, args, out_format, log)
     }
 
@@ -444,7 +451,7 @@ impl CommandExecutor for SshSessionRef {
         run_as: Option<&str>,
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError> {
+    ) -> CommandResult<TaskResult> {
         self.read()
             .exec_script(engine, script, args, env, cwd, run_as, out_format, log)
     }

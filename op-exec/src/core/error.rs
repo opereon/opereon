@@ -51,14 +51,6 @@ impl From<kg_tree::opath::ExprErrorDetail> for RuntimeError {
 }
 
 //FIXME (jc)
-impl From<CommandError> for RuntimeError {
-    fn from(_err: CommandError) -> Self {
-        println!("command err");
-        RuntimeError::Custom
-    }
-}
-
-//FIXME (jc)
 impl From<FileError> for RuntimeError {
     fn from(_err: FileError) -> Self {
         println!("file err");
