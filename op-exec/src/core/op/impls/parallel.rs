@@ -14,7 +14,7 @@ impl ParallelOperation {
         operation: OperationRef,
         engine: EngineRef,
         steps: Vec<OperationRef>,
-    ) -> Result<ParallelOperation, RuntimeError> {
+    ) -> RuntimeResult<ParallelOperation> {
         let n = steps.len();
         let mut steps_ = Vec::with_capacity(steps.len());
         for s in steps {
@@ -62,7 +62,7 @@ impl Future for ParallelOperation {
 }
 
 impl OperationImpl for ParallelOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         self.operation.write().progress = Progress::from_steps(
             self.steps
                 .iter()

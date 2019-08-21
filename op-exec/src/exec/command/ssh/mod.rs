@@ -595,7 +595,7 @@ mod tests {
 
         let out_fut = out_fut
             .select(err_fut)
-            .for_each(|line: Result<String, RuntimeError>| {
+            .for_each(|line: RuntimeResult<String>| {
                 eprintln!("{}", line.unwrap());
                 Ok(())
             });

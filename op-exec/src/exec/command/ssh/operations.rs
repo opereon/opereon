@@ -22,7 +22,7 @@ pub struct RemoteCommandOperation {
     model_path: ModelPath,
 
     hosts: Vec<Host>,
-    futures: Arc<Mutex<Vec<(Option<ChildFuture>, Option<Result<String, RuntimeError>>)>>>,
+    futures: Arc<Mutex<Vec<(Option<ChildFuture>, Option<RuntimeResult<String>>)>>>,
     started: bool,
     logger: Logger,
 }
@@ -158,7 +158,7 @@ impl RemoteCommandOperation {
 
     /// Consume inner futures results, log them and return `Async::Ready`
     fn finish_polling(&mut self) -> Poll<Outcome, RuntimeError> {
-        let res: Vec<(String, Result<String, RuntimeError>)> = self
+        let res: Vec<(String, RuntimeResult<String>)> = self
             .hosts
             .iter()
             .zip(self.futures.lock().unwrap().iter_mut())
@@ -210,7 +210,7 @@ impl Future for RemoteCommandOperation {
 }
 
 impl OperationImpl for RemoteCommandOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }

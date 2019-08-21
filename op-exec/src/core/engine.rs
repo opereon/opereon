@@ -192,7 +192,7 @@ impl EngineRef {
         &self,
         operation: OperationRef,
         persist: bool,
-    ) -> Result<OutcomeFuture, RuntimeError> {
+    ) -> RuntimeResult<OutcomeFuture> {
         if persist {
             operation.persist(self.read().config.queue().persist_dir())?;
         }

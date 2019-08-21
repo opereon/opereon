@@ -14,7 +14,7 @@ impl SequenceOperation {
         operation: OperationRef,
         engine: EngineRef,
         steps: Vec<OperationRef>,
-    ) -> Result<SequenceOperation, RuntimeError> {
+    ) -> RuntimeResult<SequenceOperation> {
         let n = steps.len();
         let mut steps_ = Vec::with_capacity(steps.len());
         for s in steps {
@@ -71,7 +71,7 @@ impl Future for SequenceOperation {
 }
 
 impl OperationImpl for SequenceOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         self.operation.write().progress = Progress::from_steps(
             self.steps
                 .iter()

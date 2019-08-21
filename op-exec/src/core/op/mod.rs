@@ -33,7 +33,7 @@ pub struct Operation {
     #[serde(skip)]
     progress_task: AtomicTask,
     #[serde(skip)]
-    outcome: Option<Result<Outcome, RuntimeError>>,
+    outcome: Option<RuntimeResult<Outcome>>,
     #[serde(skip)]
     outcome_task: AtomicTask,
     #[serde(skip)]
@@ -220,7 +220,7 @@ impl OperationTask {
     pub(super) fn new(
         operation: OperationRef,
         engine: EngineRef,
-    ) -> Result<OperationTask, RuntimeError> {
+    ) -> RuntimeResult<OperationTask> {
         let impl_future = create_operation_impl(&operation, &engine)?;
         Ok(OperationTask {
             operation,

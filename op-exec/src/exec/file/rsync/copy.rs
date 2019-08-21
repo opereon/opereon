@@ -231,7 +231,7 @@ pub struct FileCopyOperation {
     chown: Option<String>,
     chmod: Option<String>,
     host: Host,
-    status: Arc<Mutex<Option<Result<ExitStatus, RuntimeError>>>>,
+    status: Arc<Mutex<Option<RuntimeResult<ExitStatus>>>>,
     running: bool,
     logger: Logger,
 }
@@ -322,7 +322,7 @@ impl FileCopyOperation {
         Ok((stdout_writer, stderr_writer))
     }
 
-    fn start_copying(&mut self) -> Result<(), RuntimeError> {
+    fn start_copying(&mut self) -> RuntimeResult<()> {
         let params = self.prepare_params()?;
         let config = self.engine.read().config().exec().file().rsync().clone();
         let (stdout, stderr) = self.spawn_std_watchers()?;
@@ -331,7 +331,7 @@ impl FileCopyOperation {
         let operation = self.operation.clone();
 
         std::thread::spawn(move || {
-            let execute_cmd = move || -> Result<ExitStatus, RuntimeError> {
+            let execute_cmd = move || -> RuntimeResult<ExitStatus> {
                 let mut command = params.to_cmd(&config);
                 command
                     .arg("--progress")
@@ -360,7 +360,7 @@ impl FileCopyOperation {
         Ok(())
     }
 
-    fn calculate_progress(&mut self) -> Result<(), RuntimeError> {
+    fn calculate_progress(&mut self) -> RuntimeResult<()> {
         let mut executor = create_file_executor(&self.host, &self.engine)?;
 
         let result = executor.file_compare(
@@ -397,7 +397,7 @@ impl FileCopyOperation {
         Ok(())
     }
 
-    pub fn status(&self) -> MutexGuard<Option<Result<ExitStatus, RuntimeError>>> {
+    pub fn status(&self) -> MutexGuard<Option<RuntimeResult<ExitStatus>>> {
         self.status.lock().unwrap()
     }
 }
@@ -429,7 +429,7 @@ impl Future for FileCopyOperation {
 }
 
 impl OperationImpl for FileCopyOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         // FIXME blocking call - implement as future
         self.calculate_progress()?;
         Ok(())

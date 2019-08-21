@@ -33,6 +33,7 @@ use op_model::*;
 pub use self::config::*;
 pub use self::core::*;
 pub use self::exec::*;
+pub use self::RuntimeResult;
 pub use self::proto::*;
 
 mod config;

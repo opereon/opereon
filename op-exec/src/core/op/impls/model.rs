@@ -54,7 +54,7 @@ impl Future for ModelInitOperation {
 }
 
 impl OperationImpl for ModelInitOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -88,7 +88,7 @@ impl Future for ModelCommitOperation {
 }
 
 impl OperationImpl for ModelCommitOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -153,7 +153,7 @@ impl Future for ModelQueryOperation {
 }
 
 impl OperationImpl for ModelQueryOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -192,7 +192,7 @@ impl Future for ModelTestOperation {
 }
 
 impl OperationImpl for ModelTestOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -243,7 +243,7 @@ impl Future for ModelDiffOperation {
 }
 
 impl OperationImpl for ModelDiffOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -371,7 +371,7 @@ impl Future for ModelUpdateOperation {
 }
 
 impl OperationImpl for ModelUpdateOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -483,7 +483,7 @@ impl Future for ModelCheckOperation {
 }
 
 impl OperationImpl for ModelCheckOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -603,7 +603,7 @@ impl Future for ModelProbeOperation {
 }
 
 impl OperationImpl for ModelProbeOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }

@@ -16,11 +16,11 @@ mod sequence;
 pub trait OperationImpl:
     Future<Item = Outcome, Error = RuntimeError> + Send + Sync + Debug
 {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 
-    fn on_cancel(&mut self) -> Result<(), RuntimeError> {
+    fn on_cancel(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -30,7 +30,7 @@ pub type OperationImplType = dyn OperationImpl<Item = Outcome, Error = RuntimeEr
 pub fn create_operation_impl(
     operation: &OperationRef,
     engine: &EngineRef,
-) -> Result<Box<OperationImplType>, RuntimeError> {
+) -> RuntimeResult<Box<OperationImplType>> {
     let mut op_impl: Box<OperationImplType> = match *operation.read().context() {
         Context::ConfigGet => Box::new(ConfigGetOperation::new(operation.clone(), engine.clone())),
         Context::ModelCommit(ref path) => Box::new(ModelCommitOperation::new(

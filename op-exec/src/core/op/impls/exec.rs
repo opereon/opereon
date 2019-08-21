@@ -22,7 +22,7 @@ impl ProcExecOperation {
         operation: OperationRef,
         engine: EngineRef,
         exec_path: &Path,
-    ) -> Result<ProcExecOperation, RuntimeError> {
+    ) -> RuntimeResult<ProcExecOperation> {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -77,7 +77,7 @@ impl Future for ProcExecOperation {
 }
 
 impl OperationImpl for ProcExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -96,7 +96,7 @@ impl StepExecOperation {
         engine: EngineRef,
         exec_path: &Path,
         step_index: usize,
-    ) -> Result<StepExecOperation, RuntimeError> {
+    ) -> RuntimeResult<StepExecOperation> {
         let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
 
         let label = operation.read().label().to_string();
@@ -156,7 +156,7 @@ impl Future for StepExecOperation {
 }
 
 impl OperationImpl for StepExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
@@ -179,7 +179,7 @@ impl TaskExecOperation {
         exec_path: &Path,
         step_index: usize,
         task_index: usize,
-    ) -> Result<TaskExecOperation, RuntimeError> {
+    ) -> RuntimeResult<TaskExecOperation> {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
             "label"=> label,
@@ -458,7 +458,7 @@ impl Future for TaskExecOperation {
 }
 
 impl OperationImpl for TaskExecOperation {
-    fn init(&mut self) -> Result<(), RuntimeError> {
+    fn init(&mut self) -> RuntimeResult<()> {
         Ok(())
     }
 }
