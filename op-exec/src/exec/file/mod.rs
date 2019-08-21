@@ -65,6 +65,6 @@ pub trait FileExecutor {
 pub fn create_file_executor(
     host: &Host,
     engine: &EngineRef,
-) -> Result<Box<dyn FileExecutor>, CommandError> {
+) -> CommandResult<Box<dyn FileExecutor>> {
     Ok(Box::new(RsyncExecutor::new(host, engine)))
 }

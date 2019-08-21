@@ -217,10 +217,7 @@ pub(super) struct OperationTask {
 }
 
 impl OperationTask {
-    pub(super) fn new(
-        operation: OperationRef,
-        engine: EngineRef,
-    ) -> RuntimeResult<OperationTask> {
+    pub(super) fn new(operation: OperationRef, engine: EngineRef) -> RuntimeResult<OperationTask> {
         let impl_future = create_operation_impl(&operation, &engine)?;
         Ok(OperationTask {
             operation,

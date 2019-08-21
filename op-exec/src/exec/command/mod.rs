@@ -14,45 +14,17 @@ mod config;
 mod local;
 mod ssh;
 
+pub type CommandError = BasicDiag;
+pub type CommandResult<T> = Result<T, CommandError>;
+
 //FIXME (jc)
-#[derive(Debug, Clone)]
-pub enum CommandError {
+#[derive(Debug, Display, Detail)]
+pub enum CommandErrorDetail {
+    #[display(fmt = "cannot spawn command")]
+    CommandSpawn,
+
+    #[display(fmt = "placeholder")]
     Undef,
-}
-
-impl From<SshError> for CommandError {
-    fn from(err: SshError) -> Self {
-        eprintln!("ssh error: {:?}", err);
-        CommandError::Undef
-    }
-}
-
-impl From<std::io::Error> for CommandError {
-    fn from(err: std::io::Error) -> Self {
-        eprintln!("io error: {:?}", err);
-        CommandError::Undef
-    }
-}
-
-impl From<std::fmt::Error> for CommandError {
-    fn from(err: std::fmt::Error) -> Self {
-        eprintln!("fmt error: {:?}", err);
-        CommandError::Undef
-    }
-}
-
-impl From<kg_diag::IoErrorDetail> for CommandError {
-    fn from(err: kg_diag::IoErrorDetail) -> Self {
-        eprintln!("io error: {:?}", err);
-        CommandError::Undef
-    }
-}
-
-impl From<kg_tree::TreeErrorDetail> for CommandError {
-    fn from(err: kg_tree::TreeErrorDetail) -> Self {
-        eprintln!("tree error: {:?}", err);
-        CommandError::Undef
-    }
 }
 
 pub type EnvVars = LinkedHashMap<String, String>;
@@ -96,7 +68,7 @@ pub trait CommandExecutor {
         args: &[String],
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError>;
+    ) -> CommandResult<TaskResult>;
 
     fn exec_script(
         &mut self,
@@ -108,13 +80,13 @@ pub trait CommandExecutor {
         run_as: Option<&str>,
         out_format: Option<FileFormat>,
         log: &OutputLog,
-    ) -> Result<TaskResult, CommandError>;
+    ) -> CommandResult<TaskResult>;
 }
 
 pub fn create_command_executor(
     host: &Host,
     engine: &EngineRef,
-) -> Result<Box<dyn CommandExecutor>, CommandError> {
+) -> CommandResult<Box<dyn CommandExecutor>> {
     let e = engine
         .write()
         .ssh_session_cache_mut()
@@ -257,7 +229,7 @@ fn execute(
     out_format: Option<FileFormat>,
     err_format: Option<FileFormat>,
     log: &OutputLog,
-) -> Result<TaskResult, CommandError> {
+) -> CommandResult<TaskResult> {
     use std::io::BufRead;
 
     let mut stdout = child.stdout.take().unwrap();
@@ -265,7 +237,7 @@ fn execute(
     let log_err = log.clone();
     let log_out = log.clone();
 
-    let herr: JoinHandle<std::io::Result<_>> = if err_format.is_some() {
+    let herr: JoinHandle<CommandResult<_>> = if err_format.is_some() {
         std::thread::spawn(move || {
             let mut stderr_buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
             {
@@ -273,12 +245,12 @@ fn execute(
                 let mut line = String::new();
                 loop {
                     line.clear();
-                    let len = r.read_line(&mut line)?;
+                    let len = r.read_line(&mut line).map_err_to_diag()?;
                     if len == 0 {
                         break;
                     } else {
                         log_err.log_stderr(line.as_bytes())?;
-                        stderr_buf.write_all(line.as_bytes())?;
+                        stderr_buf.write_all(line.as_bytes()).map_err_to_diag()?;
                     }
                 }
             }
@@ -290,7 +262,7 @@ fn execute(
             let mut line = String::new();
             loop {
                 line.clear();
-                let len = r.read_line(&mut line)?;
+                let len = r.read_line(&mut line).map_err_to_diag()?;
                 if len == 0 {
                     break;
                 } else {
@@ -301,7 +273,7 @@ fn execute(
         })
     };
 
-    let hout: JoinHandle<std::io::Result<_>> = if out_format.is_some() {
+    let hout: JoinHandle<CommandResult<_>> = if out_format.is_some() {
         std::thread::spawn(move || {
             let mut stdout_buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
             {
@@ -309,12 +281,12 @@ fn execute(
                 let mut line = String::new();
                 loop {
                     line.clear();
-                    let len = r.read_line(&mut line)?;
+                    let len = r.read_line(&mut line).map_err_to_diag()?;
                     if len == 0 {
                         break;
                     } else {
                         log_out.log_stdout(line.as_bytes())?;
-                        stdout_buf.write_all(line.as_bytes())?;
+                        stdout_buf.write_all(line.as_bytes()).map_err_to_diag()?;
                     }
                 }
             }
@@ -326,7 +298,7 @@ fn execute(
             let mut line = String::new();
             loop {
                 line.clear();
-                let len = r.read_line(&mut line)?;
+                let len = r.read_line(&mut line).map_err_to_diag()?;
                 if len == 0 {
                     break;
                 } else {
@@ -337,11 +309,14 @@ fn execute(
         })
     };
 
-    let status = child.wait()?;
+    let status = child
+        .wait()
+        .map_err_to_diag()
+        .map_err_as_cause(|| CommandErrorDetail::CommandSpawn)?;
     let mut stdout = hout.join().unwrap()?;
     let mut stderr = herr.join().unwrap()?;
-    stdout.seek(SeekFrom::Start(0))?;
-    stderr.seek(SeekFrom::Start(0))?;
+    stdout.seek(SeekFrom::Start(0)).map_err_to_diag()?;
+    stderr.seek(SeekFrom::Start(0)).map_err_to_diag()?;
 
     log.log_status(status.code())?;
 
