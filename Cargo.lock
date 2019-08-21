@@ -527,7 +527,6 @@ version = "0.2.6"
 dependencies = [
  "backtrace 0.3.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "kg-display-derive 0.1.1",
- "regex 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.99 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.99 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
