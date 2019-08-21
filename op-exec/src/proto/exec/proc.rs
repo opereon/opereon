@@ -58,10 +58,12 @@ impl ProcExec {
         dir_name
     }
 
-    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path) -> Result<(), ProtoError> {
+    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path) -> ProtoResult<()> {
         let p = proc_exec_dir.join(self.get_proc_exec_dir_name());
         debug_assert!(!p.exists());
-        fs::create_dir_all(&p)?;
+        fs::create_dir_all(&p)
+            .into_diag_res()
+            .map_err_as_cause(|| ProtoErrorDetail::ProcExecDir)?;
         self.path = p;
         Ok(())
     }
@@ -71,7 +73,7 @@ impl ProcExec {
         model: &Model,
         proc: &ProcDef,
         proc_exec_dir: &Path,
-    ) -> Result<(), ProtoError> {
+    ) -> ProtoResult<()> {
         self.name = proc.id().to_string();
         self.label = proc.label().to_string();
         self.kind = proc.kind();
@@ -80,10 +82,8 @@ impl ProcExec {
 
         self.proc_path = proc.node().path();
 
-        // FIXME ws error handling
-        self.args
-            .resolve(proc.root(), proc.node(), proc.scope_mut()?)
-            .expect("Cannot resolve args");
+        let scope = proc.scope_mut()?;
+        self.args.resolve(proc.root(), proc.node(), scope)?;
 
         if proc_exec_dir.is_absolute() {
             self.create_proc_exec_dir(proc_exec_dir)?;
@@ -95,7 +95,8 @@ impl ProcExec {
             let hosts = s.resolve_hosts(model, proc)?;
 
             for host in hosts {
-                let step = StepExec::create(model, proc, s, &host, self)?;
+                let step = StepExec::create(model, proc, s, &host, self)
+                    .map_err_as_cause(|| ProtoErrorDetail::StepExecCreate)?;
                 self.add_step(step);
             }
         }
@@ -107,7 +108,7 @@ impl ProcExec {
         self.run.add_step(step);
     }
 
-    pub fn store(&self) -> Result<(), ProtoError> {
+    pub fn store(&self) -> ProtoResult<()> {
         for s in self.run.steps().iter() {
             s.store()?;
         }
@@ -118,16 +119,27 @@ impl ProcExec {
         Ok(())
     }
 
-    //FIXME (jc) errors
-    pub fn load<P: AsRef<Path>>(dir: P) -> Result<ProcExec, ProtoError> {
-        let dir = dir.as_ref().canonicalize()?;
+    pub fn load<P: AsRef<Path>>(dir: P) -> ProtoResult<ProcExec> {
+        let dir = dir
+            .as_ref()
+            .canonicalize()
+            .map_err(|err| IoErrorDetail::from(err))?;
 
         EXEC_PATH.with(|path| {
             *path.borrow_mut() = dir.clone();
         });
 
-        let s = fs::read_string(dir.join("_proc.yaml"))?;
-        let mut p: ProcExec = serde_yaml::from_str(&s).unwrap(); //FIXME (jc)
+        let file_path = dir.join("_proc.yaml");
+        let s = fs::read_string(&file_path)?;
+        //FIXME (ws) use kg_tree::serial::yaml
+        let mut p: ProcExec = serde_yaml::from_str(&s)
+            .map_err(|err| -> BasicDiag {
+                println!("error: {}", err);
+                unimplemented!()
+            })
+            .map_err_as_cause(|| ProtoErrorDetail::ProcExecLoad {
+                file_path: file_path.to_string_lossy().to_string(),
+            })?;
 
         p.path = dir;
         Ok(p)

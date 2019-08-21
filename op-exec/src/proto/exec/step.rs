@@ -18,7 +18,7 @@ impl StepExec {
         step: &Step,
         host: &HostDef,
         proc_exec: &ProcExec,
-    ) -> Result<StepExec, ProtoError> {
+    ) -> ProtoResult<StepExec> {
         let mut step_exec = StepExec {
             step: step.index(),
             // only set host_path if host is defined inside the model
@@ -31,7 +31,7 @@ impl StepExec {
         step_exec.prepare(proc_exec)?;
 
         for task in step.tasks().iter() {
-            let t = TaskExec::create(model, proc, task, host, proc_exec, &step_exec)?;
+            let t = TaskExec::create(model, proc, task, host, proc_exec, &step_exec);
             step_exec.add_task(t);
         }
 
@@ -42,7 +42,7 @@ impl StepExec {
         format!("{:03}_{}", self.step + 1, self.host.hostname())
     }
 
-    fn create_step_dir(&mut self, proc_exec_dir: &Path) -> Result<(), ProtoError> {
+    fn create_step_dir(&mut self, proc_exec_dir: &Path) -> ProtoResult<()> {
         let p = proc_exec_dir.join(self.get_step_dir_name());
         debug_assert!(!p.exists());
         fs::create_dir(&p)?;
@@ -50,11 +50,11 @@ impl StepExec {
         Ok(())
     }
 
-    pub fn prepare(&mut self, proc_exec: &ProcExec) -> Result<(), ProtoError> {
+    pub fn prepare(&mut self, proc_exec: &ProcExec) -> ProtoResult<()> {
         self.create_step_dir(proc_exec.path())
     }
 
-    pub fn store(&self) -> Result<(), ProtoError> {
+    pub fn store(&self) -> ProtoResult<()> {
         let e = serde_yaml::to_string(self).unwrap();
         let p = self.path.join("_step.yaml");
         debug_assert!(!p.exists());

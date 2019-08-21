@@ -76,7 +76,7 @@ impl ExecManager {
         Ok(model)
     }*/
 
-    pub fn get(&mut self, path: &Path) -> Result<ProcExecRef, ProtoError> {
+    pub fn get(&mut self, path: &Path) -> ProtoResult<ProcExecRef> {
         if let Some(w) = self.cache.get_mut(path) {
             return Ok(w.clone());
         }

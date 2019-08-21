@@ -16,12 +16,12 @@ impl TaskExec {
         _host: &HostDef,
         _proc_exec: &ProcExec,
         _step_exec: &StepExec,
-    ) -> Result<TaskExec, ProtoError> {
-        Ok(TaskExec {
+    ) -> TaskExec {
+        TaskExec {
             name: task.label().to_string(),
             kind: task.kind(),
             task_path: Opath::from(task.node()),
-        })
+        }
     }
 
     pub fn name(&self) -> &str {

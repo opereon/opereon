@@ -1,5 +1,4 @@
 use super::*;
-use crate::{FileError, ProtoError};
 use kg_diag::{BasicDiag, Diag};
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -51,13 +50,6 @@ impl From<kg_tree::opath::ExprErrorDetail> for RuntimeError {
     }
 }
 
-//FIXME (jc)
-impl From<ProtoError> for RuntimeError {
-    fn from(_err: ProtoError) -> Self {
-        println!("proto err");
-        RuntimeError::Custom
-    }
-}
 
 //FIXME (jc)
 impl From<CommandError> for RuntimeError {

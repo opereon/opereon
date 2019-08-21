@@ -7,8 +7,10 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn from_def(host_def: &HostDef) -> Result<Host, ProtoError> {
-        let mut h: Host = from_tree(host_def.node())?;
+    pub fn from_def(host_def: &HostDef) -> ProtoResult<Host> {
+        let mut h: Host = from_tree(host_def.node())
+            .into_diag_res()
+            .map_err_as_cause(|| ProtoErrorDetail::HostParse)?;
         h.hostname = host_def.hostname().to_string();
         if h.ssh_dest.hostname().is_empty() {
             h.ssh_dest.set_hostname(&h.hostname);
