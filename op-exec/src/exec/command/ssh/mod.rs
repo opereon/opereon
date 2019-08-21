@@ -11,35 +11,42 @@ use super::*;
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
 pub use self::operations::RemoteCommandOperation;
+use kg_diag::io::ResultExt;
 use tokio_process::CommandExt;
 
 mod config;
 mod dest;
 mod operations;
 
-#[derive(Debug)]
-pub enum SshError {
-    IoErrorDetail(kg_diag::IoErrorDetail),
-    SshOpen(String),
-    SshProcessTerminated,
-    SshClosed,
-    ScriptOpenError(std::io::Error),
-}
-
-//FIXME (jc)
-impl From<kg_diag::IoErrorDetail> for SshError {
-    fn from(err: kg_diag::IoErrorDetail) -> Self {
-        SshError::IoErrorDetail(err)
-    }
-}
-
-impl From<std::io::Error> for SshError {
-    fn from(err: std::io::Error) -> Self {
-        SshError::IoErrorDetail(err.into())
-    }
-}
-
+pub type SshError = BasicDiag;
 pub type SshResult<T> = Result<T, SshError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum SshErrorDetail {
+    #[display(fmt = "ssh process didn't exited successfully: {stderr}")]
+    SshProcess { stderr: String },
+    //    #[display(fmt = "ssh process unexpectedly terminated")]
+    //    SshProcessTerminated,
+    #[display(fmt = "connection closed")]
+    SshClosed,
+
+    #[display(fmt = "cannot spawn ssh process")]
+    SshSpawn,
+}
+
+impl SshErrorDetail {
+    pub fn ssh_closed<T>() -> SshResult<T> {
+        Err(SshErrorDetail::SshClosed.into())
+    }
+    pub fn ssh_process<T>(stderr: String) -> SshResult<T> {
+        Err(SshErrorDetail::SshProcess { stderr }.into())
+    }
+
+    pub fn ssh_spawn_err(err: std::io::Error) -> SshError {
+        let err = IoErrorDetail::from(err);
+        SshErrorDetail::SshSpawn.with_cause(BasicDiag::from(err))
+    }
+}
 
 #[derive(Debug)]
 pub struct SshSessionCache {
@@ -144,21 +151,19 @@ impl SshSession {
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
 
-        let output = cmd.output()?;
+        let output = cmd.output().map_err(SshErrorDetail::ssh_spawn_err)?;
         if output.status.success() {
             self.opened.set(true);
             Ok(())
         } else {
-            Err(SshError::SshOpen(
-                String::from_utf8(output.stderr).expect("non UTF-8 stderr output"),
-            ))
+            return SshErrorDetail::ssh_process(String::from_utf8_lossy(&output.stderr).to_string());
         }
     }
 
     #[allow(dead_code)]
     fn check(&self) -> SshResult<bool> {
         if !self.opened.get() {
-            return Err(SshError::SshClosed);
+            return SshErrorDetail::ssh_closed();
         }
 
         let mut cmd = self
@@ -171,7 +176,7 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-        let s = cmd.status()?;
+        let s = cmd.status().map_err(SshErrorDetail::ssh_spawn_err)?;
         Ok(s.success())
     }
 
@@ -190,13 +195,11 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
-        let output = cmd.output()?;
+        let output = cmd.output().map_err(SshErrorDetail::ssh_spawn_err)?;
         if output.status.success() {
             Ok(())
         } else {
-            Err(SshError::SshOpen(
-                String::from_utf8(output.stderr).expect("non UTF-8 stderr output"),
-            ))
+            return SshErrorDetail::ssh_process(String::from_utf8_lossy(&output.stderr).to_string());
         }
     }
 
@@ -209,7 +212,7 @@ impl SshSession {
         log: &OutputLog,
     ) -> Result<Child, SshError> {
         if !self.opened.get() {
-            return Err(SshError::SshClosed);
+            return SshErrorDetail::ssh_closed();
         }
 
         let usr_cmd = CommandBuilder::new(cmd)
@@ -227,7 +230,8 @@ impl SshSession {
 
         ssh_cmd.stdout(stdout).stderr(stderr);
 
-        Ok(ssh_cmd.spawn()?)
+        let res = ssh_cmd.spawn().map_err(SshErrorDetail::ssh_spawn_err)?;
+        Ok(res)
     }
 
     // this code may be used during migration to non-blocking api
@@ -265,7 +269,7 @@ impl SshSession {
         log: &OutputLog,
     ) -> Result<Child, SshError> {
         if !self.opened.get() {
-            return Err(SshError::SshClosed);
+            return SshErrorDetail::ssh_closed();
         }
 
         let mut usr_cmd = if let Some(user) = run_as {
@@ -299,10 +303,10 @@ impl SshSession {
 
         let mut buf = Cursor::new(Vec::new());
         prepare_script(script, args, env, cwd, &mut buf)?;
-        buf.seek(SeekFrom::Start(0))?;
-        log.log_stdin(&mut buf)?;
+        buf.seek(SeekFrom::Start(0)).map_err_to_diag()?;
+        log.log_stdin(&mut buf).map_err_to_diag()?;
 
-        w_in.write_all(buf.get_ref())?;
+        w_in.write_all(buf.get_ref()).map_err_to_diag()?;
         std::mem::drop(w_in);
 
         Ok(ssh_cmd.spawn()?)
@@ -317,7 +321,7 @@ impl SshSession {
         run_as: Option<&str>,
     ) -> Result<tokio_process::Child, SshError> {
         if !self.opened.get() {
-            return Err(SshError::SshClosed);
+            return SshErrorDetail::ssh_closed();
         }
 
         let mut usr_cmd = if let Some(user) = run_as {

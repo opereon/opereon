@@ -50,7 +50,6 @@ impl From<kg_tree::opath::ExprErrorDetail> for RuntimeError {
     }
 }
 
-
 //FIXME (jc)
 impl From<CommandError> for RuntimeError {
     fn from(_err: CommandError) -> Self {
@@ -71,14 +70,6 @@ impl From<FileError> for RuntimeError {
 impl From<kg_diag::BasicDiag> for RuntimeError {
     fn from(err: BasicDiag) -> Self {
         println!("basic diag err: {}", err);
-        RuntimeError::Custom
-    }
-}
-
-//FIXME (jc)
-impl From<SshError> for RuntimeError {
-    fn from(err: SshError) -> Self {
-        println!("ssh err {:?}", err);
         RuntimeError::Custom
     }
 }
