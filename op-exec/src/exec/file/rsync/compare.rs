@@ -27,7 +27,7 @@ impl ModFlags {
             } else if b == b'?' {
                 Ok(None)
             } else {
-                return RsyncParseErrorDetail::custom_line(line!());
+                RsyncParseErrorDetail::custom_line(line!())
             }
         }
 
@@ -259,7 +259,7 @@ pub fn rsync_compare(
         None => Err(RsyncErrorDetail::RsyncTerminated.into()),
         Some(0) => {
             let output = String::from_utf8_lossy(&stdout);
-            parse_output(&output).map_err(|err| err.into())
+            parse_output(&output)
         }
         Some(_c) => {
             let output = String::from_utf8_lossy(&stderr);

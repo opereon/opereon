@@ -15,7 +15,7 @@ use slog::Logger;
 type Loaded = u64;
 
 #[inline(always)]
-fn check_progress_info(progress_info: &Vec<&str>) -> RsyncParseResult<()> {
+fn check_progress_info(progress_info: &[&str]) -> RsyncParseResult<()> {
     if progress_info.len() == 4 || progress_info.len() == 6 {
         return Ok(());
     }
@@ -23,7 +23,7 @@ fn check_progress_info(progress_info: &Vec<&str>) -> RsyncParseResult<()> {
 }
 
 #[inline(always)]
-fn check_file_info(file_info: &Vec<&str>) -> RsyncParseResult<()> {
+fn check_file_info(file_info: &[&str]) -> RsyncParseResult<()> {
     if file_info.len() != 2 {
         return RsyncParseErrorDetail::custom_line(line!());
     }
@@ -51,8 +51,8 @@ fn read_until<R: BufRead + ?Sized>(
 
             let mut found = None;
 
-            for i in 0..available.len() {
-                if pred(available[i]) {
+            for (i, item) in available.iter().enumerate() {
+                if pred(*item) {
                     found = Some(i);
                     break;
                 }
@@ -103,7 +103,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> RsyncParse
         // skip \n or \r at the end of line
         let line = &line[..line.len() - 1];
 
-        if !file_completed && !line.starts_with("[") {
+        if !file_completed && !line.starts_with('[') {
             let progress_info = progress_reg
                 .split(&line)
                 .filter(|s| !s.is_empty())
@@ -149,7 +149,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> RsyncParse
 
         file_name = file_info[0].to_string();
 
-        if file_name.ends_with("/") || file_name.ends_with("/.") {
+        if file_name.ends_with('/') || file_name.ends_with("/.") {
             // directory - no progress value
             operation.write().update_progress_step_value_done(file_idx);
 
@@ -428,12 +428,10 @@ impl Future for FileCopyOperation {
                 if status.success() {
                     Ok(Async::Ready(Outcome::Empty))
                 } else {
-                    return Err(RsyncErrorDetail::RsyncProcessStatus { status })
-                        .into_diag_res()
-                        .map_err(|err| err.into());
+                    Err(RsyncErrorDetail::RsyncProcessStatus { status }).into_diag_res()
                 }
             }
-            Some(Err(err)) => Err(err.into()),
+            Some(Err(err)) => Err(err),
             None => Ok(Async::NotReady),
         }
     }

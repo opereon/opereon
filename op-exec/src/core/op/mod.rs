@@ -332,7 +332,7 @@ impl Stream for ProgressStream {
             self.operation.write().progress_task.register();
 
             let o = self.operation.read();
-            let ref progress = o.progress;
+            let progress = &o.progress;
             if self.progress.counter() != progress.counter() {
                 if progress.is_done() {
                     self.done = true;

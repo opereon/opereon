@@ -161,9 +161,7 @@ impl SshSession {
             self.opened.set(true);
             Ok(())
         } else {
-            return SshErrorDetail::process_exit(
-                String::from_utf8_lossy(&output.stderr).to_string(),
-            );
+            SshErrorDetail::process_exit(String::from_utf8_lossy(&output.stderr).to_string())
         }
     }
 
@@ -206,9 +204,7 @@ impl SshSession {
         if output.status.success() {
             Ok(())
         } else {
-            return SshErrorDetail::process_exit(
-                String::from_utf8_lossy(&output.stderr).to_string(),
-            );
+            SshErrorDetail::process_exit(String::from_utf8_lossy(&output.stderr).to_string())
         }
     }
 

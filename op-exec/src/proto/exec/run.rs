@@ -19,7 +19,7 @@ impl RunExec {
         RunExec { steps: Vec::new() }
     }
 
-    fn store_steps<S>(steps: &Vec<StepExec>, serializer: S) -> Result<S::Ok, S::Error>
+    fn store_steps<S>(steps: &[StepExec], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {

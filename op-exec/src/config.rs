@@ -39,7 +39,7 @@ pub fn resolve_env_vars(input: &str) -> Cow<str> {
 
     ENV_VAR_NAME_RE.replace_all(input, |caps: &Captures| {
         let var_name = &caps[1];
-        env::var(var_name).unwrap_or(String::new())
+        env::var(var_name).unwrap_or_default()
     })
 }
 
@@ -47,7 +47,7 @@ pub fn parse_path_list(path_list: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     for p in path_list.split(';') {
         let p = p.trim();
-        if p.len() > 0 {
+        if !p.is_empty() {
             let s = resolve_env_vars(p);
             let path = PathBuf::from(s.as_ref());
             paths.push(path);

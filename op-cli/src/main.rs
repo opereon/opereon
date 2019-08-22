@@ -26,9 +26,9 @@ use tokio::runtime;
 mod display;
 mod options;
 
-pub static SHORT_VERSION: &'static str = env!("OP_SHORT_VERSION");
-pub static LONG_VERSION: &'static str = env!("OP_LONG_VERSION");
-pub static TIMESTAMP: &'static str = env!("OP_TIMESTAMP");
+pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
+pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
+pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
 
 fn check<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
     match result {
@@ -41,11 +41,8 @@ fn check<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
 }
 
 fn make_model_path_absolute(path: &mut ModelPath) {
-    match path {
-        ModelPath::Path(ref mut path) => {
-            *path = path.canonicalize().unwrap();
-        }
-        _ => {}
+    if let ModelPath::Path(ref mut path) = path {
+        *path = path.canonicalize().unwrap();
     }
 }
 
@@ -226,8 +223,8 @@ fn main() {
                 dry_run,
             }
         }
-        Command::Exec { mut path } => {
-            make_path_absolute(&mut path);
+        Command::Exec { path } => {
+            make_path_absolute(&path);
 
             ExecContext::ProcExec { exec_path: path }
         }

@@ -144,7 +144,7 @@ impl RemoteCommandOperation {
                     futs.push((Some(fut), None));
                 }
                 Err(err) => {
-                    futs.push((None, Some(Err(RuntimeError::from(err)))));
+                    futs.push((None, Some(Err(err))));
                 }
             }
         }
@@ -193,7 +193,7 @@ impl Future for RemoteCommandOperation {
                 match fut.as_mut().unwrap().poll() {
                     Ok(Async::Ready(output)) => *result = Some(Ok(output)),
                     Ok(Async::NotReady) => finished = false,
-                    Err(err) => *result = Some(Err(RuntimeError::from(err))),
+                    Err(err) => *result = Some(Err(err)),
                 }
             }
 

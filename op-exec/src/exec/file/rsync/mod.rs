@@ -343,6 +343,6 @@ impl FileExecutor for RsyncExecutor {
             params.chmod(chmod);
         }
 
-        self::rsync::copy::rsync_copy(self.config(), &params).map_err(|err| err.into())
+        self::rsync::copy::rsync_copy(self.config(), &params)
     }
 }

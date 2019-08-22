@@ -108,7 +108,7 @@ impl StepExecOperation {
 
         let tasks = {
             let proc_exec = proc_exec.lock();
-            let ref step_exec = proc_exec.run().steps()[step_index];
+            let step_exec = &proc_exec.run().steps()[step_index];
 
             info!(logger, "Executing step on [{host}] in [{path}]", host=format!("{}",step_exec.host()), path=step_exec.path().display(); "verbosity"=>1);
 
@@ -233,8 +233,8 @@ impl Future for TaskExecOperation {
                     .resolve(proc_exec.curr_model())?;
                 let curr_model = curr_model.lock();
 
-                let ref step_exec = proc_exec.run().steps()[self.step_index];
-                let ref task_exec = step_exec.tasks()[self.task_index];
+                let step_exec = &proc_exec.run().steps()[self.step_index];
+                let task_exec = &step_exec.tasks()[self.task_index];
 
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();

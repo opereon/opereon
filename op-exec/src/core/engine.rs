@@ -206,7 +206,7 @@ impl EngineRef {
                         o!(
             //                "context"=> format!("{:?}", op.context()),
                             "id"=> format!("{}", op.id()),
-                             "label"=> format!("{}", op.label()),
+                             "label"=> op.label().to_string(),
                           )
                         );
         }

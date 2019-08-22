@@ -159,7 +159,7 @@ impl ModelManager {
 
         let oid = git.commit(message)?;
 
-        self.get(oid.into())
+        self.get(oid)
     }
 
     pub fn get(&mut self, id: Sha1Hash) -> ModelManagerResult<ModelRef> {
@@ -209,7 +209,7 @@ impl ModelManager {
 # Opereon tmp directory
 .op/
 "#;
-        writeln!(&mut content, "{}", ignore_content).map_err(|err| IoErrorDetail::from(err))?;
+        writeln!(&mut content, "{}", ignore_content).map_err(IoErrorDetail::from)?;
         fs::write(excludes, content)?;
         Ok(())
     }
