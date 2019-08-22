@@ -7,13 +7,13 @@ use super::*;
 pub use self::engine::*;
 pub use self::error::*;
 pub use self::exec::*;
-pub use self::model::*;
+pub use self::model_manager::*;
 pub use self::op::*;
 pub use self::resource::*;
 
 mod engine;
 mod error;
 mod exec;
-mod model;
+mod model_manager;
 mod op;
 mod resource;

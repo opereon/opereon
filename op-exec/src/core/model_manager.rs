@@ -1,7 +1,9 @@
 use git2::RepositoryInitOptions;
 
+use self::ModelManagerErrorDetail::*;
 use super::*;
 use crate::ConfigRef;
+use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
 use kg_utils::collections::LruCache;
 use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
@@ -45,6 +47,27 @@ impl slog::Value for ModelPath {
     }
 }
 
+pub type ModelManagerError = BasicDiag;
+pub type ModelManagerResult<T> = Result<T, ModelManagerError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum ModelManagerErrorDetail {
+    #[display(fmt = "manifest file not found")]
+    ManifestNotFound,
+
+    #[display(fmt = "cannot find manifest file")]
+    ManifestSearch,
+
+    #[display(fmt = "cannot init manifest file in '{path}'")]
+    InitManifest { path: String },
+
+    #[display(fmt = "cannot init git repository in '{path}'")]
+    InitRepo { path: String },
+
+    #[display(fmt = "cannot init .operc file in '{path}'")]
+    InitOperc { path: String },
+}
+
 #[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,
@@ -70,7 +93,7 @@ impl ModelManager {
     /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
     /// # Returns
     /// path to manifest dir.
-    pub fn search_manifest(start_dir: &Path) -> IoResult<PathBuf> {
+    pub fn search_manifest(start_dir: &Path) -> ModelManagerResult<PathBuf> {
         let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
 
         let mut parent = Some(start_dir);
@@ -85,7 +108,9 @@ impl ModelManager {
                 }
                 Err(err) => {
                     if err.kind() != std::io::ErrorKind::NotFound {
-                        return Err(err);
+                        return Err(err)
+                            .into_diag_res()
+                            .map_err_as_cause(|| ModelManagerErrorDetail::ManifestSearch);
                     } else {
                         parent = curr_dir.parent();
                     }
@@ -93,15 +118,12 @@ impl ModelManager {
             }
         }
 
-        return Err(IoErrorDetail::file_not_found(
-            manifest_filename,
-            OpType::Read,
-        ));
+        Err(ModelManagerErrorDetail::ManifestNotFound.into())
     }
 
     /// Initialize model manager.
     /// This method can be called multiple times.
-    pub fn init(&mut self) -> IoResult<()> {
+    pub fn init(&mut self) -> ModelManagerResult<()> {
         if self.initialized {
             return Ok(());
         }
@@ -116,15 +138,21 @@ impl ModelManager {
     }
 
     /// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
-        Self::init_git_repo(&path)?;
-        Self::init_manifest(&path)?;
-        Self::init_operc(&path)?;
+    pub fn init_model<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
+        Self::init_git_repo(&path).map_err_as_cause(|| InitRepo {
+            path: path.as_ref().to_string_lossy().to_string(),
+        })?;
+        Self::init_manifest(&path).map_err_as_cause(|| InitManifest {
+            path: path.as_ref().to_string_lossy().to_string(),
+        })?;
+        Self::init_operc(&path).map_err_as_cause(|| InitOperc {
+            path: path.as_ref().to_string_lossy().to_string(),
+        })?;
         Ok(())
     }
 
     /// Commit current model
-    pub fn commit(&mut self, message: &str) -> RuntimeResult<ModelRef> {
+    pub fn commit(&mut self, message: &str) -> ModelManagerResult<ModelRef> {
         self.init()?;
 
         let git = GitManager::new(self.model_dir())?;
@@ -134,7 +162,7 @@ impl ModelManager {
         self.get(oid.into())
     }
 
-    pub fn get(&mut self, id: Sha1Hash) -> RuntimeResult<ModelRef> {
+    pub fn get(&mut self, id: Sha1Hash) -> ModelManagerResult<ModelRef> {
         self.init()?;
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
@@ -150,7 +178,7 @@ impl ModelManager {
         Ok(model)
     }
 
-    pub fn resolve(&mut self, model_path: &ModelPath) -> RuntimeResult<ModelRef> {
+    pub fn resolve(&mut self, model_path: &ModelPath) -> ModelManagerResult<ModelRef> {
         self.init()?;
         match *model_path {
             ModelPath::Current => self.current(),
@@ -161,12 +189,12 @@ impl ModelManager {
 
     /// Returns current model - model represented by content of the git index.
     /// This method loads model on each call.
-    pub fn current(&mut self) -> RuntimeResult<ModelRef> {
+    pub fn current(&mut self) -> ModelManagerResult<ModelRef> {
         let oid = GitManager::new(self.model_dir())?.update_index()?;
         self.get(oid.into())
     }
 
-    fn init_git_repo<P: AsRef<Path>>(path: P) -> RuntimeResult<()> {
+    fn init_git_repo<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
         use std::fmt::Write;
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
@@ -186,7 +214,7 @@ impl ModelManager {
         Ok(())
     }
 
-    fn init_manifest<P: AsRef<Path>>(path: P) -> IoResult<()> {
+    fn init_manifest<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
         let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
         // language=toml
         let default_manifest = r#"
@@ -198,9 +226,8 @@ description = "Opereon model"
         Ok(())
     }
 
-    fn init_operc<P: AsRef<Path>>(path: P) -> IoResult<()> {
+    fn init_operc<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
         let manifest_path = path.as_ref().join(PathBuf::from(".operc"));
-        let mut content = String::new();
         // language=toml
         let default_operc = r#"
 [[exclude]]
@@ -210,7 +237,7 @@ path = ".op"
         Ok(())
     }
 
-    fn resolve_revision_str(&self, spec: &str) -> RuntimeResult<Sha1Hash> {
+    fn resolve_revision_str(&self, spec: &str) -> ModelManagerResult<Sha1Hash> {
         let git = GitManager::new(self.model_dir())?;
         let id = git.resolve_revision_str(spec)?;
         Ok(id)

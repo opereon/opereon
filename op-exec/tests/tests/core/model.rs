@@ -1,15 +1,7 @@
 use super::*;
 use op_exec::ModelManager;
+use op_exec::ModelManagerErrorDetail;
 use std::fs::File;
-
-macro_rules! assert_err {
-    ($err: expr, $variant: pat) => {
-        match $err {
-            $variant => {}
-            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
-        }
-    };
-}
 
 macro_rules! assert_exists {
     ($path: expr) => {
@@ -50,9 +42,13 @@ fn search_manifest_nested() {
 fn search_manifest_not_found() {
     let (_tmp_dir, path) = get_tmp_dir();
 
-    let err = ModelManager::search_manifest(&path).unwrap_err();
+    let res = ModelManager::search_manifest(&path);
 
-    assert_err!(err.kind(), std::io::ErrorKind::NotFound)
+    let (_err, _detail) = assert_detail!(
+        res,
+        ModelManagerErrorDetail,
+        ModelManagerErrorDetail::ManifestNotFound
+    );
 }
 
 #[test]

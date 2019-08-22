@@ -1,5 +1,4 @@
-use super::*;
-use kg_diag::{BasicDiag, Diag};
+use kg_diag::{BasicDiag};
 
 //pub type RuntimeError = BasicDiag;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -34,25 +33,9 @@ impl From<kg_diag::IoErrorDetail> for RuntimeError {
 }
 
 //FIXME (jc)
-impl From<kg_tree::opath::ExprErrorDetail> for RuntimeError {
-    fn from(_err: kg_tree::opath::ExprErrorDetail) -> Self {
-        println!("opath err");
-        RuntimeError::Custom
-    }
-}
-
-//FIXME (jc)
 impl From<kg_diag::BasicDiag> for RuntimeError {
     fn from(err: BasicDiag) -> Self {
         println!("basic diag err: {}", err);
-        RuntimeError::Custom
-    }
-}
-
-//FIXME ws
-impl From<std::fmt::Error> for RuntimeError {
-    fn from(err: std::fmt::Error) -> Self {
-        println!("fmt err {:?}", err);
         RuntimeError::Custom
     }
 }
