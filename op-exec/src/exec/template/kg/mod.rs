@@ -1,5 +1,6 @@
 use kg_template::parse::Parser;
 
+use super::TemplateErrorDetail::*;
 use super::*;
 
 pub struct TemplateResolver {
@@ -23,29 +24,37 @@ impl TemplateExecutor for TemplateResolver {
         src_path: &Path,
         dst_path: &Path,
         _log: &OutputLog,
-    ) -> RuntimeResult<TaskResult> {
+    ) -> TemplateResult<TaskResult> {
         let template = {
-            let f = FileBuffer::open(src_path)?;
+            let f = FileBuffer::open(src_path)
+                .into_diag_res()
+                .map_err_as_cause(|| Open)?;
             let mut r = f.char_reader();
-            match self.parser.parse(&mut r) {
-                Ok(t) => t,
-                Err(err) => {
-                    //FIXME (jc)
-                    eprintln!("Error parsing template: {:?}", err);
-                    return Err(RuntimeError::Custom);
-                }
-            }
+
+            self.parser.parse(&mut r).map_err_as_cause(|| Parse {
+                file: src_path.to_string_lossy().to_string(),
+            })?
         };
 
         let mut res = String::new();
         template
             .render_ext(task.root(), task.node(), task.scope()?, &mut res)
-            .unwrap(); //FIXME (jc)
+            .map_err_as_cause(|| Render {
+                file: src_path.to_string_lossy().to_string(),
+            })?;
 
         if let Some(p) = dst_path.parent() {
-            std::fs::create_dir_all(p)?;
+            fs::create_dir_all(p).into_diag_res().map_err_as_cause(|| {
+                TemplateErrorDetail::Write {
+                    dst_file: dst_path.to_string_lossy().to_string(),
+                }
+            })?;
         }
-        std::fs::write(&dst_path, res)?;
+        fs::write(&dst_path, res)
+            .into_diag_res()
+            .map_err_as_cause(|| TemplateErrorDetail::Write {
+                dst_file: dst_path.to_string_lossy().to_string(),
+            })?;
 
         Ok(TaskResult::new(Outcome::Empty, Some(0), None))
     }

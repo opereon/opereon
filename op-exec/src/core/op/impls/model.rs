@@ -3,7 +3,7 @@ use regex::Regex;
 
 use super::*;
 use crate::core::op::impls::model::ModelOpErrorDetail::QueryOp;
-use kg_diag::{DiagResultExt};
+use kg_diag::DiagResultExt;
 use kg_tree::opath::Opath;
 use op_model::ModelUpdate;
 use slog::Logger;

@@ -1,4 +1,4 @@
-use kg_diag::{BasicDiag};
+use kg_diag::BasicDiag;
 
 //pub type RuntimeError = BasicDiag;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -14,14 +14,6 @@ pub enum RuntimeError {
     // FIXME ws to be removed
     //    #[display(fmt = "custom")]
     Custom,
-}
-
-//FIXME (jc)
-impl From<std::io::Error> for RuntimeError {
-    fn from(err: std::io::Error) -> Self {
-        println!("io err: {}", err);
-        RuntimeError::Io
-    }
 }
 
 //FIXME (jc)
