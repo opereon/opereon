@@ -18,8 +18,8 @@ pub struct ModFlags {
 }
 
 impl ModFlags {
-    pub fn parse(s: &[u8]) -> Result<ModFlags, ParseError> {
-        fn parse_flag(b: u8, on: u8) -> Result<Option<bool>, ParseError> {
+    pub fn parse(s: &[u8]) -> RsyncParseResult<ModFlags> {
+        fn parse_flag(b: u8, on: u8) -> RsyncParseResult<Option<bool>> {
             if b == on {
                 Ok(Some(true))
             } else if b == b' ' || b == b'.' || b == b'+' {
@@ -27,12 +27,12 @@ impl ModFlags {
             } else if b == b'?' {
                 Ok(None)
             } else {
-                Err(ParseError::Line(line!())) //FIXME (jc)
+                return RsyncParseErrorDetail::custom_line(line!());
             }
         }
 
         if s.len() != 9 {
-            Err(ParseError::Line(line!())) //FIXME (jc)
+            RsyncParseErrorDetail::custom_output(line!(), String::from_utf8_lossy(s).to_string())
         } else {
             Ok(ModFlags {
                 checksum: parse_flag(s[0], b'c')?,
@@ -155,14 +155,14 @@ pub enum FileType {
 }
 
 impl FileType {
-    pub fn parse(t: u8) -> Result<FileType, ParseError> {
+    pub fn parse(t: u8) -> RsyncParseResult<FileType> {
         match t {
             b'f' => Ok(FileType::File),
             b'd' => Ok(FileType::Dir),
             b'L' => Ok(FileType::Symlink),
             b'D' => Ok(FileType::Device),
             b'S' => Ok(FileType::Special),
-            _ => Err(ParseError::Line(line!())),
+            _ => RsyncParseErrorDetail::custom_line(line!()),
         }
     }
 }
@@ -181,7 +181,7 @@ impl DiffInfo {
         details: &[u8],
         file_path: &str,
         file_size: FileSize,
-    ) -> Result<DiffInfo, ParseError> {
+    ) -> RsyncParseResult<DiffInfo> {
         let (file_type, state) = {
             if details == b"*deleting  " {
                 (None, State::Extraneous)
@@ -247,7 +247,8 @@ pub fn rsync_compare(
         rsync_cmd.arg("--checksum"); // skip based on checksum, not mod-time & size.
     }
 
-    let output = rsync_cmd.output()?;
+    let output = rsync_cmd.output()
+        .map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
         status,
@@ -256,20 +257,19 @@ pub fn rsync_compare(
     } = output;
 
     match status.code() {
-        None => Err(RsyncError::RsyncProcessTerminated),
+        None => Err(RsyncErrorDetail::RsyncTerminated.into()),
         Some(0) => {
-            let output = String::from_utf8(stdout).unwrap(); // FIXME (jc)
+            let output = String::from_utf8_lossy(&stdout);
             parse_output(&output).map_err(|err| err.into())
         }
         Some(_c) => {
-            let output = String::from_utf8(stderr).unwrap(); // FIXME (jc)
-            eprintln!("{}", output);
-            Err(RsyncError::RsyncProcessTerminated) //FIXME (jc)
+            let output = String::from_utf8_lossy(&stderr);
+            RsyncErrorDetail::process_exit(output.to_string())
         }
     }
 }
 
-fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
+fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
     let mut diffs = Vec::new();
 
     let items = output.lines().filter_map(|line| {
@@ -289,13 +289,16 @@ fn parse_output(output: &str) -> Result<Vec<DiffInfo>, ParseError> {
             .collect::<Vec<&str>>();
 
         if file_info.len() != 2 {
-            return Err(ParseError::Line(line!())); // FIXME ws
+            return RsyncParseErrorDetail::custom_output(line!(), output.to_string());
         }
 
         let file_path = file_info[0];
         let file_size = file_info[1]
             .parse::<FileSize>()
-            .map_err(|_e| ParseError::Line(line!()))?; // FIXME ws
+            .map_err(|_e| RsyncParseErrorDetail::Custom{
+                line: line!(),
+                output: output.to_string(),
+            })?;
 
         let diff = DiffInfo::parse(details, file_path, file_size)?;
         diffs.push(diff);

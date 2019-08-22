@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
-use std::str::Utf8Error;
 
 use os_pipe::PipeWriter;
 use tokio::prelude::{Async, Future, Poll};
@@ -18,43 +17,60 @@ mod compare;
 mod config;
 mod copy;
 
-pub type RsyncResult<T> = Result<T, RsyncError>;
 type FileSize = u64;
 
-#[derive(Debug)]
-pub enum ParseError {
-    Line(u32),
+pub type RsyncError = BasicDiag;
+pub type RsyncResult<T> = Result<T, RsyncError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum RsyncErrorDetail {
+    #[display(fmt = "cannot spawn rsync process")]
+    RsyncSpawn,
+    #[display(fmt = "rsync process didn't exited successfully: {stderr}")]
+    RsyncProcess { stderr: String },
+
+    #[display(fmt = "rsync process terminated")]
+    RsyncTerminated,
 }
 
-#[derive(Debug)]
-pub enum RsyncError {
-    IoErrorDetail(std::io::Error),
-    RsyncProcessTerminated,
-    ParseError(ParseError),
-    SshError(SshError),
-    Utf8Error(Utf8Error),
-}
-
-impl From<Utf8Error> for RsyncError {
-    fn from(err: Utf8Error) -> Self {
-        RsyncError::Utf8Error(err)
+impl RsyncErrorDetail {
+    pub fn process_exit<T>(stderr: String) -> RsyncResult<T> {
+        Err(RsyncErrorDetail::RsyncProcess { stderr }.into())
     }
-}
-impl From<ParseError> for RsyncError {
-    fn from(err: ParseError) -> Self {
-        RsyncError::ParseError(err)
-    }
-}
 
-impl From<std::io::Error> for RsyncError {
-    fn from(err: std::io::Error) -> Self {
-        RsyncError::IoErrorDetail(err)
+    pub fn spawn_err(err: std::io::Error) -> RsyncError {
+        let err = IoErrorDetail::from(err);
+        RsyncErrorDetail::RsyncSpawn.with_cause(BasicDiag::from(err))
     }
 }
 
-impl From<SshError> for RsyncError {
-    fn from(err: SshError) -> Self {
-        RsyncError::SshError(err)
+pub type RsyncParseError = BasicDiag;
+pub type RsyncParseResult<T> = Result<T, RsyncParseError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum RsyncParseErrorDetail {
+    #[display(fmt = "cannot parse rsync output - this error is probably \
+    caused by incompatible rsync binary version.\
+    If you think you have correct rsync version installed, please contact support.\
+    Error occurred in '{line}'.\n{output}")]
+    Custom {
+        line: u32,
+        output: String
+    },
+}
+
+impl RsyncParseErrorDetail {
+    pub fn custom_line<T>(line: u32) -> RsyncParseResult<T> {
+        Err(RsyncParseErrorDetail::Custom {
+            line,
+            output: String::new()
+        }).into_diag_res()
+    }
+    pub fn custom_output<T>(line: u32, output: String) -> RsyncParseResult<T> {
+        Err(RsyncParseErrorDetail::Custom {
+            line,
+            output
+        }).into_diag_res()
     }
 }
 
@@ -266,7 +282,7 @@ impl FileExecutor for RsyncExecutor {
         chown: Option<&str>,
         chmod: Option<&str>,
         checksum: bool,
-    ) -> Result<CompareResult, FileError> {
+    ) -> FileResult<CompareResult> {
         let ssh_session = engine
             .write()
             .ssh_session_cache_mut()
@@ -312,7 +328,7 @@ impl FileExecutor for RsyncExecutor {
         chown: Option<&str>,
         chmod: Option<&str>,
         _log: &OutputLog,
-    ) -> Result<TaskResult, FileError> {
+    ) -> FileResult<TaskResult> {
         let ssh_session = engine
             .write()
             .ssh_session_cache_mut()

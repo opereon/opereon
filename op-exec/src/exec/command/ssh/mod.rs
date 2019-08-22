@@ -35,14 +35,14 @@ pub enum SshErrorDetail {
 }
 
 impl SshErrorDetail {
-    pub fn ssh_closed<T>() -> SshResult<T> {
+    pub fn closed<T>() -> SshResult<T> {
         Err(SshErrorDetail::SshClosed.into())
     }
-    pub fn ssh_process<T>(stderr: String) -> SshResult<T> {
+    pub fn process_exit<T>(stderr: String) -> SshResult<T> {
         Err(SshErrorDetail::SshProcess { stderr }.into())
     }
 
-    pub fn ssh_spawn_err(err: std::io::Error) -> SshError {
+    pub fn spawn_err(err: std::io::Error) -> SshError {
         let err = IoErrorDetail::from(err);
         SshErrorDetail::SshSpawn.with_cause(BasicDiag::from(err))
     }
@@ -151,12 +151,12 @@ impl SshSession {
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
 
-        let output = cmd.output().map_err(SshErrorDetail::ssh_spawn_err)?;
+        let output = cmd.output().map_err(SshErrorDetail::spawn_err)?;
         if output.status.success() {
             self.opened.set(true);
             Ok(())
         } else {
-            return SshErrorDetail::ssh_process(
+            return SshErrorDetail::process_exit(
                 String::from_utf8_lossy(&output.stderr).to_string(),
             );
         }
@@ -165,7 +165,7 @@ impl SshSession {
     #[allow(dead_code)]
     fn check(&self) -> SshResult<bool> {
         if !self.opened.get() {
-            return SshErrorDetail::ssh_closed();
+            return SshErrorDetail::closed();
         }
 
         let mut cmd = self
@@ -178,7 +178,7 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-        let s = cmd.status().map_err(SshErrorDetail::ssh_spawn_err)?;
+        let s = cmd.status().map_err(SshErrorDetail::spawn_err)?;
         Ok(s.success())
     }
 
@@ -197,11 +197,11 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
-        let output = cmd.output().map_err(SshErrorDetail::ssh_spawn_err)?;
+        let output = cmd.output().map_err(SshErrorDetail::spawn_err)?;
         if output.status.success() {
             Ok(())
         } else {
-            return SshErrorDetail::ssh_process(
+            return SshErrorDetail::process_exit(
                 String::from_utf8_lossy(&output.stderr).to_string(),
             );
         }
@@ -216,7 +216,7 @@ impl SshSession {
         log: &OutputLog,
     ) -> Result<Child, SshError> {
         if !self.opened.get() {
-            return SshErrorDetail::ssh_closed();
+            return SshErrorDetail::closed();
         }
 
         let usr_cmd = CommandBuilder::new(cmd)
@@ -234,7 +234,7 @@ impl SshSession {
 
         ssh_cmd.stdout(stdout).stderr(stderr);
 
-        let res = ssh_cmd.spawn().map_err(SshErrorDetail::ssh_spawn_err)?;
+        let res = ssh_cmd.spawn().map_err(SshErrorDetail::spawn_err)?;
         Ok(res)
     }
 
@@ -273,7 +273,7 @@ impl SshSession {
         log: &OutputLog,
     ) -> Result<Child, SshError> {
         if !self.opened.get() {
-            return SshErrorDetail::ssh_closed();
+            return SshErrorDetail::closed();
         }
 
         let mut usr_cmd = if let Some(user) = run_as {
@@ -313,7 +313,7 @@ impl SshSession {
         w_in.write_all(buf.get_ref()).map_err_to_diag()?;
         std::mem::drop(w_in);
 
-        let res = ssh_cmd.spawn().map_err(SshErrorDetail::ssh_spawn_err)?;
+        let res = ssh_cmd.spawn().map_err(SshErrorDetail::spawn_err)?;
         Ok(res)
     }
 
@@ -326,7 +326,7 @@ impl SshSession {
         run_as: Option<&str>,
     ) -> Result<tokio_process::Child, SshError> {
         if !self.opened.get() {
-            return SshErrorDetail::ssh_closed();
+            return SshErrorDetail::closed();
         }
 
         let mut usr_cmd = if let Some(user) = run_as {
@@ -365,7 +365,7 @@ impl SshSession {
         std::mem::drop(w_in);
         let res = ssh_cmd
             .spawn_async()
-            .map_err(SshErrorDetail::ssh_spawn_err)?;
+            .map_err(SshErrorDetail::spawn_err)?;
         Ok(res)
     }
 }

@@ -10,21 +10,22 @@ use crate::RuntimeError;
 
 use super::*;
 use slog::Logger;
+use crate::exec::file::rsync::RsyncParseErrorDetail::Custom;
 
 type Loaded = u64;
 
 #[inline(always)]
-fn check_progress_info(progress_info: &Vec<&str>) -> Result<(), ParseError> {
+fn check_progress_info(progress_info: &Vec<&str>) -> RsyncParseResult<()> {
     if progress_info.len() == 4 || progress_info.len() == 6 {
         return Ok(());
     }
-    Err(ParseError::Line(line!()))
+    RsyncParseErrorDetail::custom_line(line!())
 }
 
 #[inline(always)]
-fn check_file_info(file_info: &Vec<&str>) -> Result<(), ParseError> {
+fn check_file_info(file_info: &Vec<&str>) -> RsyncParseResult<()> {
     if file_info.len() != 2 {
-        return Err(ParseError::Line(line!()));
+        return RsyncParseErrorDetail::custom_line(line!())
     }
     Ok(())
 }
@@ -33,14 +34,18 @@ fn read_until<R: BufRead + ?Sized>(
     r: &mut R,
     pred: impl Fn(u8) -> bool,
     buf: &mut Vec<u8>,
-) -> std::io::Result<usize> {
+) -> RsyncParseResult<usize> {
     let mut read = 0;
     loop {
         let (done, used) = {
             let available = match r.fill_buf() {
                 Ok(n) => n,
                 Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e),
+                Err(e) => return Err(e).map_err_to_diag()
+                    .map_err_as_cause(|| Custom {
+                        line: line!(),
+                        output: String::new(),
+                    }),
             };
 
             let mut found = None;
@@ -71,7 +76,7 @@ fn read_until<R: BufRead + ?Sized>(
     }
 }
 
-fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(), RsyncError> {
+fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> RsyncParseResult<()> {
     let mut file_name: String;
     let mut file_completed = true;
     let mut file_idx = 0;
@@ -88,7 +93,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
     buf.clear();
 
     while read_until(&mut out, delimiter, &mut buf)? != 0 {
-        let line = std::str::from_utf8(buf.as_slice())?;
+        let line = String::from_utf8_lossy(buf.as_slice());
         // skip parsing when line is empty
         if line == "\n" || line == "\r" || line.is_empty() {
             buf.clear();
@@ -109,7 +114,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
             let loaded_bytes = loaded_bytes.parse::<Loaded>();
 
             if loaded_bytes.is_err() {
-                Err(ParseError::Line(line!()))?;
+                return RsyncParseErrorDetail::custom_line(line!());
             }
             let loaded_bytes = loaded_bytes.unwrap() as f64;
 
@@ -138,7 +143,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
 
         let res = file_info[1].parse::<FileSize>();
         if res.is_err() {
-            Err(ParseError::Line(line!()))?;
+            return RsyncParseErrorDetail::custom_line(line!())
         }
 
         file_name = file_info[0].to_string();
@@ -158,9 +163,9 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> Result<(),
     Ok(())
 }
 
-pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResult, RsyncError> {
-    let (stdout, stdout_writer) = pipe()?;
-    let (stderr, stderr_writer) = pipe()?;
+pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<TaskResult> {
+    let (stdout, stdout_writer) = pipe().map_err_to_diag()?;
+    let (stderr, stderr_writer) = pipe().map_err_to_diag()?;
 
     let run_stdout = move || {
         let buf = BufReader::new(stdout);
@@ -168,7 +173,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
         for line in buf.lines() {
             match line {
                 Ok(line) => println!("out: {}", line),
-                Err(err) => return Err(err),
+                Err(err) => return Err(err).map_err_to_diag(),
             }
         }
         Ok(())
@@ -180,14 +185,14 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
         for line in buf.lines() {
             match line {
                 Ok(line) => println!("err: {}", line),
-                Err(err) => return Err(err),
+                Err(err) => return Err(err).map_err_to_diag(),
             }
         }
         Ok(())
     };
 
-    let hout: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stdout);
-    let herr: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stderr);
+    let hout: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stdout);
+    let herr: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stderr);
     let mut child = {
         let mut rsync_cmd = params.to_cmd(config);
         rsync_cmd
@@ -201,11 +206,12 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> Result<TaskResu
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout_writer))
             .stderr(Stdio::from(stderr_writer))
-            .spawn()?
+            .spawn()
+            .map_err(RsyncErrorDetail::spawn_err)?
     };
     let status;
     loop {
-        if let Some(s) = child.try_wait()? {
+        if let Some(s) = child.try_wait().map_err(RsyncErrorDetail::spawn_err)? {
             status = Some(s);
             break;
         } else {
