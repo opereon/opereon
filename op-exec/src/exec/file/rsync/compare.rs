@@ -247,8 +247,7 @@ pub fn rsync_compare(
         rsync_cmd.arg("--checksum"); // skip based on checksum, not mod-time & size.
     }
 
-    let output = rsync_cmd.output()
-        .map_err(RsyncErrorDetail::spawn_err)?;
+    let output = rsync_cmd.output().map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
         status,
@@ -293,12 +292,13 @@ fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
         }
 
         let file_path = file_info[0];
-        let file_size = file_info[1]
-            .parse::<FileSize>()
-            .map_err(|_e| RsyncParseErrorDetail::Custom{
-                line: line!(),
-                output: output.to_string(),
-            })?;
+        let file_size =
+            file_info[1]
+                .parse::<FileSize>()
+                .map_err(|_e| RsyncParseErrorDetail::Custom {
+                    line: line!(),
+                    output: output.to_string(),
+                })?;
 
         let diff = DiffInfo::parse(details, file_path, file_size)?;
         diffs.push(diff);

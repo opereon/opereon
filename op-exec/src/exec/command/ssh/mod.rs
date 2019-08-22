@@ -363,9 +363,7 @@ impl SshSession {
 
         w_in.write_all(buf.get_ref()).map_err_to_diag()?;
         std::mem::drop(w_in);
-        let res = ssh_cmd
-            .spawn_async()
-            .map_err(SshErrorDetail::spawn_err)?;
+        let res = ssh_cmd.spawn_async().map_err(SshErrorDetail::spawn_err)?;
         Ok(res)
     }
 }

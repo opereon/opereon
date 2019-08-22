@@ -1,4 +1,5 @@
 use super::*;
+use kg_diag::io::ResultExt;
 use slog::Logger;
 
 fn cleanup_resources(engine: &EngineRef, resource_id: Uuid) {
@@ -252,12 +253,14 @@ impl Future for TaskExecOperation {
                     s.set_var("$task".into(), task.node().clone().into());
                 }
 
+                let log_path = step_exec.path().join("output.log");
                 let output = OutputLog::new(
                     OpenOptions::new()
                         .write(true)
                         .create(true)
                         .append(true)
-                        .open(step_exec.path().join("output.log"))?,
+                        .open(&log_path)
+                        .info(log_path, OpType::Write, FileType::File)?,
                 );
 
                 info!(self.logger, "Executing task [{exec_name}] on host [{host}] ...", host=format!("{}", step_exec.host()), exec_name=task_exec.name(); "verbosity"=>1);

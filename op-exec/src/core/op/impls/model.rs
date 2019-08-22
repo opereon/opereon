@@ -2,10 +2,20 @@ use kg_tree::diff::ModelDiff;
 use regex::Regex;
 
 use super::*;
+use crate::core::op::impls::model::ModelOpErrorDetail::QueryOp;
+use kg_diag::{BasicDiag, DiagResultExt};
 use kg_tree::opath::Opath;
 use op_model::ModelUpdate;
 use slog::Logger;
 use std::path::{Path, PathBuf};
+
+pub type ModelOpError = BasicDiag;
+
+#[derive(Debug, Detail, Display)]
+pub enum ModelOpErrorDetail {
+    #[display(fmt = "cannot query model")]
+    QueryOp,
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -132,23 +142,17 @@ impl Future for ModelQueryOperation {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
         let m = e.model_manager_mut().resolve(&self.model_path)?;
-        match Opath::parse(&self.expr) {
-            Ok(expr) => {
-                info!(self.logger, "Querying model...");
-                let res = {
-                    let m = m.lock();
-                    kg_tree::set_base_path(m.metadata().path());
-                    let scope = m.scope()?;
-                    expr.apply_ext(m.root(), m.root(), &scope)?
-                };
 
-                Ok(Async::Ready(Outcome::NodeSet(res.into())))
-            }
-            Err(err) => {
-                eprintln!("{}", err); //FIXME (jc) error handling
-                Err(RuntimeError::Custom)
-            }
-        }
+        let expr = Opath::parse(&self.expr).map_err_as_cause(|| QueryOp)?;
+        info!(self.logger, "Querying model...");
+        let res = {
+            let m = m.lock();
+            kg_tree::set_base_path(m.metadata().path());
+            let scope = m.scope()?;
+            expr.apply_ext(m.root(), m.root(), &scope)?
+        };
+
+        Ok(Async::Ready(Outcome::NodeSet(res.into())))
     }
 }
 

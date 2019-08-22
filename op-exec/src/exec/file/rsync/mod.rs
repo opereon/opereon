@@ -26,8 +26,12 @@ pub type RsyncResult<T> = Result<T, RsyncError>;
 pub enum RsyncErrorDetail {
     #[display(fmt = "cannot spawn rsync process")]
     RsyncSpawn,
+
     #[display(fmt = "rsync process didn't exited successfully: {stderr}")]
     RsyncProcess { stderr: String },
+
+    #[display(fmt = "rsync process didn't exited successfully: {status}")]
+    RsyncProcessStatus { status: ExitStatus },
 
     #[display(fmt = "rsync process terminated")]
     RsyncTerminated,
@@ -50,27 +54,22 @@ pub type RsyncParseResult<T> = Result<T, RsyncParseError>;
 #[derive(Debug, Display, Detail)]
 pub enum RsyncParseErrorDetail {
     #[display(fmt = "cannot parse rsync output - this error is probably \
-    caused by incompatible rsync binary version.\
-    If you think you have correct rsync version installed, please contact support.\
-    Error occurred in '{line}'.\n{output}")]
-    Custom {
-        line: u32,
-        output: String
-    },
+                     caused by incompatible rsync binary version.\
+                     If you think you have correct rsync version installed, please contact support.\
+                     Error occurred in '{line}'.\n{output}")]
+    Custom { line: u32, output: String },
 }
 
 impl RsyncParseErrorDetail {
     pub fn custom_line<T>(line: u32) -> RsyncParseResult<T> {
         Err(RsyncParseErrorDetail::Custom {
             line,
-            output: String::new()
-        }).into_diag_res()
+            output: String::new(),
+        })
+        .into_diag_res()
     }
     pub fn custom_output<T>(line: u32, output: String) -> RsyncParseResult<T> {
-        Err(RsyncParseErrorDetail::Custom {
-            line,
-            output
-        }).into_diag_res()
+        Err(RsyncParseErrorDetail::Custom { line, output }).into_diag_res()
     }
 }
 

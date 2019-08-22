@@ -2,6 +2,7 @@ use crate::{
     AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
     RuntimeResult, SourceRef,
 };
+use kg_diag::IoErrorDetail;
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
 use serde::export::fmt::Debug;
@@ -95,7 +96,7 @@ impl RemoteCommandOperation {
 
         // for now skip child exit status
         let child_fut = child
-            .map_err(|_err| RuntimeError::Custom)
+            .map_err(|err| IoErrorDetail::from(err).into())
             .map(|_exit_status| ());
 
         // format stdout/stderr lines
@@ -109,15 +110,12 @@ impl RemoteCommandOperation {
         // stdout and stderr as single stream
         let out_fut = stdout_fut
             .select(stderr_fut)
-            .map_err(|err| RuntimeError::from(err))
+            .map_err(|err| IoErrorDetail::from(err).into())
             .collect()
             .map(|res| res.join("\n")); // collect output as single string
 
         // map errors and resolve with collected output when child finishes
-        let fut = child_fut
-            .join(out_fut)
-            .map_err(|_err| RuntimeError::Custom)
-            .map(|(_, out)| out);
+        let fut = child_fut.join(out_fut).map(|(_, out)| out);
 
         Box::new(fut)
     }

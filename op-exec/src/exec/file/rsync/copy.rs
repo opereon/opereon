@@ -9,8 +9,8 @@ use crate::exec::file::rsync::compare::State;
 use crate::RuntimeError;
 
 use super::*;
-use slog::Logger;
 use crate::exec::file::rsync::RsyncParseErrorDetail::Custom;
+use slog::Logger;
 
 type Loaded = u64;
 
@@ -25,7 +25,7 @@ fn check_progress_info(progress_info: &Vec<&str>) -> RsyncParseResult<()> {
 #[inline(always)]
 fn check_file_info(file_info: &Vec<&str>) -> RsyncParseResult<()> {
     if file_info.len() != 2 {
-        return RsyncParseErrorDetail::custom_line(line!())
+        return RsyncParseErrorDetail::custom_line(line!());
     }
     Ok(())
 }
@@ -41,11 +41,12 @@ fn read_until<R: BufRead + ?Sized>(
             let available = match r.fill_buf() {
                 Ok(n) => n,
                 Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e).map_err_to_diag()
-                    .map_err_as_cause(|| Custom {
+                Err(e) => {
+                    return Err(e).map_err_to_diag().map_err_as_cause(|| Custom {
                         line: line!(),
                         output: String::new(),
-                    }),
+                    })
+                }
             };
 
             let mut found = None;
@@ -143,7 +144,7 @@ fn parse_progress<R: BufRead>(mut out: R, operation: OperationRef) -> RsyncParse
 
         let res = file_info[1].parse::<FileSize>();
         if res.is_err() {
-            return RsyncParseErrorDetail::custom_line(line!())
+            return RsyncParseErrorDetail::custom_line(line!());
         }
 
         file_name = file_info[0].to_string();
@@ -237,7 +238,7 @@ pub struct FileCopyOperation {
     chown: Option<String>,
     chmod: Option<String>,
     host: Host,
-    status: Arc<Mutex<Option<RuntimeResult<ExitStatus>>>>,
+    status: Arc<Mutex<Option<RsyncResult<ExitStatus>>>>,
     running: bool,
     logger: Logger,
 }
@@ -277,7 +278,7 @@ impl FileCopyOperation {
         }
     }
 
-    fn prepare_params(&self) -> CommandResult<RsyncParams> {
+    fn prepare_params(&self) -> RsyncResult<RsyncParams> {
         let ssh_session = self
             .engine
             .write()
@@ -296,7 +297,7 @@ impl FileCopyOperation {
         Ok(params)
     }
 
-    fn spawn_std_watchers(&self) -> CommandResult<(PipeWriter, PipeWriter)> {
+    fn spawn_std_watchers(&self) -> RsyncResult<(PipeWriter, PipeWriter)> {
         let (stdout, stdout_writer) = pipe().map_err_to_diag()?;
         let (stderr, stderr_writer) = pipe().map_err_to_diag()?;
 
@@ -306,7 +307,8 @@ impl FileCopyOperation {
             let mut buf = BufReader::new(stdout);
 
             if let Err(err) = parse_progress(&mut buf, operation) {
-                println!("Error parsing rsync progress: {:?}", err)
+                // TODO ws report this error somehow?
+                println!("Error parsing rsync progress: {}", err)
             };
             Ok(())
         };
@@ -328,7 +330,7 @@ impl FileCopyOperation {
         Ok((stdout_writer, stderr_writer))
     }
 
-    fn start_copying(&mut self) -> RuntimeResult<()> {
+    fn start_copying(&mut self) -> RsyncResult<()> {
         let params = self.prepare_params()?;
         let config = self.engine.read().config().exec().file().rsync().clone();
         let (stdout, stderr) = self.spawn_std_watchers()?;
@@ -337,7 +339,7 @@ impl FileCopyOperation {
         let operation = self.operation.clone();
 
         std::thread::spawn(move || {
-            let execute_cmd = move || -> RuntimeResult<ExitStatus> {
+            let execute_cmd = move || -> RsyncResult<ExitStatus> {
                 let mut command = params.to_cmd(&config);
                 command
                     .arg("--progress")
@@ -353,8 +355,9 @@ impl FileCopyOperation {
 
                 //                eprintln!("command = {:?}", command);
 
-                let mut child = command.spawn()?;
-                Ok(child.wait()?)
+                let mut child = command.spawn().map_err(RsyncErrorDetail::spawn_err)?;
+                let res = child.wait().map_err(RsyncErrorDetail::spawn_err)?;
+                Ok(res)
             };
 
             match execute_cmd() {
@@ -366,7 +369,7 @@ impl FileCopyOperation {
         Ok(())
     }
 
-    fn calculate_progress(&mut self) -> RuntimeResult<()> {
+    fn calculate_progress(&mut self) -> RsyncResult<()> {
         let mut executor = create_file_executor(&self.host, &self.engine)?;
 
         let result = executor.file_compare(
@@ -403,7 +406,7 @@ impl FileCopyOperation {
         Ok(())
     }
 
-    pub fn status(&self) -> MutexGuard<Option<RuntimeResult<ExitStatus>>> {
+    pub fn status(&self) -> MutexGuard<Option<RsyncResult<ExitStatus>>> {
         self.status.lock().unwrap()
     }
 }
@@ -420,15 +423,17 @@ impl Future for FileCopyOperation {
             return Ok(Async::NotReady);
         }
 
-        match *self.status() {
-            Some(Ok(ref status)) => {
+        match self.status().take() {
+            Some(Ok(status)) => {
                 if status.success() {
                     Ok(Async::Ready(Outcome::Empty))
                 } else {
-                    Err(RuntimeError::Custom)
+                    return Err(RsyncErrorDetail::RsyncProcessStatus { status })
+                        .into_diag_res()
+                        .map_err(|err| err.into());
                 }
             }
-            Some(Err(ref _err)) => Err(RuntimeError::Custom),
+            Some(Err(err)) => Err(err.into()),
             None => Ok(Async::NotReady),
         }
     }

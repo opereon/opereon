@@ -1,29 +1,20 @@
 use super::*;
 use kg_diag::{BasicDiag, Diag};
 
+//pub type RuntimeError = BasicDiag;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
-//FIXME (jc)
-#[derive(Debug, Detail)]
-#[diag(code_offset = 500)]
+#[derive(Debug)]
 pub enum RuntimeError {
-    #[diag(code = 1)]
+    //    #[display(fmt = "task cancelled by user")]
     Cancelled,
-    #[diag(code = 2)]
+
+    // FIXME ws to be removed
+    //    #[display(fmt = "io")]
     Io,
-    //    Io(Box<kg_diag::Diag>),
-    #[diag(code = 3)]
+    // FIXME ws to be removed
+    //    #[display(fmt = "custom")]
     Custom,
-}
-
-impl Diag for RuntimeError {
-    fn cause(&self) -> Option<&dyn Diag> {
-        unimplemented!()
-    }
-
-    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
-        unimplemented!()
-    }
 }
 
 //FIXME (jc)

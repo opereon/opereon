@@ -120,10 +120,7 @@ impl ProcExec {
     }
 
     pub fn load<P: AsRef<Path>>(dir: P) -> ProtoResult<ProcExec> {
-        let dir = dir
-            .as_ref()
-            .canonicalize()
-            .map_err(|err| IoErrorDetail::from(err))?;
+        let dir = fs::canonicalize(dir.as_ref())?;
 
         EXEC_PATH.with(|path| {
             *path.borrow_mut() = dir.clone();

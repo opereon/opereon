@@ -24,7 +24,7 @@ impl ArgumentSet {
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
-    ) -> RuntimeResult<NodeSet> {
+    ) -> ProtoResult<NodeSet> {
         let mut n = Vec::new();
         for v in self.0.iter() {
             n.push(v.resolve(root, current, scope)?.into_one().unwrap());
@@ -45,12 +45,7 @@ impl Arguments {
         self.0.insert(name, value);
     }
 
-    pub fn resolve(
-        &self,
-        root: &NodeRef,
-        current: &NodeRef,
-        scope: &ScopeMut,
-    ) -> RuntimeResult<()> {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef, scope: &ScopeMut) -> ProtoResult<()> {
         for (k, v) in self.0.iter() {
             let n = v.resolve(root, current, scope)?;
             scope.set_var(k.clone(), n);

@@ -17,14 +17,10 @@ mod ssh;
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;
 
-//FIXME (jc)
 #[derive(Debug, Display, Detail)]
 pub enum CommandErrorDetail {
     #[display(fmt = "cannot spawn command")]
     CommandSpawn,
-
-    #[display(fmt = "placeholder")]
-    Undef,
 }
 
 pub type EnvVars = LinkedHashMap<String, String>;

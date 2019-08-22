@@ -176,34 +176,37 @@ impl ModelManager {
         // ignore ./op directory
         let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
         let mut content = fs::read_string(&excludes)?;
-        writeln!(&mut content, "# Opereon tmp directory")?;
-        writeln!(&mut content, ".op/")?;
+        // language=gitignore
+        let ignore_content = r#"
+# Opereon tmp directory
+.op/
+"#;
+        writeln!(&mut content, "{}", ignore_content).map_err(|err| IoErrorDetail::from(err))?;
         fs::write(excludes, content)?;
         Ok(())
     }
 
     fn init_manifest<P: AsRef<Path>>(path: P) -> IoResult<()> {
-        use std::fmt::Write;
-
-        // ignore ./op directory
         let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
-        let mut content = String::new();
-        writeln!(&mut content, "[info]")?;
-        writeln!(&mut content, "authors = [\"\"]")?;
-        writeln!(&mut content, "description = \"Opereon model\"")?;
-        fs::write(manifest_path, content)?;
+        // language=toml
+        let default_manifest = r#"
+[info]
+authors = [""]
+description = "Opereon model"
+"#;
+        fs::write(manifest_path, default_manifest)?;
         Ok(())
     }
 
     fn init_operc<P: AsRef<Path>>(path: P) -> IoResult<()> {
-        use std::fmt::Write;
-
-        // ignore ./op directory
         let manifest_path = path.as_ref().join(PathBuf::from(".operc"));
         let mut content = String::new();
-        writeln!(&mut content, "[[exclude]]")?;
-        writeln!(&mut content, "path = \".op\"")?;
-        fs::write(manifest_path, content)?;
+        // language=toml
+        let default_operc = r#"
+[[exclude]]
+path = ".op"
+"#;
+        fs::write(manifest_path, default_operc)?;
         Ok(())
     }
 

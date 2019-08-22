@@ -153,11 +153,11 @@ impl OperationRef {
         self.0.write().unwrap()
     }
 
-    pub(super) fn persist<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+    pub(super) fn persist<P: AsRef<Path>>(&self, path: P) -> RuntimeResult<()> {
         let data = rmp_serde::to_vec_named(self).unwrap();
         let mut fname = self.read().id().to_string();
         fname.push_str(".op");
-        std::fs::write(path.as_ref().join(fname), &data)?;
+        kg_diag::io::fs::write(path.as_ref().join(fname), &data)?;
         Ok(())
     }
 }
