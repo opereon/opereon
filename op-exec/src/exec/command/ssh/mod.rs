@@ -25,13 +25,18 @@ pub type SshResult<T> = Result<T, SshError>;
 pub enum SshErrorDetail {
     #[display(fmt = "ssh process didn't exited successfully: {stderr}")]
     SshProcess { stderr: String },
-    //    #[display(fmt = "ssh process unexpectedly terminated")]
-    //    SshProcessTerminated,
+
     #[display(fmt = "connection closed")]
     SshClosed,
 
     #[display(fmt = "cannot spawn ssh process")]
     SshSpawn,
+
+    #[display(fmt = "cannot parse hosts opath expression")]
+    HostsOpathParse,
+
+    #[display(fmt = "cannot parse hosts definition")]
+    HostsDefParse,
 }
 
 impl SshErrorDetail {

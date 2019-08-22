@@ -260,7 +260,8 @@ impl Future for TaskExecOperation {
                         .create(true)
                         .append(true)
                         .open(&log_path)
-                        .info(log_path, OpType::Write, FileType::File)?,
+                        .info(log_path, OpType::Write, FileType::File)
+                        .into_diag_res()?,
                 );
 
                 info!(self.logger, "Executing task [{exec_name}] on host [{host}] ...", host=format!("{}", step_exec.host()), exec_name=task_exec.name(); "verbosity"=>1);

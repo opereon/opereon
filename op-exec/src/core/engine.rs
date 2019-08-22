@@ -191,11 +191,11 @@ impl EngineRef {
     pub fn enqueue_operation(
         &self,
         operation: OperationRef,
-        persist: bool,
+        _persist: bool,
     ) -> RuntimeResult<OutcomeFuture> {
-        if persist {
-            operation.persist(self.read().config.queue().persist_dir())?;
-        }
+        //        if persist {
+        //            operation.persist(self.read().config.queue().persist_dir())?;
+        //        }
         let of = OperationTask::new(operation.clone(), self.clone())?;
         self.write().operation_queue1.push_back(of);
         let engine = self.read();

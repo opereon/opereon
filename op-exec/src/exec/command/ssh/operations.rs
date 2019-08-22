@@ -1,8 +1,8 @@
 use crate::{
     AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
-    RuntimeResult, SourceRef,
+    RuntimeResult, SourceRef, SshError, SshErrorDetail, SshResult,
 };
-use kg_diag::IoErrorDetail;
+use kg_diag::{DiagResultExt, IoErrorDetail};
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
 use serde::export::fmt::Debug;
@@ -13,7 +13,7 @@ use tokio::prelude::*;
 use tokio::prelude::{Async, Future, Poll};
 use tokio_process::Child;
 
-type ChildFuture = Box<dyn Future<Item = String, Error = RuntimeError> + Send>;
+type ChildFuture = Box<dyn Future<Item = String, Error = SshError> + Send>;
 
 /// Operation executing command on hosts specified by `expr`.
 pub struct RemoteCommandOperation {
@@ -62,12 +62,11 @@ impl RemoteCommandOperation {
     }
 
     /// Returns hosts matching `self.expr`
-    fn resolve_hosts(&self) -> RuntimeResult<Vec<Host>> {
+    fn resolve_hosts(&self) -> SshResult<Vec<Host>> {
         let mut e = self.engine.write();
         let m = e.model_manager_mut().resolve(&self.model_path)?;
 
-        // FIXME ws error handling
-        let expr = Opath::parse(&self.expr).expect("Cannot parse hosts expression!");
+        let expr = Opath::parse(&self.expr).map_err_as_cause(|| SshErrorDetail::HostsOpathParse)?;
         let hosts_nodes = {
             let m = m.lock();
             kg_tree::set_base_path(m.metadata().path());
@@ -79,8 +78,8 @@ impl RemoteCommandOperation {
         let m = m.lock();
 
         for h in hosts_nodes.iter() {
-            // FIXME ws error handling
-            let hd = HostDef::parse(&*m, m.as_scoped(), h).expect("Cannot parse host definition!");
+            let hd = HostDef::parse(&*m, m.as_scoped(), h)
+                .map_err_as_cause(|| SshErrorDetail::HostsDefParse)?;
             hosts.push(Host::from_def(&hd)?);
         }
         Ok(hosts)

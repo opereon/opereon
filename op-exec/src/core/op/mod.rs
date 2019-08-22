@@ -15,6 +15,7 @@ pub use self::impls::OperationImpl;
 use self::impls::{create_operation_impl, OperationImplType};
 pub use self::outcome::Outcome;
 pub use self::progress::{Progress, Unit};
+use kg_diag::IntoDiagRes;
 use std::path::Path;
 
 mod context;
@@ -153,13 +154,13 @@ impl OperationRef {
         self.0.write().unwrap()
     }
 
-    pub(super) fn persist<P: AsRef<Path>>(&self, path: P) -> RuntimeResult<()> {
-        let data = rmp_serde::to_vec_named(self).unwrap();
-        let mut fname = self.read().id().to_string();
-        fname.push_str(".op");
-        kg_diag::io::fs::write(path.as_ref().join(fname), &data)?;
-        Ok(())
-    }
+    //    pub(super) fn persist<P: AsRef<Path>>(&self, path: P) -> RuntimeResult<()> {
+    //        let data = rmp_serde::to_vec_named(self).unwrap();
+    //        let mut fname = self.read().id().to_string();
+    //        fname.push_str(".op");
+    //        kg_diag::io::fs::write(path.as_ref().join(fname), &data)?;
+    //        Ok(())
+    //    }
 }
 
 impl ser::Serialize for OperationRef {
@@ -240,7 +241,7 @@ impl Future for OperationTask {
 
         if self.operation.read().is_cancelled() {
             self.inner.on_cancel().unwrap(); //FIXME (jc) handle panic and error
-            self.operation.write().outcome = Some(Err(RuntimeError::Cancelled));
+            self.operation.write().outcome = Some(Err(RuntimeErrorDetail::Cancelled.into()));
             self.engine.write().remove_operation(&self.operation);
             self.engine.read().notify();
         } else {
