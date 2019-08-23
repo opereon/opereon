@@ -1,0 +1,10 @@
+hostname: <% @key %>
+domain: domain.com
+fqdn: <% hostname + '.' + domain %>
+ssh_dest:
+  hostname: <% array(@^.**{0}.ip4)[0] %>
+  port: 22
+  username: outsider
+  auth:
+    method: public-key
+    identity_file: ~/.ssh/id_rsa
