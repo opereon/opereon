@@ -2,17 +2,19 @@
 # vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "centos/7"
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "512"
+  config.vm.provider "docker" do |docker|
+    docker.image   = "jdeathe/centos-ssh"
+    docker.env = {
+        "SSH_USER" =>"root",
+    }
+    docker.has_ssh = true
   end
 
   # use default vagrant insecure key instead of generating new one.
   config.ssh.insert_key = false
+  config.ssh.username = "root"
 
-  # allow root login with vagrant authorized_keys
   config.vm.provision "shell", inline: <<-SHELL
-  mkdir -m 700 /root/.ssh && cp ~vagrant/.ssh/authorized_keys /root/.ssh
   SHELL
 
   config.vm.define "zeus" do |host|
