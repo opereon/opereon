@@ -1,0 +1,32 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "centos/7"
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "512"
+  end
+
+  # use default vagrant insecure key instead of generating new one.
+  config.ssh.insert_key = false
+
+  # allow root login with vagrant authorized_keys
+  config.vm.provision "shell", inline: <<-SHELL
+  mkdir -m 700 /root/.ssh && cp ~vagrant/.ssh/authorized_keys /root/.ssh
+  SHELL
+
+  config.vm.define "zeus" do |host|
+    host.vm.hostname = "zeus"
+    host.vm.network "private_network", ip: "192.168.33.10"
+  end
+
+  config.vm.define "ares" do |host|
+    host.vm.hostname = "ares"
+    host.vm.network "private_network", ip: "192.168.33.11"
+  end
+
+  config.vm.define "apollo" do |host|
+    host.vm.hostname = "apollo"
+    host.vm.network "private_network", ip: "192.168.33.12"
+  end
+end
