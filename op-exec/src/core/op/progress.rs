@@ -92,7 +92,7 @@ impl Progress {
         } else if value < self.min {
             value = self.min;
         }
-        if self.value != value {
+        if self.value.to_bits() != value.to_bits() {
             self.value = value;
             self.counter += 1;
             true
@@ -105,7 +105,7 @@ impl Progress {
         for s in &mut self.steps {
             s.set_value_done();
         }
-        if self.value != self.max {
+        if (self.value - self.max).abs() < std::f64::EPSILON {
             self.value = self.max;
             self.counter += 1;
             true
