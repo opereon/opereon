@@ -105,7 +105,7 @@ impl Progress {
         for s in &mut self.steps {
             s.set_value_done();
         }
-        if (self.value - self.max).abs() < std::f64::EPSILON {
+        if (self.value - self.max).abs() > std::f64::EPSILON {
             self.value = self.max;
             self.counter += 1;
             true
