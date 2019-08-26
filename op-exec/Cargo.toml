@@ -6,11 +6,11 @@ workspace = ".."
 edition = "2018"
 
 [dependencies]
-kg-diag = "0.2.6"
+kg-diag = "0.2"
 kg-diag-derive = "0.2.3"
 kg-display-derive = "0.1.1"
 kg-utils = "0.3.1"
-kg-tree = "0.1.5"
+kg-tree = "0.1"
 kg-template = "0.1.2"
 kg-symbol= "0.1.10"
 kg-lang = "0.1.1"
