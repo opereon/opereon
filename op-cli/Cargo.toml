@@ -31,6 +31,7 @@ integration-tests =[]
 
 [dev-dependencies]
 op-test-helpers = { version = "*", path = "../op-test-helpers" }
+pretty_assertions = "0.6.1"
 
 [[bin]]
 name = "op"

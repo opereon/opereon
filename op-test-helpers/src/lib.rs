@@ -2,9 +2,11 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use std::fmt::Display;
-use tempfile::TempDir;
+pub use tempfile::TempDir;
 
+mod git;
 mod node;
+pub use git::*;
 pub use node::*;
 
 pub use copy_dir;

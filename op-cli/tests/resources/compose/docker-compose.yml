@@ -3,26 +3,34 @@ services:
   zeus:
     hostname: zeus
     image: jdeathe/centos-ssh
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./zeus/ssh:/etc/ssh
     environment:
       SSH_USER: "root"
     ports:
       - "8820:22"
-    networks:
-      op_network:
-        ipv4_address: 192.168.11.10
+#    networks:
+#      op_network:
+#        ipv4_address: 192.168.11.10
   ares:
     hostname: ares
     image: jdeathe/centos-ssh
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./ares/ssh:/etc/ssh
     environment:
       SSH_USER: "root"
     ports:
       - "8821:22"
-    networks:
-      op_network:
-        ipv4_address: 192.168.11.11
-networks:
-  op_network:
-    ipam:
-      config:
-        - subnet: 192.168.11.0/24
-          gateway: 192.168.11.1
+#    networks:
+#      op_network:
+#        ipv4_address: 192.168.11.11
+#networks:
+#  op_network:
+#    ipam:
+#      config:
+#        - subnet: 192.168.11.0/24
+#          gateway: 192.168.11.1

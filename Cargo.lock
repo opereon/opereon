@@ -929,6 +929,7 @@ dependencies = [
  "op-exec 0.1.1",
  "op-log 0.1.0",
  "op-test-helpers 0.1.0",
+ "pretty_assertions 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.99 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.99 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.40 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1033,6 +1034,7 @@ name = "op-test-helpers"
 version = "0.1.0"
 dependencies = [
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "git2 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "kg-tree 0.1.7",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
