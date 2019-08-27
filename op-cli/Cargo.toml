@@ -32,6 +32,7 @@ integration-tests =[]
 [dev-dependencies]
 op-test-helpers = { version = "*", path = "../op-test-helpers" }
 pretty_assertions = "0.6.1"
+strip-ansi-escapes = "0.1.0"
 
 [[bin]]
 name = "op"

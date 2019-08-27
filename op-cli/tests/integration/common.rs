@@ -10,6 +10,21 @@ pub struct Context {
     model_dir: PathBuf,
 }
 
+//fn check_host(port: &str) -> Result<(), ()> {
+//    let status = Command::new("ssh")
+//        .args(&["root@127.0.0.1", "-p", port])
+//        .args(&["echo", "works"])
+//        .spawn()
+//        .map_err(|_| ())?
+//        .wait()
+//        .map_err(|_|())?;
+//    if status.success() {
+//        Ok(())
+//    } else {
+//        Err(())
+//    }
+//}
+
 impl Context {
     pub fn new() -> Context {
         let (tmp, dir) = get_tmp_dir();
@@ -36,18 +51,19 @@ impl Context {
             panic!()
         }
 
-        Context {
+        let ctx = Context {
             tmp,
             compose_file: compose,
             model_dir: model,
             tmp_dir: dir,
-        }
+        };
+        ctx.wait_for_ssh_up();
+        ctx
     }
 
     pub fn exec_op(&self, args: &[&str]) -> (String, String, i32) {
         let out = Command::new("op")
             .args(args)
-            .stdin(Stdio::inherit())
             .current_dir(&self.model_dir)
             .output()
             .unwrap();
@@ -72,6 +88,29 @@ impl Context {
             .stdout;
 
         String::from_utf8_lossy(&logs).to_string()
+    }
+
+    pub fn wait_for_ssh_up(&self) {
+        std::thread::sleep(Duration::from_secs(2))
+
+//        let mut zeus = check_host("8820");
+//        let mut ares = check_host("8820");
+//
+//        for _i in 0..10 {
+//            println!("attempt to connect...");
+//            match (zeus.is_ok(), ares.is_ok()) {
+//                (true, true) => return,
+//                (false, true) => zeus = check_host("8820"),
+//                (true, false) => ares = check_host("8821"),
+//                (false, false) => {
+//                    zeus = check_host("8820");
+//                    ares = check_host("8821");
+//                }
+//            }
+//            println!("hosts not ready...");
+//            std::thread::sleep(Duration::from_millis(100))
+//        }
+//        panic!("Cannot establish ssh connections!")
     }
 
     pub fn model_dir(&self) -> &Path {
@@ -105,4 +144,11 @@ impl std::ops::Drop for Context {
             }
         }
     }
+}
+
+macro_rules! strip_ansi {
+    ($text: expr) => {{
+        let ret = strip_ansi_escapes::strip($text.as_bytes()).expect("Cannot strip ansi escapes!");
+        String::from_utf8_lossy(&ret).to_string()
+    }};
 }
