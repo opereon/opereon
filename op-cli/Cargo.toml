@@ -27,7 +27,7 @@ chrono = "0.4.7"
 tokio = "0.1.22"
 
 [features]
-integration-tests =[]
+system-tests =[]
 
 [dev-dependencies]
 op-test-helpers = { version = "*", path = "../op-test-helpers" }
