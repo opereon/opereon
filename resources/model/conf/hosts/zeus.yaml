@@ -1,0 +1,5 @@
+ssh_port: 8820
+packages: [mc, vim-enhanced2]
+ifaces:
+  ens33:
+    ip4: 127.0.0.1

@@ -1,2 +1,5 @@
 [[exclude]]
 path = ".op"
+
+[[exclude]]
+path = "keys"

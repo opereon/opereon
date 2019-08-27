@@ -3,8 +3,8 @@ domain: kodegenix.pl
 fqdn: <% hostname + '.' + domain %>
 ssh_dest:
   hostname: <% array(@^.**{0}.ip4)[0] %>
-  port: 22
-  username: outsider
+  port: <% @^.ssh_port %>
+  username: root
   auth:
     method: public-key
-    identity_file: ~/.ssh/id_rsa
+    identity_file: keys/vagrant

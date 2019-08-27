@@ -1,0 +1,26 @@
+version: "2"
+services:
+  zeus:
+    hostname: zeus
+    image: jdeathe/centos-ssh
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./zeus/ssh:/etc/ssh         # mount ssh dir to preserve host ssh fingerprint and config
+      - /dev/shm:/dev/shm           # mount shared memory to allow executing remote scripts (shm is used as script tmp storage)
+    environment:
+      SSH_USER: "root"
+    ports:
+      - "8820:22"
+  ares:
+    hostname: ares
+    image: jdeathe/centos-ssh
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./ares/ssh:/etc/ssh
+      - /dev/shm:/dev/shm
+    environment:
+      SSH_USER: "root"
+    ports:
+      - "8821:22"

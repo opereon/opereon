@@ -1,2 +1,11 @@
 [[exclude]]
 path = ".op"
+
+[[exclude]]
+path = "keys"
+
+[[exclude]]
+path = "restart-env.sh"
+
+[[exclude]]
+path = "ssh-into.sh"

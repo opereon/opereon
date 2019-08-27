@@ -35,7 +35,6 @@ impl Context {
         copy_resource!("compose/zeus", dir.join("zeus"));
 
         copy_resource!("model", model);
-        copy_resource!("keys", dir.join("keys"));
 
         init_repo(&model);
         initial_commit(&model);
@@ -73,7 +72,6 @@ impl Context {
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             let code = out.status.code().expect("Process terminated");
             (stdout, stderr, code)
-
         } else {
             panic!("error calling op command: {:?}", out)
         }
@@ -93,24 +91,24 @@ impl Context {
     pub fn wait_for_ssh_up(&self) {
         std::thread::sleep(Duration::from_secs(2))
 
-//        let mut zeus = check_host("8820");
-//        let mut ares = check_host("8820");
-//
-//        for _i in 0..10 {
-//            println!("attempt to connect...");
-//            match (zeus.is_ok(), ares.is_ok()) {
-//                (true, true) => return,
-//                (false, true) => zeus = check_host("8820"),
-//                (true, false) => ares = check_host("8821"),
-//                (false, false) => {
-//                    zeus = check_host("8820");
-//                    ares = check_host("8821");
-//                }
-//            }
-//            println!("hosts not ready...");
-//            std::thread::sleep(Duration::from_millis(100))
-//        }
-//        panic!("Cannot establish ssh connections!")
+        //        let mut zeus = check_host("8820");
+        //        let mut ares = check_host("8820");
+        //
+        //        for _i in 0..10 {
+        //            println!("attempt to connect...");
+        //            match (zeus.is_ok(), ares.is_ok()) {
+        //                (true, true) => return,
+        //                (false, true) => zeus = check_host("8820"),
+        //                (true, false) => ares = check_host("8821"),
+        //                (false, false) => {
+        //                    zeus = check_host("8820");
+        //                    ares = check_host("8821");
+        //                }
+        //            }
+        //            println!("hosts not ready...");
+        //            std::thread::sleep(Duration::from_millis(100))
+        //        }
+        //        panic!("Cannot establish ssh connections!")
     }
 
     pub fn model_dir(&self) -> &Path {
@@ -148,7 +146,6 @@ impl std::ops::Drop for Context {
 
 macro_rules! strip_ansi {
     ($text: expr) => {{
-        let ret = strip_ansi_escapes::strip($text.as_bytes()).expect("Cannot strip ansi escapes!");
-        String::from_utf8_lossy(&ret).to_string()
+        console::strip_ansi_codes(&$text).to_string()
     }};
 }
