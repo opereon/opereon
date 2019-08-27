@@ -254,6 +254,8 @@ impl Future for OperationTask {
                     o.outcome = Some(Ok(outcome));
                 }
                 Err(err) => {
+                    // FIXME ws these errors are sometimes discarded! Trace back where it happens (eg. `op check` for example model - error with parsing script output)
+                    println!("{}", err);
                     self.operation.write().outcome = Some(Err(err));
                 }
             }

@@ -21,6 +21,9 @@ pub type CommandResult<T> = Result<T, CommandError>;
 pub enum CommandErrorDetail {
     #[display(fmt = "cannot spawn command")]
     CommandSpawn,
+
+    #[display(fmt = "malformed command output")]
+    MalformedOutput,
 }
 
 pub type EnvVars = LinkedHashMap<String, String>;
@@ -317,8 +320,8 @@ fn execute(
     log.log_status(status.code())?;
 
     let outcome = if let Some(fmt) = out_format {
-        // FIXME ws error handling
-        let n = NodeRef::from_bytes(stdout.get_ref(), fmt).expect("cannot build node from bytes!");
+        let n = NodeRef::from_bytes(stdout.get_ref(), fmt)
+            .map_err_as_cause(|| CommandErrorDetail::MalformedOutput)?;
         Outcome::NodeSet(n.into())
     } else {
         Outcome::Empty
