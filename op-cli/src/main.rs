@@ -21,8 +21,9 @@ use op_log::{build_cli_drain, build_file_drain};
 use options::*;
 use slog::Duplicate;
 use slog::FnValue;
+use std::sync::atomic::*;
+use std::sync::Arc;
 use tokio::runtime;
-
 mod display;
 mod options;
 
@@ -69,16 +70,14 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
     );
     logger
 }
-/// start engine and execute provided operation
+/// start engine and execute provided operation. Returns exit code
 fn local_run(
     current_dir: PathBuf,
     config: ConfigRef,
     operation: ExecContext,
     disp_format: DisplayFormat,
     verbose: u8,
-) {
-    let mut rt = runtime::Builder::new().build().unwrap();
-
+) -> u32 {
     let logger = init_logger(&config, verbose);
 
     let engine = check(EngineRef::start(current_dir, config, logger.clone()));
@@ -109,25 +108,31 @@ fn local_run(
         futures::future::ok(())
     });
 
+    let exit_code = Arc::new(AtomicU32::new(0));
+    let code = exit_code.clone();
     let outcome_fut = outcome_fut
         .and_then(move |outcome| {
             display::display_outcome(&outcome, disp_format);
             futures::future::ok(())
         })
         .map_err(move |err| {
-            error!(logger, "Operation execution error = {:?}", err);
+            use kg_diag::Diag;
+            code.store(err.detail().code(), Ordering::Relaxed);
+            error!(logger, "Operation execution error = {}", err; "verbosity" => 0);
         })
         .then(move |_| {
             engine.stop();
             futures::future::ok::<(), ()>(())
         });
 
+    let mut rt = runtime::Builder::new().build().unwrap();
     rt.block_on(
         outcome_fut
             .join3(engine_fut, progress_fut)
             .then(|_| futures::future::ok::<(), ()>(())),
     )
     .unwrap();
+    exit_code.load(Ordering::Relaxed)
 }
 
 fn main() {
@@ -285,5 +290,6 @@ fn main() {
         }
     };
 
-    local_run(model_dir_path, config, cmd, disp_format, verbose);
+    let exit_code = local_run(model_dir_path, config, cmd, disp_format, verbose);
+    std::process::exit(exit_code as i32)
 }
