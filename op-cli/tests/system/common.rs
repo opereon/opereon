@@ -3,6 +3,11 @@ use std::process::Stdio;
 
 static COMPOSE_CMD: &str = "docker-compose";
 
+pub struct CmdOutput {
+    pub out: String,
+    pub err: String,
+    pub code: i32,
+}
 pub struct Context {
     tmp: TempDir,
     tmp_dir: PathBuf,
@@ -60,20 +65,44 @@ impl Context {
         ctx
     }
 
-    pub fn exec_op(&self, args: &[&str]) -> (String, String, i32) {
-        let out = Command::new("op")
+    pub fn exec_op(&self, args: &[&str]) -> CmdOutput {
+        self.exec_cmd("op", args)
+    }
+
+    pub fn exec_ssh(&self, host: &str, args: &[&str]) -> CmdOutput {
+        let port = match host {
+            "ares" => "8821",
+            "zeus" => "8820",
+            _ => panic!("Unknown host!"),
+        };
+
+        let key = self
+            .model_dir
+            .join("keys/vagrant")
+            .to_string_lossy()
+            .to_string();;
+
+        let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key];
+        params.extend_from_slice(args);
+
+        self.exec_cmd("ssh", &params)
+    }
+
+    pub fn exec_cmd(&self, cmd: &str, args: &[&str]) -> CmdOutput {
+        let out = Command::new(cmd)
             .args(args)
             .current_dir(&self.model_dir)
             .output()
             .unwrap();
 
-        if out.status.success() {
-            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-            let code = out.status.code().expect("Process terminated");
-            (stdout, stderr, code)
-        } else {
-            panic!("error calling op command: {:?}", out)
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        let code = out.status.code().expect("Process terminated");
+
+        CmdOutput {
+            out: stdout,
+            err: stderr,
+            code,
         }
     }
 
@@ -147,5 +176,20 @@ impl std::ops::Drop for Context {
 macro_rules! strip_ansi {
     ($text: expr) => {{
         console::strip_ansi_codes(&$text).to_string()
+    }};
+}
+
+macro_rules! assert_out {
+    ($output: expr) => {{
+        let out = &$output.out;
+        let err = &$output.err;
+        let code = &$output.code;
+
+        if *code != 0 {
+            panic!(
+                "Command didn't exited successfully: code '{}'\nout:{}\nerr:{}",
+                code, out, err
+            );
+        }
     }};
 }

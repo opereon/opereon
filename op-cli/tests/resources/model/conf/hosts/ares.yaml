@@ -1,10 +1,5 @@
-hostname: <% @key %>
-domain: example.com
-fqdn: <% hostname + '.' + domain %>
-ssh_dest:
-  hostname: 127.0.0.1
-  port: 8821
-  username: root
-  auth:
-    method: public-key
-    identity_file: keys/vagrant
+ssh_port: 8821
+packages: [mc, vim-enhanced2, git]
+ifaces:
+  ens33:
+    ip4: 127.0.0.1

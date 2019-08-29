@@ -19,9 +19,10 @@ fn query_hosts() {
 - zeus
 "#;
 
-    let (out, _, _) = ctx.exec_op(&["query", "@.conf.hosts[*].@key"]);
+    let out = ctx.exec_op(&["query", "@.conf.hosts[*].@key"]);
 
-    assert_eq!(expected, out);
+    assert_out!(out);
+    assert_eq!(expected, out.out);
 }
 
 #[test]
@@ -51,7 +52,54 @@ Info: ================Host [zeus.example.com]================
 [zeus.example.com] out: .tcshrc
 "#;
 
-    let (out, _err, _code) = ctx.exec_op(&["remote", "--", "ls -a"]);
+    let out = ctx.exec_op(&["remote", "--", "ls -a"]);
 
-    assert_eq!(expected, strip_ansi!(out));
+    assert_out!(out);
+    assert_eq!(expected, strip_ansi!(out.out));
+}
+
+#[test]
+fn install_package() {
+    let ctx = Context::new();
+
+    // language=yaml
+    let host = r#"
+ssh_port: 8820
+packages: [mc, vim-enhanced2, git] # append `git` package
+ifaces:
+  ens33:
+    ip4: 127.0.0.1
+"#;
+    write_file!(ctx.model_dir().join("conf/hosts/zeus.yaml"), host);
+    let out = ctx.exec_ssh("zeus", &["yum list installed git"]);
+    assert_eq!(1, out.code);
+
+    let out = ctx.exec_op(&["update"]);
+    assert_out!(out);
+
+    let out = ctx.exec_ssh("zeus", &["yum list installed git"]);
+    assert_out!(out);
+}
+
+#[test]
+fn remove_package() {
+    let ctx = Context::new();
+
+    // language=yaml
+    let host = r#"
+ssh_port: 8821
+packages: [mc, vim-enhanced2] # remove `git` package
+ifaces:
+  ens33:
+    ip4: 127.0.0.1
+"#;
+    write_file!(ctx.model_dir().join("conf/hosts/ares.yaml"), host);
+    let out = ctx.exec_ssh("ares", &["yum install -y git"]);
+    assert_out!(out);
+
+    let out = ctx.exec_op(&["update"]);
+    assert_out!(out);
+
+    let out = ctx.exec_ssh("ares", &["yum list installed git"]);
+    assert_eq!(1, out.code);
 }

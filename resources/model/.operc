@@ -8,4 +8,7 @@ path = "keys"
 path = "restart-env.sh"
 
 [[exclude]]
+path = "stop-env.sh"
+
+[[exclude]]
 path = "ssh-into.sh"
