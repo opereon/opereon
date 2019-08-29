@@ -14,6 +14,7 @@ use url::Url;
 use crate::slog::Drain;
 use display::DisplayFormat;
 use futures::stream::Stream;
+use kg_diag::BasicDiag;
 use op_exec::OutcomeFuture;
 use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
 use op_exec::{SshAuth, SshDest};
@@ -30,16 +31,6 @@ mod options;
 pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
-
-fn check<T, E: std::fmt::Display>(result: Result<T, E>) -> T {
-    match result {
-        Ok(t) => t,
-        Err(err) => {
-            eprintln!("Error starting opereon: {}", err);
-            std::process::exit(-1);
-        }
-    }
-}
 
 fn make_model_path_absolute(path: &mut ModelPath) {
     if let ModelPath::Path(ref mut path) = path {
@@ -77,13 +68,11 @@ fn local_run(
     operation: ExecContext,
     disp_format: DisplayFormat,
     verbose: u8,
-) -> u32 {
+) -> Result<u32, BasicDiag> {
     let logger = init_logger(&config, verbose);
 
-    let engine = check(EngineRef::start(current_dir, config, logger.clone()));
-    let outcome_fut: OutcomeFuture = engine
-        .enqueue_operation(operation.into(), false)
-        .expect("Cannot enqueue operation");
+    let engine = EngineRef::start(current_dir, config, logger.clone())?;
+    let outcome_fut: OutcomeFuture = engine.enqueue_operation(operation.into(), false)?;
 
     let progress_fut = outcome_fut.progress().for_each(|p| {
         println!("=========================================");
@@ -100,7 +89,7 @@ fn local_run(
     });
 
     let progress_fut = progress_fut.map_err(|err| {
-        eprintln!("err = {:?}", err);
+        eprintln!("progress error \n{}", err);
     });
 
     let engine_fut = engine.clone().then(|_| {
@@ -132,7 +121,7 @@ fn local_run(
             .then(|_| futures::future::ok::<(), ()>(())),
     )
     .unwrap();
-    exit_code.load(Ordering::Relaxed)
+    Ok(exit_code.load(Ordering::Relaxed))
 }
 
 fn main() {
@@ -290,6 +279,14 @@ fn main() {
         }
     };
 
-    let exit_code = local_run(model_dir_path, config, cmd, disp_format, verbose);
-    std::process::exit(exit_code as i32)
+    let res = local_run(model_dir_path, config, cmd, disp_format, verbose);
+
+    let exit_code = match res {
+        Ok(code) => code as i32,
+        Err(err) => {
+            eprintln!("{}", err);
+            -1
+        }
+    };
+    std::process::exit(exit_code)
 }

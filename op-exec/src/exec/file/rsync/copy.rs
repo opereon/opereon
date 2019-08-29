@@ -173,7 +173,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<Tas
 
         for line in buf.lines() {
             match line {
-                Ok(line) => println!("out: {}", line),
+                Ok(line) => println!("out: {}", line), // FIXME ws what to do with output?
                 Err(err) => return Err(err).map_err_to_diag(),
             }
         }
@@ -185,7 +185,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<Tas
 
         for line in buf.lines() {
             match line {
-                Ok(line) => println!("err: {}", line),
+                Ok(line) => println!("err: {}", line), // FIXME ws what to do with output?
                 Err(err) => return Err(err).map_err_to_diag(),
             }
         }
