@@ -93,7 +93,7 @@ impl ProcExec {
 
         for s in proc.run().steps().iter() {
             let hosts = s.resolve_hosts(model, proc)?;
-
+            // TODO ws log warning when hosts.is_empty()
             for host in hosts {
                 let step = StepExec::create(model, proc, s, &host, self)
                     .map_err_as_cause(|| ProtoErrorDetail::StepExecCreate)?;

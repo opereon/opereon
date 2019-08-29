@@ -269,6 +269,7 @@ impl Future for TaskExecOperation {
                 let scope = task.scope()?;
                 let base_path = proc.dir();
 
+                // TODO log scopes
                 let result = match task.kind() {
                     TaskKind::Exec => {
                         let exec = scope.get_var("exec").unwrap();

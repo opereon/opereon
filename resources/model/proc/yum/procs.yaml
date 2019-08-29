@@ -32,13 +32,13 @@ yum_update_add:
   watch:
     $$hosts.packages[*]: "+"
   run:
-  - hosts: ${$$hosts[$$model_changes.path ^= @.@path])}
+  - hosts: ${$$hosts[$$model_changes.path ^= '${' + @.@path])}
     tasks:
     - task: exec
       scope:
         exec: ${$$procs[@key == 'yum_install']}
         yum_hosts: ${$$host}
-        yum_packages: ${map($$host.hostname, array($$host.packages[@path == $$model_changes.path]))}
+        yum_packages: ${map($$host.hostname, array($$host.packages[$$model_changes.path == '${' + @path + '}']))}
 
 yum_update_remove:
   proc: update
@@ -46,13 +46,13 @@ yum_update_remove:
   watch:
     $$hosts.packages[*]: "-"
   run:
-  - hosts: ${$$hosts[$$model_changes.path ^= @.@path])}
+  - hosts: ${$$hosts[$$model_changes.path ^= '${' + @.@path])}
     tasks:
     - task: exec
       scope:
         exec: ${$$procs[@key == 'yum_remove']}
         yum_hosts: ${$$host}
-        yum_packages: ${map($$host.hostname, array($$old.**[@path == $$model_changes.path]))}
+        yum_packages: ${map($$host.hostname, array($$old.**[$$model_changes.path == '${' + @path + '}']))}
 
 # Checks
 yum_check:
