@@ -9,6 +9,7 @@ pub use self::host::HostDef;
 pub use self::proc::*;
 pub use self::scope::*;
 pub use self::user::UserDef;
+use serde::export::fmt::{Debug, Display};
 
 // DefsError should probably be ParseDiag instead of BasicDiag. Each error should contain source file and quote
 pub type DefsError = BasicDiag;
@@ -296,5 +297,11 @@ impl Clone for Scoped {
             s.scope.set_method(n, m);
         }
         s
+    }
+}
+
+impl Display for Scoped {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.scope)
     }
 }

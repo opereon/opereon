@@ -269,7 +269,7 @@ impl Future for TaskExecOperation {
                 let scope = task.scope()?;
                 let base_path = proc.dir();
 
-                // TODO log scopes
+                info!(self.logger, "Task [{exec_name}] scope:\n{scope} ", exec_name=task_exec.name(), scope=format!("{}", scope); "verbosity"=>2);
                 let result = match task.kind() {
                     TaskKind::Exec => {
                         let exec = scope.get_var("exec").unwrap();
@@ -434,7 +434,7 @@ impl Future for TaskExecOperation {
                             .into_task_result()
                     }
                 };
-                info!(self.logger, "Task [{task_name}] finished on [{host}]. Result : [{result}]",
+                info!(self.logger, "Task [{task_name}] finished on [{host}]. Status : {result}",
                       task_name = task_exec.name(),
                       host = format!("{}", step_exec.host()),
                       result = format!("{}", result);

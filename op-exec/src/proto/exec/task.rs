@@ -93,13 +93,18 @@ impl TaskResult {
 impl std::fmt::Display for TaskResult {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(code) = self.status() {
-            write!(f, "status: {}", code)?
+            if code == 0 {
+                write!(f, "Success")?;
+            } else {
+                write!(f, "Error")?;
+            }
+            write!(f, " (exit code: {})", code)?;
         } else {
-            write!(f, "status: ?")?
+            write!(f, "Interrupted")?;
         }
         if let Some(signal) = self.signal() {
-            write!(f, ", signal: {}", signal)?
+            write!(f, " (signal: {})", signal)?;
         }
-        write!(f, ", {}", self.outcome)
+        write!(f, ", Outcome: {}", self.outcome)
     }
 }
