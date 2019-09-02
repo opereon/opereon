@@ -56,6 +56,10 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
         o!("module" =>
          FnValue(move |info| {
               info.module()
+         }),
+         "thread" =>
+         FnValue(move |_info| {
+              std::thread::current().name().unwrap().to_string()
          })
         ),
     );

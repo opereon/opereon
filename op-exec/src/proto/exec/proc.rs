@@ -200,7 +200,10 @@ impl ProcExecRef {
     }
 
     pub fn lock(&self) -> MutexGuard<ProcExec> {
-        self.0.lock().unwrap()
+        println!("locking proc exec... {}", std::thread::current().name().unwrap().to_string());
+        let l = self.0.lock().unwrap();
+        println!("proc exec locked! {}", std::thread::current().name().unwrap().to_string());
+        l
     }
 }
 

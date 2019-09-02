@@ -107,9 +107,11 @@ impl StepExecOperation {
         ));
 
         let tasks = {
+            println!("11 {}", std::thread::current().name().unwrap().to_string());
             let proc_exec = proc_exec.lock();
+            println!("12 {}", std::thread::current().name().unwrap().to_string());
             let step_exec = &proc_exec.run().steps()[step_index];
-
+            println!("13 {}", std::thread::current().name().unwrap().to_string());
             info!(logger, "Executing step on [{host}] in [{path}]", host=format!("{}",step_exec.host()), path=step_exec.path().display(); "verbosity"=>1);
 
             let mut tasks = Vec::with_capacity(step_exec.tasks().len());
@@ -128,7 +130,9 @@ impl StepExecOperation {
         };
 
         let op: OperationRef = Context::Sequence(tasks).into();
+        println!("9 {}", std::thread::current().name().unwrap().to_string());
         let op = engine.enqueue_operation(op, false)?.into_exec();
+        println!("10 {}", std::thread::current().name().unwrap().to_string());
 
         Ok(StepExecOperation {
             operation,
@@ -225,7 +229,6 @@ impl Future for TaskExecOperation {
                     .exec_manager_mut()
                     .get(&self.exec_path)?;
                 let proc_exec = proc_exec.lock();
-
                 let curr_model = self
                     .engine
                     .write()
@@ -236,9 +239,12 @@ impl Future for TaskExecOperation {
                 let step_exec = &proc_exec.run().steps()[self.step_index];
                 let task_exec = &step_exec.tasks()[self.task_index];
 
+                println!("getting proc {}", std::thread::current().name().unwrap().to_string());
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
+                println!("getting task {}", std::thread::current().name().unwrap().to_string());
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
+                println!("setting vars... {}", std::thread::current().name().unwrap().to_string());
                 {
                     let s = proc.scope_mut()?;
                     s.set_var("$proc".into(), proc.node().clone().into());
@@ -327,7 +333,6 @@ impl Future for TaskExecOperation {
 
                             let exec_dir = Path::new(".op");
                             let mut e = ProcExec::with_args(Utc::now(), args.build());
-
                             e.prepare(&curr_model, p, exec_dir)?;
                             e.store()?;
 
@@ -453,10 +458,14 @@ impl Future for TaskExecOperation {
                         //print!(" => ${}", out.var());
                     }
                 }
+                println!("1");
                 result
             };
-
+            println!("2");
             cleanup_resources(&self.engine, self.operation.read().id());
+            println!("3");
+
+            println!("unlocking proc_exec...");
             Ok(Async::Ready(result.into_outcome()))
         }
     }

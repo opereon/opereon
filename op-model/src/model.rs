@@ -569,7 +569,10 @@ impl ModelRef {
     }
 
     pub fn lock(&self) -> ReentrantMutexGuard<Model> {
-        self.0.lock()
+        println!("locking model... {}", std::thread::current().name().unwrap().to_string());
+        let l = self.0.lock();
+        println!("model locked! {}", std::thread::current().name().unwrap().to_string());
+        l
     }
 
     pub fn deep_copy(&self) -> ModelRef {
