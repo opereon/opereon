@@ -105,6 +105,6 @@ impl std::fmt::Display for TaskResult {
         if let Some(signal) = self.signal() {
             write!(f, " (signal: {})", signal)?;
         }
-        write!(f, ", Outcome: {}", self.outcome)
+        write!(f, ", Result: {}", self.outcome)
     }
 }
