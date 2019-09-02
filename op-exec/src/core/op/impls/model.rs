@@ -304,6 +304,8 @@ impl Future for ModelUpdateOperation {
                 Ok(Async::NotReady)
             }
         } else {
+            debug!(self.logger, "Starting model update operation");
+
             let mut proc_ops = Vec::new();
             {
                 let (m1, m2) = {
@@ -317,52 +319,57 @@ impl Future for ModelUpdateOperation {
                 let mut update = ModelUpdate::new(&model1, &model2)?;
 
                 let exec_dir = Path::new(".op");
-                for p in model2.procs().iter() {
-                    if p.kind() == ProcKind::Update {
-                        let id = p.id();
 
-                        let (model_changes, file_changes) = update.check_updater(p)?;
+                if model2.procs().is_empty() {
+                    info!(self.logger, "Nothing to do, there is no procedures defined in model: [{model_id}]", model_id = model2.metadata().id().to_string(); "verbosity"=>0);
+                } else {
+                    for p in model2.procs().iter() {
+                        if p.kind() == ProcKind::Update {
+                            let id = p.id();
 
-                        if model_changes.is_empty() && file_changes.is_empty() {
-                            info!(self.logger, "Update [{proc_id}]: skipped - no changes", proc_id = id; "verbosity"=>0);
-                            continue;
+                            let (model_changes, file_changes) = update.check_updater(p)?;
+
+                            if model_changes.is_empty() && file_changes.is_empty() {
+                                info!(self.logger, "Update [{proc_id}]: skipped - no changes", proc_id = id; "verbosity"=>0);
+                                continue;
+                            }
+
+                            let mut args = ArgumentsBuilder::new(model2.root());
+
+                            if !model_changes.is_empty() {
+                                args.set_arg(
+                                    "$model_changes".into(),
+                                    &model_changes
+                                        .iter()
+                                        .map(|c| to_tree(c).unwrap())
+                                        .collect::<Vec<_>>()
+                                        .into(),
+                                );
+                            }
+                            if !file_changes.is_empty() {
+                                args.set_arg(
+                                    "$file_changes".into(),
+                                    &file_changes
+                                        .iter()
+                                        .map(|c| to_tree(c).unwrap())
+                                        .collect::<Vec<_>>()
+                                        .into(),
+                                );
+                            }
+                            args.set_arg("$old".into(), &model1.root().clone().into());
+
+                            let mut e = ProcExec::with_args(Utc::now(), args.build());
+                            e.prepare(&model2, p, exec_dir)?;
+                            e.store()?;
+
+                            let op: OperationRef = Context::ProcExec {
+                                exec_path: e.path().to_path_buf(),
+                            }
+                                .into();
+                            proc_ops.push(op);
+
+                            info!(self.logger, "Update [{proc_id}]: prepared in [{path}]", proc_id = id, path = e.path().display(); "verbosity"=>1);
                         }
-
-                        let mut args = ArgumentsBuilder::new(model2.root());
-
-                        if !model_changes.is_empty() {
-                            args.set_arg(
-                                "$model_changes".into(),
-                                &model_changes
-                                    .iter()
-                                    .map(|c| to_tree(c).unwrap())
-                                    .collect::<Vec<_>>()
-                                    .into(),
-                            );
-                        }
-                        if !file_changes.is_empty() {
-                            args.set_arg(
-                                "$file_changes".into(),
-                                &file_changes
-                                    .iter()
-                                    .map(|c| to_tree(c).unwrap())
-                                    .collect::<Vec<_>>()
-                                    .into(),
-                            );
-                        }
-                        args.set_arg("$old".into(), &model1.root().clone().into());
-
-                        let mut e = ProcExec::with_args(Utc::now(), args.build());
-                        e.prepare(&model2, p, exec_dir)?;
-                        e.store()?;
-
-                        let op: OperationRef = Context::ProcExec {
-                            exec_path: e.path().to_path_buf(),
-                        }
-                        .into();
-                        proc_ops.push(op);
-
-                        info!(self.logger, "Update [{proc_id}]: prepared in [{path}]", proc_id = id, path = e.path().display(); "verbosity"=>1);
                     }
                 }
             }
