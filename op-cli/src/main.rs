@@ -111,7 +111,7 @@ fn local_run(
         .map_err(move |err| {
             use kg_diag::Diag;
             code.store(err.detail().code(), Ordering::Relaxed);
-            error!(logger, "Operation execution error = {}", err; "verbosity" => 0);
+            error!(logger, "Operation execution error:\n{}", err; "verbosity" => 0);
         })
         .then(move |_| {
             engine.stop();

@@ -44,7 +44,6 @@ impl StepExec {
 
     fn create_step_dir(&mut self, proc_exec_dir: &Path) -> ProtoResult<()> {
         let p = proc_exec_dir.join(self.get_step_dir_name());
-        debug_assert!(!p.exists());
         fs::create_dir(&p)?;
         self.path = p;
         Ok(())
