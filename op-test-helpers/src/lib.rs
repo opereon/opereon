@@ -30,6 +30,13 @@ macro_rules! remove_file {
 }
 
 #[macro_export]
+macro_rules! rename {
+    ($from: expr, $to: expr) => {{
+        std::fs::rename(&$from, &$to).expect(&format!("Cannot rename file file: '{}'", $from.display()))
+    }};
+}
+
+#[macro_export]
 macro_rules! assert_detail {
     ($res: expr, $detail:ident, $variant: pat) => {
         assert_detail!($res, $detail, $variant, {})

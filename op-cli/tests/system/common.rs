@@ -80,7 +80,7 @@ impl Context {
             .model_dir
             .join("keys/vagrant")
             .to_string_lossy()
-            .to_string();;
+            .to_string();
 
         let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key];
         params.extend_from_slice(args);

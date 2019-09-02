@@ -204,6 +204,7 @@ pub fn rsync_copy(config: &RsyncConfig, params: &RsyncParams) -> RsyncResult<Tas
             .arg("--times") // preserve modification times
             .arg("--out-format=[%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
             .env("TERM", "xterm-256color")
+            .current_dir(kg_diag::io::fs::current_dir()?)
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout_writer))
             .stderr(Stdio::from(stderr_writer))
@@ -286,7 +287,7 @@ impl FileCopyOperation {
             .get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(&self.curr_dir, &self.src_path, &self.dst_path);
         params
-            //.dst_hostname(self.host.ssh_dest().hostname())
+            .dst_hostname(self.host.ssh_dest().hostname())
             .remote_shell(ssh_session.read().remote_shell_call());
         if let Some(chown) = &self.chown {
             params.chown(chown.to_owned());
