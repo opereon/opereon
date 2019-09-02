@@ -239,6 +239,7 @@ pub fn rsync_compare(
         .arg("--delete") // delete extraneous files from dest dirs
         .arg("-ii") // output unchanged files
         .arg("--out-format=###%i [%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
+        .current_dir(kg_diag::io::fs::current_dir()?)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

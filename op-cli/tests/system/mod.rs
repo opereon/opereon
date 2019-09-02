@@ -12,7 +12,7 @@ mod common;
 
 #[test]
 fn query_hosts() {
-    let ctx = Context::new();
+    let ctx = Context::new("model");
 
     let expected = r#"---
 - ares
@@ -27,7 +27,7 @@ fn query_hosts() {
 
 #[test]
 fn remote_ls() {
-    let ctx = Context::new();
+    let ctx = Context::new("model");
 
     let expected = r#"Info: Finished executing command on remote hosts!
 Info: ================Host [ares.example.com]================
@@ -60,7 +60,7 @@ Info: ================Host [zeus.example.com]================
 
 #[test]
 fn install_package() {
-    let ctx = Context::new();
+    let ctx = Context::new("model");
 
     // language=yaml
     let host = r#"
@@ -83,7 +83,7 @@ ifaces:
 
 #[test]
 fn remove_package() {
-    let ctx = Context::new();
+    let ctx = Context::new("model");
 
     // language=yaml
     let host = r#"
@@ -102,4 +102,30 @@ ifaces:
 
     let out = ctx.exec_ssh("ares", &["yum list installed git"]);
     assert_eq!(1, out.code);
+}
+
+//#[test]
+fn update_etc_hosts() {
+    let ctx = Context::new("model");
+
+    let expected_etc_hosts = r#"127.0.0.1   localhost ares_renamed
+::1         localhost ip6-localhost ip6-loopback
+fe00::0     ip6-localnet
+ff00::0     ip6-mcastprefix
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+"#;
+    // remove yum procs. This should not be necessary after fix : https://github.com/opereon/opereon/issues/23
+    remove_file!(ctx.model_dir().join("proc/yum/procs.yaml"));
+    let out = ctx.exec_op(&["commit"]);
+    assert_out!(out);
+    let hosts_dir = ctx.model_dir().join("conf/hosts/");
+    rename!(hosts_dir.join("ares.yaml"), hosts_dir.join("ares_renamed.yaml"));
+
+    let out = ctx.exec_op(&["update"]);
+    assert_out!(out);
+
+    let out = ctx.exec_ssh("ares", &["cat /etc/hosts"]);
+    assert_out!(out);
+    assert_eq!(expected_etc_hosts, out.out);
 }

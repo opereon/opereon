@@ -31,7 +31,7 @@ pub struct Context {
 //}
 
 impl Context {
-    pub fn new() -> Context {
+    pub fn new(model_resource: &str) -> Context {
         let (tmp, dir) = get_tmp_dir();
         let compose = dir.join("docker-compose.yml");
         let model = dir.join("model");
@@ -39,7 +39,7 @@ impl Context {
         copy_resource!("compose/ares", dir.join("ares"));
         copy_resource!("compose/zeus", dir.join("zeus"));
 
-        copy_resource!("model", model);
+        copy_resource!(model_resource, model);
 
         init_repo(&model);
         initial_commit(&model);
@@ -80,7 +80,7 @@ impl Context {
             .model_dir
             .join("keys/vagrant")
             .to_string_lossy()
-            .to_string();;
+            .to_string();
 
         let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key];
         params.extend_from_slice(args);

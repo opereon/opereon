@@ -288,7 +288,7 @@ impl FileExecutor for RsyncExecutor {
             .get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
-            //.dst_hostname(self.host.ssh_dest().hostname())
+            .dst_hostname(self.host.ssh_dest().hostname())
             .remote_shell(ssh_session.read().remote_shell_call());
         if let Some(chown) = chown {
             params.chown(chown);
@@ -334,7 +334,7 @@ impl FileExecutor for RsyncExecutor {
             .get(self.host.ssh_dest())?;
         let mut params = RsyncParams::new(curr_dir, src_path, dst_path);
         params
-            //.dst_hostname(self.host.ssh_dest().hostname())
+            .dst_hostname(self.host.ssh_dest().hostname())
             .remote_shell(ssh_session.read().remote_shell_call());
         if let Some(chown) = chown {
             params.chown(chown);
