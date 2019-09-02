@@ -6,8 +6,8 @@ workspace = ".."
 edition = "2018"
 
 [dependencies]
-kg-diag = "0.2.7"
-kg-diag-derive = "0.2.3"
+kg-diag = "0.3.0"
+kg-diag-derive = "0.3.0"
 kg-display-derive = "0.1.1"
 kg-utils = "0.3.1"
 kg-tree = "0.1.7"

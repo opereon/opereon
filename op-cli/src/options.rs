@@ -25,12 +25,8 @@ fn parse_ssh_url(s: &str) -> Result<Url, String> {
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "op",
-    author = "",
     about = "OPEREON - System configuration automation.\nCopyright (c) Kodegenix Sp z o.o. (http://www.kodegenix.pl).",
-    raw(
-        setting = "AppSettings::InferSubcommands",
-        setting = "structopt::clap::AppSettings::ColoredHelp"
-    )
+    settings = &[AppSettings::InferSubcommands, AppSettings::ColoredHelp],
 )]
 pub struct Opts {
     /// Path(s) to the config file
@@ -64,18 +60,15 @@ pub enum Command {
     /// Prints config to the output
     #[structopt(
         name = "config",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp
     )]
     Config {
         /// Output format
         #[structopt(
             short = "f",
             long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml"]"#,
-                case_insensitive = "true"
-            ),
+            possible_values = &["json","yaml","toml"],
+            case_insensitive = true,
             default_value = "toml"
         )]
         format: DisplayFormat,
@@ -83,8 +76,7 @@ pub enum Command {
     /// Commit current model
     #[structopt(
         name = "commit",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Commit {
         /// Optional path to read model from. By default current directory model is used.
@@ -94,18 +86,15 @@ pub enum Command {
     /// Query model
     #[structopt(
         name = "query",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Query {
         /// Output format
         #[structopt(
             short = "f",
             long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
+            possible_values = &["json","yaml","toml","text","table"],
+            case_insensitive = true,
             default_value = "yaml"
         )]
         format: DisplayFormat,
@@ -119,18 +108,15 @@ pub enum Command {
     /// Test model
     #[structopt(
         name = "test",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Test {
         /// Output format
         #[structopt(
             short = "f",
             long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
+            possible_values = &["json","yaml","toml","text","table"],
+            case_insensitive = true,
             default_value = "yaml"
         )]
         format: DisplayFormat,
@@ -141,18 +127,15 @@ pub enum Command {
     /// Compare two model versions
     #[structopt(
         name = "diff",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Diff {
         /// Output format
         #[structopt(
             short = "f",
             long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
+            possible_values = &["json","yaml","toml","text","table"],
+            case_insensitive = true,
             default_value = "yaml"
         )]
         format: DisplayFormat,
@@ -160,7 +143,8 @@ pub enum Command {
         #[structopt(
             short = "m",
             long = "method",
-            raw(possible_values = r#"&["minimal","full"]"#, case_insensitive = "true"),
+            possible_values = &["minimal","full"],
+            case_insensitive = true,
             default_value = "minimal"
         )]
         method: DiffMethod,
@@ -174,18 +158,15 @@ pub enum Command {
     /// Update model to a new version
     #[structopt(
         name = "update",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Update {
         /// Output format
         #[structopt(
             short = "f",
             long = "format",
-            raw(
-                possible_values = r#"&["json","yaml","toml","text","table"]"#,
-                case_insensitive = "true"
-            ),
+            possible_values = &["json","yaml","toml","text","table"],
+            case_insensitive = true,
             default_value = "yaml"
         )]
         format: DisplayFormat,
@@ -202,8 +183,7 @@ pub enum Command {
     /// Run checks from a model
     #[structopt(
         name = "check",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Check {
         /// Model path, defaults to current model
@@ -219,12 +199,11 @@ pub enum Command {
     /// Run probe from a model
     #[structopt(
         name = "probe",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Probe {
         /// SSH connection url to remote host being probed, for example ssh://root@example.org:22
-        #[structopt(name = "URL", parse(try_from_str = "parse_ssh_url"))]
+        #[structopt(name = "URL", parse(try_from_str = parse_ssh_url))]
         url: Url,
         /// Password for SSH authentication
         #[structopt(short = "P", long = "password", group = "ssh_auth")]
@@ -236,7 +215,7 @@ pub enum Command {
         #[structopt(short = "n", long = "name")]
         filter: Option<String>,
         /// Arguments for the probe
-        #[structopt(short = "A", parse(try_from_str = "parse_key_value"))]
+        #[structopt(short = "A", parse(try_from_str = parse_key_value))]
         args: Vec<(String, String)>,
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
@@ -245,15 +224,14 @@ pub enum Command {
     /// Execute shell command on remote host(s)
     #[structopt(
         name = "remote",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Remote {
         /// Query expression. Determines target hosts. Defaults to all hosts from current model
         #[structopt(name = "OPATH", short = "h", long = "hosts", default_value = "$$hosts")]
         expr: String,
         /// Command to execute on remote hosts
-        #[structopt(name = "COMMAND", raw(raw = "true"))]
+        #[structopt(name = "COMMAND", raw(true))]
         command: Vec<String>,
         /// Model path, defaults to current working directory
         #[structopt(short = "m", long = "model", default_value = "@")]
@@ -262,8 +240,7 @@ pub enum Command {
     /// Execute prepared work package
     #[structopt(
         name = "exec",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Exec {
         /// Work path, defaults to current working directory
@@ -273,8 +250,7 @@ pub enum Command {
     /// Initialize empty opereon model
     #[structopt(
         name = "init",
-        author = "",
-        raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+        setting = AppSettings::ColoredHelp,
     )]
     Init {
         /// Path to new model, defaults to current working directory
