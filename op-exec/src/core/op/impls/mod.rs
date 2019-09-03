@@ -168,7 +168,12 @@ pub fn create_operation_impl(
         )),
     };
 
-    op_impl.init()?;
+    op_impl.init()
+        .map_err(|err| {
+            // stop progress future when initialization error occurs
+            operation.write().update_progress_value_done();
+            err
+        })?;
 
     Ok(op_impl)
 }

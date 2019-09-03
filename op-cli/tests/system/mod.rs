@@ -104,7 +104,7 @@ ifaces:
     assert_eq!(1, out.code);
 }
 
-//#[test]
+#[test]
 fn update_etc_hosts() {
     let ctx = Context::new("model");
 

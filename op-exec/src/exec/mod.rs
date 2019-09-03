@@ -147,6 +147,13 @@ impl std::fmt::Display for OutputLog {
     }
 }
 
+impl std::fmt::Debug  for OutputLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("OutputLog")
+            .finish()
+    }
+}
+
 unsafe impl Send for OutputLog {}
 
 unsafe impl Sync for OutputLog {}

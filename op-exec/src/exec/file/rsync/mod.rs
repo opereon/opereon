@@ -326,7 +326,7 @@ impl FileExecutor for RsyncExecutor {
         dst_path: &Path,
         chown: Option<&str>,
         chmod: Option<&str>,
-        _log: &OutputLog,
+        log: &OutputLog,
     ) -> FileResult<TaskResult> {
         let ssh_session = engine
             .write()
@@ -343,6 +343,6 @@ impl FileExecutor for RsyncExecutor {
             params.chmod(chmod);
         }
 
-        self::rsync::copy::rsync_copy(self.config(), &params)
+        self::rsync::copy::rsync_copy(self.config(), &params, log)
     }
 }
