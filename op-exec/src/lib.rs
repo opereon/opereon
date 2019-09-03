@@ -14,6 +14,10 @@ extern crate serde_derive;
 #[macro_use]
 extern crate slog;
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 

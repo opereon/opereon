@@ -23,7 +23,7 @@ impl StepExec {
             step: step.index(),
             // only set host_path if host is defined inside the model
             host_path: model.get_host(host.node()).map(|h| h.node().path()),
-            host: Host::from_def(host)?,
+            host: Host::from_def(model, host)?,
             tasks: Vec::new(),
             path: PathBuf::new(),
         };

@@ -365,7 +365,7 @@ impl Future for ModelUpdateOperation {
                             let op: OperationRef = Context::ProcExec {
                                 exec_path: e.path().to_path_buf(),
                             }
-                                .into();
+                            .into();
                             proc_ops.push(op);
 
                             info!(self.logger, "Update [{proc_id}]: prepared in [{path}]", proc_id = id, path = e.path().display(); "verbosity"=>1);

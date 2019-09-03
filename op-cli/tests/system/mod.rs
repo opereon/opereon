@@ -120,7 +120,10 @@ ff02::2     ip6-allrouters
     let out = ctx.exec_op(&["commit"]);
     assert_out!(out);
     let hosts_dir = ctx.model_dir().join("conf/hosts/");
-    rename!(hosts_dir.join("ares.yaml"), hosts_dir.join("ares_renamed.yaml"));
+    rename!(
+        hosts_dir.join("ares.yaml"),
+        hosts_dir.join("ares_renamed.yaml")
+    );
 
     let out = ctx.exec_op(&["update"]);
     assert_out!(out);

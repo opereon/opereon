@@ -80,7 +80,7 @@ impl RemoteCommandOperation {
         for h in hosts_nodes.iter() {
             let hd = HostDef::parse(&*m, m.as_scoped(), h)
                 .map_err_as_cause(|| SshErrorDetail::HostsDefParse)?;
-            hosts.push(Host::from_def(&hd)?);
+            hosts.push(Host::from_def(&m, &hd)?);
         }
         Ok(hosts)
     }

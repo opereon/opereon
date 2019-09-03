@@ -7,7 +7,7 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn from_def(host_def: &HostDef) -> ProtoResult<Host> {
+    pub fn from_def(model: &Model, host_def: &HostDef) -> ProtoResult<Host> {
         let mut h: Host = from_tree(host_def.node())
             .into_diag_res()
             .map_err_as_cause(|| ProtoErrorDetail::HostParse)?;
@@ -17,6 +17,15 @@ impl Host {
         }
         if h.ssh_dest.username().is_empty() {
             h.ssh_dest.set_username_current();
+        }
+        // path must be absolute
+        if let SshAuth::PublicKey {
+            ref mut identity_file,
+        } = h.ssh_dest.auth_mut()
+        {
+            if identity_file.is_relative() && !identity_file.starts_with("~") {
+                *identity_file = model.metadata().path().join(&identity_file);
+            }
         }
         Ok(h)
     }
@@ -81,7 +90,8 @@ mod tests {
         let n = NodeRef::from_json(as_json()).unwrap();
 
         let host_def = HostDef::new(n.clone(), n.clone()).unwrap();
-        let host = Host::from_def(&host_def).unwrap();
+        let m = Model::empty();
+        let host = Host::from_def(&m,&host_def).unwrap();
 
         assert_eq!(as_host(), host);
     }

@@ -102,12 +102,15 @@ impl SshDest {
         }
     }
 
-    pub fn set_dest(&self, cmd: &mut CommandBuilder) {
-        cmd.arg(format!(
-            "{username}@{hostname}",
-            username = self.username,
-            hostname = self.hostname
-        ));
+    pub fn set_dest(&self, target: bool, cmd: &mut CommandBuilder) {
+        if target {
+            cmd.arg(format!(
+                "{username}@{hostname}",
+                username = self.username,
+                hostname = self.hostname
+            ));
+        }
+
         if self.port != 22 {
             cmd.arg("-p").arg(self.port.to_string());
         }
@@ -157,6 +160,10 @@ impl SshDest {
 
     pub fn auth(&self) -> &SshAuth {
         &self.auth
+    }
+
+    pub fn auth_mut(&mut self) -> &mut SshAuth {
+        &mut self.auth
     }
 
     pub fn set_auth(&mut self, auth: SshAuth) {

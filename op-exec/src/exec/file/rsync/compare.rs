@@ -223,11 +223,11 @@ impl DiffInfo {
     }
 }
 
-pub fn rsync_compare(
+fn build_compare_cmd(
     config: &RsyncConfig,
     params: &RsyncParams,
     checksum: bool,
-) -> RsyncResult<Vec<DiffInfo>> {
+) -> RsyncResult<Command> {
     let mut rsync_cmd = params.to_cmd(config);
 
     rsync_cmd
@@ -239,7 +239,6 @@ pub fn rsync_compare(
         .arg("--delete") // delete extraneous files from dest dirs
         .arg("-ii") // output unchanged files
         .arg("--out-format=###%i [%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
-        .current_dir(kg_diag::io::fs::current_dir()?)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -247,7 +246,16 @@ pub fn rsync_compare(
     if checksum {
         rsync_cmd.arg("--checksum"); // skip based on checksum, not mod-time & size.
     }
+    Ok(rsync_cmd)
+}
 
+pub fn rsync_compare(
+    config: &RsyncConfig,
+    params: &RsyncParams,
+    checksum: bool,
+) -> RsyncResult<Vec<DiffInfo>> {
+    let mut rsync_cmd = build_compare_cmd(config, params, checksum)?;
+    eprintln!("rsync_cmd = {:?}", rsync_cmd);
     let output = rsync_cmd.output().map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
@@ -306,4 +314,26 @@ fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
     }
 
     Ok(diffs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use op_test_helpers::UnwrapDisplay;
+
+    #[test]
+    fn compare_cmd() {
+        let expected = r#""/bin/rsync" "/home/wiktor/Desktop/opereon/resources/model/proc/hosts_file/etc/hosts" "127.0.0.1:/etc/hosts" "--chmod" "u+rw,g+r,o+r" "--group" "--owner" "--chown" "root:root" "--verbose" "--recursive" "--dry-run" "--super" "--archive" "--delete" "-ii" "--out-format=###%i [%f][%l]""#;
+        let cfg = RsyncConfig::default();
+        let mut params = RsyncParams::new(
+            "/home/wiktor/Desktop/opereon/resources/model/",
+            "/home/wiktor/Desktop/opereon/resources/model/proc/hosts_file/etc/hosts",
+            "127.0.0.1:/etc/hosts",
+        );
+        params.chmod("u+rw,g+r,o+r").chown("root:root");
+
+        let cmd = build_compare_cmd(&cfg, &params, false).unwrap_disp();
+
+        assert_eq!(expected, format!("{:?}", cmd));
+    }
 }

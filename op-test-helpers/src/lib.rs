@@ -32,7 +32,8 @@ macro_rules! remove_file {
 #[macro_export]
 macro_rules! rename {
     ($from: expr, $to: expr) => {{
-        std::fs::rename(&$from, &$to).expect(&format!("Cannot rename file file: '{}'", $from.display()))
+        std::fs::rename(&$from, &$to)
+            .expect(&format!("Cannot rename file file: '{}'", $from.display()))
     }};
 }
 

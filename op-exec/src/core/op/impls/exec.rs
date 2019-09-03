@@ -251,6 +251,10 @@ impl Future for TaskExecOperation {
                 {
                     let s = task.scope_mut()?;
                     s.set_var("$task".into(), task.node().clone().into());
+                    s.set_var(
+                        "$work_dir".into(),
+                        to_tree(&step_exec.path()).unwrap().into(),
+                    );
                 }
 
                 let log_path = step_exec.path().join("output.log");
@@ -344,9 +348,9 @@ impl Future for TaskExecOperation {
                     }
                     TaskKind::Template => {
                         let src_path: PathBuf = scope.get_var_value("src_path")?;
-                        let src_path = base_path.join(src_path);
                         let dst_path: PathBuf =
                             scope.get_var_value_or_default("dst_path", &src_path);
+                        let src_path = base_path.join(src_path);
                         let dst_path = step_exec.path().join(dst_path);
                         let mut executor =
                             create_template_executor(step_exec.host(), &self.engine)?;
@@ -396,9 +400,9 @@ impl Future for TaskExecOperation {
                     }
                     TaskKind::FileCopy => {
                         let src_path: PathBuf = scope.get_var_value("src_path")?;
-                        let src_path = base_path.join(src_path);
                         let dst_path: PathBuf =
                             scope.get_var_value_or_default("dst_path", &src_path);
+                        let src_path = step_exec.path().join(src_path);
                         let chown: Option<String> = scope.get_var_value_opt("chown");
                         let chmod: Option<String> = scope.get_var_value_opt("chmod");
                         let op: OperationRef = Context::FileCopyExec {
