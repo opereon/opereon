@@ -21,8 +21,8 @@ updates:
             src_path: etc/hosts
         - task: file-copy
           scope:
-            src_path: etc/hosts
-            dst_path: /etc/hosts
+            src_path: ${$$work_dir + '/etc/hosts'}
+            dst_path: /root/hosts
             chown: root:root
             chmod: u+rw,g+r,o+r
 
