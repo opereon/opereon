@@ -2,7 +2,8 @@ version: "2"
 services:
   zeus:
     hostname: zeus
-    image: jdeathe/centos-ssh
+    build: .
+    image: opereon-host:latest
     tty: true
     stdin_open: true
     volumes:
@@ -14,7 +15,8 @@ services:
       - "8820:22"
   ares:
     hostname: ares
-    image: jdeathe/centos-ssh
+    build: .
+    image: opereon-host:latest
     tty: true
     stdin_open: true
     volumes:

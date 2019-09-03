@@ -34,8 +34,10 @@ impl Context {
     pub fn new(model_resource: &str) -> Context {
         let (tmp, dir) = get_tmp_dir();
         let compose = dir.join("docker-compose.yml");
+        let dockerfile = dir.join("Dockerfile");
         let model = dir.join("model");
         copy_resource!("compose/docker-compose.yml", compose);
+        copy_resource!("compose/Dockerfile", dockerfile);
         copy_resource!("compose/ares", dir.join("ares"));
         copy_resource!("compose/zeus", dir.join("zeus"));
 
