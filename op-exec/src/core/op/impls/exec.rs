@@ -414,6 +414,7 @@ impl Future for TaskExecOperation {
                             host: step_exec.host().clone(),
                         }
                         .into();
+                        op.write().set_output(output);
                         self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                         return self.poll();
                     }
@@ -434,6 +435,7 @@ impl Future for TaskExecOperation {
                                 chown.as_ref().map(|s| s.as_ref()),
                                 chmod.as_ref().map(|s| s.as_ref()),
                                 true,
+                                &output
                             )?
                             .into_task_result()
                     }

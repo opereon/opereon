@@ -281,6 +281,7 @@ impl FileExecutor for RsyncExecutor {
         chown: Option<&str>,
         chmod: Option<&str>,
         checksum: bool,
+        log: &OutputLog
     ) -> FileResult<CompareResult> {
         let ssh_session = engine
             .write()
@@ -298,7 +299,7 @@ impl FileExecutor for RsyncExecutor {
             params.chmod(chmod);
         }
 
-        let diffs = self::rsync::compare::rsync_compare(self.config(), &params, checksum)?;
+        let diffs = self::rsync::compare::rsync_compare(self.config(), &params, checksum, log)?;
         let mut result = 0;
         // FIXME ws to be removed?
         for diff in &diffs {

@@ -24,33 +24,34 @@ mod outcome;
 mod progress;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Operation {
+struct OperationMetadata {
     id: Uuid,
     label: String,
     context: Context,
+}
 
-    #[serde(skip)]
+#[derive(Debug)]
+pub struct Operation {
+    metadata: OperationMetadata,
+    output: OutputLog,
     progress: Progress,
-    #[serde(skip)]
     progress_task: AtomicTask,
-    #[serde(skip)]
     outcome: Option<RuntimeResult<Outcome>>,
-    #[serde(skip)]
     outcome_task: AtomicTask,
-    #[serde(skip)]
     task: AtomicTask,
-    #[serde(skip)]
     blocked: bool,
-    #[serde(skip)]
     cancelled: bool,
 }
 
 impl Operation {
     fn new(id: Uuid, label: Cow<str>, context: Context) -> Operation {
         Operation {
-            id,
-            label: label.into_owned(),
-            context,
+            metadata: OperationMetadata {
+                id,
+                label: label.into_owned(),
+                context,
+            },
+            output: OutputLog::default(),
             progress: Progress::default(),
             progress_task: AtomicTask::new(),
             outcome: None,
@@ -62,15 +63,15 @@ impl Operation {
     }
 
     pub fn id(&self) -> Uuid {
-        self.id
+        self.metadata.id
     }
 
     pub fn label(&self) -> &str {
-        &self.label
+        &self.metadata.label
     }
 
     pub fn context(&self) -> &Context {
-        &self.context
+        &self.metadata.context
     }
 
     pub(crate) fn update_progress(&mut self, progress: Progress) {
@@ -112,6 +113,14 @@ impl Operation {
         self.progress_task.notify()
     }
 
+    pub fn output(&self) -> &OutputLog {
+        &self.output
+    }
+
+    pub fn set_output(&mut self, output: OutputLog) {
+        self.output = output;
+    }
+
     pub fn is_blocked(&self) -> bool {
         self.blocked
     }
@@ -131,6 +140,22 @@ impl Operation {
 
     pub fn notify(&mut self) {
         self.task.notify();
+    }
+}
+
+impl From<OperationMetadata> for Operation {
+    fn from(metadata: OperationMetadata) -> Self {
+        Operation {
+            metadata,
+            output: OutputLog::default(),
+            progress: Progress::default(),
+            progress_task: AtomicTask::new(),
+            outcome: None,
+            outcome_task: AtomicTask::new(),
+            task: AtomicTask::new(),
+            blocked: false,
+            cancelled: false,
+        }
     }
 }
 
@@ -168,7 +193,7 @@ impl ser::Serialize for OperationRef {
     where
         S: ser::Serializer,
     {
-        self.read().serialize(serializer)
+        self.read().metadata.serialize(serializer)
     }
 }
 
@@ -177,8 +202,8 @@ impl<'de> de::Deserialize<'de> for OperationRef {
     where
         D: de::Deserializer<'de>,
     {
-        let oper = Operation::deserialize(deserializer)?;
-        Ok(OperationRef::wrap(oper))
+        let metadata = OperationMetadata::deserialize(deserializer)?;
+        Ok(OperationRef::wrap(metadata.into()))
     }
 }
 

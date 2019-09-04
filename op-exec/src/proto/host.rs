@@ -91,7 +91,7 @@ mod tests {
 
         let host_def = HostDef::new(n.clone(), n.clone()).unwrap();
         let m = Model::empty();
-        let host = Host::from_def(&m,&host_def).unwrap();
+        let host = Host::from_def(&m, &host_def).unwrap();
 
         assert_eq!(as_host(), host);
     }

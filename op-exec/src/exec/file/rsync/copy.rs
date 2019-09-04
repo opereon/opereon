@@ -310,14 +310,16 @@ impl FileCopyOperation {
         let (stdout, stdout_writer) = pipe().map_err_to_diag()?;
         let (stderr, stderr_writer) = pipe().map_err_to_diag()?;
 
+        let err_log = self.operation.read().output().clone();
+        let logger = self.logger.clone();
+
         let operation = self.operation.clone();
 
         let run_stdout = move || {
             let mut buf = BufReader::new(stdout);
 
             if let Err(err) = parse_progress(&mut buf, operation) {
-                // TODO ws report this error somehow?
-                println!("Error parsing rsync progress: {}", err)
+                warn!(logger, "cannot parse rsync progress! {}", err; "verbosity" => 0);
             };
             Ok(())
         };
@@ -327,15 +329,15 @@ impl FileCopyOperation {
 
             for line in buf.lines() {
                 match line {
-                    Ok(line) => println!("err: {}", line),
-                    Err(err) => return Err(err),
+                    Ok(line) => err_log.log_stdout(line.as_bytes())?,
+                    Err(err) => return Err(err).map_err_to_diag(),
                 }
             }
             Ok(())
         };
 
-        let _hout: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stdout);
-        let _herr: JoinHandle<std::io::Result<()>> = std::thread::spawn(run_stderr);
+        let _hout: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stdout);
+        let _herr: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stderr);
         Ok((stdout_writer, stderr_writer))
     }
 
@@ -346,6 +348,8 @@ impl FileCopyOperation {
 
         let status = self.status.clone();
         let operation = self.operation.clone();
+
+        let output_log = operation.read().output().clone();
 
         std::thread::spawn(move || {
             let execute_cmd = move || -> RsyncResult<ExitStatus> {
@@ -362,10 +366,11 @@ impl FileCopyOperation {
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr));
 
-                //                eprintln!("command = {:?}", command);
+                output_log.log_cmd(&format!("{:?}", command))?;
 
                 let mut child = command.spawn().map_err(RsyncErrorDetail::spawn_err)?;
                 let res = child.wait().map_err(RsyncErrorDetail::spawn_err)?;
+                output_log.log_status(res.code())?;
                 Ok(res)
             };
 
@@ -389,6 +394,7 @@ impl FileCopyOperation {
             self.chown.as_ref().map(|s| s.as_ref()),
             self.chmod.as_ref().map(|s| s.as_ref()),
             false,
+            self.operation.read().output()
         )?;
 
         let mut progresses = vec![];

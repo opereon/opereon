@@ -253,9 +253,10 @@ pub fn rsync_compare(
     config: &RsyncConfig,
     params: &RsyncParams,
     checksum: bool,
+    log: &OutputLog
 ) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = build_compare_cmd(config, params, checksum)?;
-    eprintln!("rsync_cmd = {:?}", rsync_cmd);
+    log.log_cmd(&format!("{:?}", rsync_cmd))?;
     let output = rsync_cmd.output().map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
@@ -264,6 +265,10 @@ pub fn rsync_compare(
         stderr,
     } = output;
 
+    log.log_stdout(stdout.as_slice())?;
+    log.log_stderr(stderr.as_slice())?;
+
+    log.log_status(status.code())?;
     match status.code() {
         None => Err(RsyncErrorDetail::RsyncTerminated.into()),
         Some(0) => {

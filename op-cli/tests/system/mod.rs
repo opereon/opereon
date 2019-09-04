@@ -1,7 +1,7 @@
 use super::*;
 use op_test_helpers::{get_tmp_dir, TempDir};
 use std::path::{Path, PathBuf};
-use std::process::{Command};
+use std::process::Command;
 
 pub use common::*;
 use std::time::Duration;
