@@ -1,8 +1,7 @@
 use super::*;
 use op_test_helpers::{get_tmp_dir, TempDir};
-use std::env::args;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::{Command};
 
 pub use common::*;
 use std::time::Duration;
@@ -104,7 +103,7 @@ ifaces:
     assert_eq!(1, out.code);
 }
 
-//#[test]
+#[test]
 fn update_etc_hosts() {
     let ctx = Context::new("model");
 
@@ -128,7 +127,8 @@ ff02::2     ip6-allrouters
     let out = ctx.exec_op(&["update"]);
     assert_out!(out);
 
-    let out = ctx.exec_ssh("ares", &["cat /etc/hosts"]);
+    // assertion should be for /etc/hosts file but because of docker limitations we cannot copy to /etc/hosts # https://github.com/moby/moby/issues/22281#issuecomment-214336587
+    let out = ctx.exec_ssh("ares", &["cat /root/hosts"]);
     assert_out!(out);
     assert_eq!(expected_etc_hosts, out.out);
 }

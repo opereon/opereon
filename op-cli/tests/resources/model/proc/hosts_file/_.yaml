@@ -21,27 +21,7 @@ updates:
             src_path: etc/hosts
         - task: file-copy
           scope:
-            src_path: etc/hosts
-            dst_path: /etc/hosts
+            src_path: ${$$work_dir + '/etc/hosts'}
+            dst_path: /root/hosts # this should be /etc/hosts but due to docker limitation just copy file to /root/hosts: https://github.com/moby/moby/issues/22281#issuecomment-214336587
             chown: root:root
             chmod: u+rw,g+r,o+r
-
-#checks:
-#  "check /etc/hosts":
-#    run:
-#      - hosts: ${$hosts}
-#        tasks:
-#          - ${$proc.tasks[0]}
-#          - kind: file-compare
-#            scope:
-#              src_path: etc/hosts
-#              dst_path: /etc/hosts
-#              chown: root:root
-#              chmod: u+rw,g+r,o+r
-#          - kind: script
-#            scope:
-#              src_path: "script.sh"
-#          - kind: command
-#            scope:
-#              cmd: uname
-#              args: ["-r"]

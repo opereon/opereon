@@ -1,5 +1,4 @@
 use super::*;
-use std::process::Stdio;
 
 static COMPOSE_CMD: &str = "docker-compose";
 
@@ -8,6 +7,8 @@ pub struct CmdOutput {
     pub err: String,
     pub code: i32,
 }
+
+#[allow(dead_code)]
 pub struct Context {
     tmp: TempDir,
     tmp_dir: PathBuf,
@@ -30,6 +31,7 @@ pub struct Context {
 //    }
 //}
 
+#[allow(dead_code)]
 impl Context {
     pub fn new(model_resource: &str) -> Context {
         let (tmp, dir) = get_tmp_dir();
