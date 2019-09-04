@@ -8,6 +8,7 @@ use slog_kvfilter::KVFilter;
 use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::path::Path;
+use std::sync::Mutex;
 
 const VERBOSITY_KEY: &str = "verbosity";
 
@@ -25,9 +26,11 @@ pub fn build_file_drain<P: AsRef<Path>>(
 
     let log_file = open_opts.open(log_path).expect("Cannot open log file");
 
-    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
-    let drain = slog_term::FullFormat::new(decorator).build();
-    let drain = slog::LevelFilter::new(drain, level);
+    let drain = slog_bunyan::default(log_file);
+
+//    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
+//    let drain = slog_term::FullFormat::new(decorator).build();
+    let drain = slog::LevelFilter::new(Mutex::new(drain), level);
     drain.fuse()
 }
 
