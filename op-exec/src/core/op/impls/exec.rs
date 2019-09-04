@@ -273,6 +273,7 @@ impl Future for TaskExecOperation {
                 let scope = task.scope()?;
                 let base_path = proc.dir();
 
+                // scope should probably be serialized to simple json
                 info!(self.logger, "Task [{exec_name}] scope:\n{scope} ", exec_name=task_exec.name(), scope=format!("{}", scope); "verbosity"=>2);
                 let result = match task.kind() {
                     TaskKind::Exec => {
