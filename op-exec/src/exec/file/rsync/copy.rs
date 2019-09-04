@@ -394,7 +394,7 @@ impl FileCopyOperation {
             self.chown.as_ref().map(|s| s.as_ref()),
             self.chmod.as_ref().map(|s| s.as_ref()),
             false,
-            self.operation.read().output()
+            self.operation.read().output(),
         )?;
 
         let mut progresses = vec![];

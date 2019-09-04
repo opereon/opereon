@@ -28,8 +28,8 @@ pub fn build_file_drain<P: AsRef<Path>>(
 
     let drain = slog_bunyan::default(log_file);
 
-//    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
-//    let drain = slog_term::FullFormat::new(decorator).build();
+    //    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
+    //    let drain = slog_term::FullFormat::new(decorator).build();
     let drain = slog::LevelFilter::new(Mutex::new(drain), level);
     drain.fuse()
 }

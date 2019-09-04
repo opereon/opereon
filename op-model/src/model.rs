@@ -12,6 +12,7 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use super::load_file::LoadFileFunc;
 use super::*;
 use kg_diag::{BasicDiag, Severity};
+use slog::{o, warn, Logger};
 
 pub type ModelError = BasicDiag;
 pub type ModelResult<T> = Result<T, ModelError>;
@@ -63,6 +64,8 @@ pub struct Model {
     procs: Vec<ProcDef>,
     #[serde(skip)]
     lookup: ModelLookup,
+    #[serde(skip)]
+    logger: Logger,
 }
 
 impl Model {
@@ -75,6 +78,7 @@ impl Model {
             users: Vec::new(),
             procs: Vec::new(),
             lookup: ModelLookup::new(),
+            logger: Logger::root(slog::Discard, o!()),
         }
     }
 
@@ -93,13 +97,16 @@ impl Model {
         Ok(manifest)
     }
 
-    pub fn read_revision(metadata: Metadata) -> ModelResult<Model> {
+    pub fn read_revision(metadata: Metadata, logger: Logger) -> ModelResult<Model> {
         let manifest = Model::load_manifest(metadata.path())?;
+
+        let logger = logger.new(o!("model_id"=> metadata.id().to_string()));
 
         kg_tree::set_base_path(metadata.path());
 
         let mut m = Model {
             metadata,
+            logger,
             ..Model::empty()
         };
 
@@ -141,6 +148,7 @@ impl Model {
         let commit = model.metadata.id();
         let model_dir = model.metadata.path().to_owned();
 
+        // TODO ws allow relative path in loadFile
         scope.set_func(
             "loadFile".into(),
             Box::new(LoadFileFunc::new(model_dir.clone(), commit)),
@@ -158,7 +166,7 @@ impl Model {
                 ObjectType::Tree => FileType::Dir,
                 ObjectType::Blob => FileType::File,
                 _ => {
-                    eprintln!("Unknown git object type, skipping = {:?}", entry.kind());
+                    warn!(model.logger, "Unknown git object type, skipping : {obj_path}", obj_path = format!("{}/{}", parent_path, entry_name) ;"verbosity" => 0);
                     return TreeWalkResult::Ok;
                 }
             };
@@ -262,9 +270,16 @@ impl Model {
                     Opath::parse(&path.to_str().unwrap().replace('/', ".")).unwrap()
                 };
 
-                let current = path
-                    .apply_one_ext(model.root(), model.root(), scope.as_ref())
+                let node_set = path
+                    .apply_ext(model.root(), model.root(), scope.as_ref())
                     .map_err_as_cause(|| ModelErrorDetail::Expr)?;
+
+                let current = if let NodeSet::One(n) = node_set {
+                    n
+                } else {
+                    warn!(model.logger, "Cannot resolve override to single node, assuming model root. Config path: '{path}'", path=path.to_string(); "verbosity"=> 1);
+                    model.root().clone()
+                };
 
                 for (p, e) in config.overrides().iter() {
                     let res = p
@@ -432,6 +447,7 @@ impl Model {
             users: self.users.clone(),
             procs: self.procs.clone(),
             lookup: ModelLookup::new(),
+            logger: self.logger.clone(),
         };
 
         m.remap(&node_map);
@@ -564,8 +580,8 @@ impl ModelRef {
 
     /// Read model for provided metadata.
     /// Returns error if `metadata.path()` is not model dir
-    pub fn read(metadata: Metadata) -> ModelResult<ModelRef> {
-        Ok(Self::new(Model::read_revision(metadata)?))
+    pub fn read(metadata: Metadata, logger: Logger) -> ModelResult<ModelRef> {
+        Ok(Self::new(Model::read_revision(metadata, logger)?))
     }
 
     pub fn lock(&self) -> ReentrantMutexGuard<Model> {

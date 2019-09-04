@@ -23,7 +23,7 @@ pub trait FileExecutor {
         chown: Option<&str>,
         chmod: Option<&str>,
         checksum: bool,
-        log: &OutputLog
+        log: &OutputLog,
     ) -> FileResult<CompareResult>;
 
     fn file_copy(

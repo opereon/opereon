@@ -253,7 +253,7 @@ pub fn rsync_compare(
     config: &RsyncConfig,
     params: &RsyncParams,
     checksum: bool,
-    log: &OutputLog
+    log: &OutputLog,
 ) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = build_compare_cmd(config, params, checksum)?;
     log.log_cmd(&format!("{:?}", rsync_cmd))?;

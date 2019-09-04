@@ -281,7 +281,7 @@ impl FileExecutor for RsyncExecutor {
         chown: Option<&str>,
         chmod: Option<&str>,
         checksum: bool,
-        log: &OutputLog
+        log: &OutputLog,
     ) -> FileResult<CompareResult> {
         let ssh_session = engine
             .write()

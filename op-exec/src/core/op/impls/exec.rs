@@ -436,7 +436,7 @@ impl Future for TaskExecOperation {
                                 chown.as_ref().map(|s| s.as_ref()),
                                 chmod.as_ref().map(|s| s.as_ref()),
                                 true,
-                                &output
+                                &output,
                             )?
                             .into_task_result()
                     }

@@ -81,6 +81,7 @@ pub struct ModelManager {
 impl ModelManager {
     pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
         let model_cache = LruCache::new(config.model().cache_limit());
+        let logger = logger.new(o!("model_dir" => model_dir.display().to_string()));
         ModelManager {
             config,
             model_cache,
@@ -173,7 +174,7 @@ impl ModelManager {
         meta.set_id(id);
         meta.set_path(self.model_dir().to_owned());
 
-        let model = ModelRef::read(meta)?;
+        let model = ModelRef::read(meta, self.logger.clone())?;
         self.cache_model(model.clone());
         Ok(model)
     }

@@ -8,7 +8,7 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-kg-diag = "0.3.0"
+kg-diag = "0.3.1"
 kg-tree = "0.1.7"
 kg-utils = "0.3.1"
 op-exec = { version = "0.1.1", path = "../op-exec" }
