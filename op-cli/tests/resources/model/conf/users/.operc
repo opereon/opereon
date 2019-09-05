@@ -1,5 +1,5 @@
 [overrides]
-"@.*" = "@.extend(loadFile('conf/users/_default.yaml'), 0)"
+"@.*" = "@.extend(loadFile('./_default.yaml'), 0)"
 
 [[exclude]]
 path = "_default.*"

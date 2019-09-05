@@ -23,9 +23,8 @@ impl Host {
             ref mut identity_file,
         } = h.ssh_dest.auth_mut()
         {
-            if identity_file.is_relative() && !identity_file.starts_with("~") {
-                *identity_file = model.metadata().path().join(&identity_file);
-            }
+            let curr_path = host_def.node().data().dir();
+            *identity_file = model.resolve_path(&identity_file, curr_path);
         }
         Ok(h)
     }

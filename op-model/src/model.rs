@@ -14,6 +14,8 @@ use super::*;
 use kg_diag::{BasicDiag, Severity};
 use slog::{o, warn, Logger};
 
+const LOAD_FILE_FUNC_NAME: &str = "loadFile";
+
 pub type ModelError = BasicDiag;
 pub type ModelResult<T> = Result<T, ModelError>;
 
@@ -144,15 +146,8 @@ impl Model {
 
     /// Walk through each entry in model directory, resolve matching `Includes` and apply changes to model tree
     fn resolve_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
-        let model = self;
-        let commit = model.metadata.id();
-        let model_dir = model.metadata.path().to_owned();
-
-        // TODO ws allow relative path in loadFile
-        scope.set_func(
-            "loadFile".into(),
-            Box::new(LoadFileFunc::new(model_dir.clone(), commit)),
-        );
+        let commit = self.metadata.id();
+        let model_dir = self.metadata.path().to_owned();
 
         let git = GitManager::new(&model_dir)?;
         let odb = git.odb()?;
@@ -166,7 +161,7 @@ impl Model {
                 ObjectType::Tree => FileType::Dir,
                 ObjectType::Blob => FileType::File,
                 _ => {
-                    warn!(model.logger, "Unknown git object type, skipping : {obj_path}", obj_path = format!("{}/{}", parent_path, entry_name) ;"verbosity" => 0);
+                    warn!(self.logger, "Unknown git object type, skipping : {obj_path}", obj_path = format!("{}/{}", parent_path, entry_name) ;"verbosity" => 0);
                     return TreeWalkResult::Ok;
                 }
             };
@@ -196,9 +191,14 @@ impl Model {
                     let n = NodeRef::binary(obj.data());
                     n.data_mut().set_file(Some(&file_info));
 
+                    scope.set_func(
+                        LOAD_FILE_FUNC_NAME.into(),
+                        Box::new(LoadFileFunc::new(model_dir.clone(), PathBuf::from(parent_path), commit)),
+                    );
+
                     let item = inc
                         .item()
-                        .apply_one_ext(model.root(), &n, scope.as_ref())
+                        .apply_one_ext(self.root(), &n, scope.as_ref())
                         .map_err_as_cause(|| ModelErrorDetail::Expr)?;
 
                     if item.data().file().is_none() {
@@ -208,8 +208,11 @@ impl Model {
                     scope.set_var("item".into(), NodeSet::One(item));
 
                     inc.mapping()
-                        .apply_ext(model.root(), model.root(), scope.as_ref())
+                        .apply_ext(self.root(), self.root(), scope.as_ref())
                         .map_err_as_cause(|| ModelErrorDetail::Expr)?;
+                    // do not leak temporary scope items
+                    scope.remove_var("item");
+                    scope.remove_func(LOAD_FILE_FUNC_NAME);
                 }
                 Ok(())
             };
@@ -230,38 +233,34 @@ impl Model {
 
     /// Parse `hosts`, `users` and `procs` definitions
     fn parse_defs(&mut self) -> ModelResult<()> {
-        let model = self;
-        {
-            let scope = model.scoped.scope_mut()?;
+        let scope = self.scoped.scope_mut()?;
 
-            // definitions (hosts, users, processors)
-            let mut hosts = Vec::new();
-            for h in scope.get_var("$hosts").unwrap().iter() {
-                let host = HostDef::parse(&model, &model.scoped, h)?;
-                hosts.push(host);
-            }
-            model.hosts = hosts;
-
-            let mut users = Vec::new();
-            for u in scope.get_var("$users").unwrap().iter() {
-                let user = UserDef::parse(&model, &model.scoped, u)?;
-                users.push(user);
-            }
-            model.users = users;
-
-            let mut procs = Vec::new();
-            for p in scope.get_var("$procs").unwrap().iter() {
-                let proc = ProcDef::parse(&model, &model.scoped, p)?;
-                procs.push(proc);
-            }
-            model.procs = procs;
+        // definitions (hosts, users, processors)
+        let mut hosts = Vec::new();
+        for h in scope.get_var("$hosts").unwrap().iter() {
+            let host = HostDef::parse(&self, &self.scoped, h)?;
+            hosts.push(host);
         }
+        self.hosts = hosts;
+
+        let mut users = Vec::new();
+        for u in scope.get_var("$users").unwrap().iter() {
+            let user = UserDef::parse(&self, &self.scoped, u)?;
+            users.push(user);
+        }
+        self.users = users;
+
+        let mut procs = Vec::new();
+        for p in scope.get_var("$procs").unwrap().iter() {
+            let proc = ProcDef::parse(&self, &self.scoped, p)?;
+            procs.push(proc);
+        }
+        self.procs = procs;
         Ok(())
     }
 
-    /// Resolve each `override` an apply changes to model tree.
+    /// Resolve each `override` and apply changes to model tree.
     fn resolve_overrides(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
-        let model = self;
         for (path, config) in cr.iter() {
             if !config.overrides().is_empty() {
                 let path = if path.as_os_str().is_empty() {
@@ -271,25 +270,34 @@ impl Model {
                 };
 
                 let node_set = path
-                    .apply_ext(model.root(), model.root(), scope.as_ref())
+                    .apply_ext(self.root(), self.root(), scope.as_ref())
                     .map_err_as_cause(|| ModelErrorDetail::Expr)?;
 
                 let current = if let NodeSet::One(n) = node_set {
                     n
                 } else {
-                    warn!(model.logger, "Cannot resolve override to single node, assuming model root. Config path: '{path}'", path=path.to_string(); "verbosity"=> 1);
-                    model.root().clone()
+                    warn!(self.logger, "Cannot resolve override to single node, assuming model root. Config path: '{path}'", path=path.to_string(); "verbosity"=> 1);
+                    self.root().clone()
                 };
 
+                scope.set_func(
+                    LOAD_FILE_FUNC_NAME.into(),
+                    Box::new(LoadFileFunc::new(
+                        self.metadata().path().into(),
+                        current.data().dir().into(),
+                        self.metadata().id(),
+                    )),
+                );
                 for (p, e) in config.overrides().iter() {
                     let res = p
-                        .apply_ext(model.root(), &current, scope.as_ref())
+                        .apply_ext(self.root(), &current, scope.as_ref())
                         .map_err_as_cause(|| ModelErrorDetail::Expr)?;
                     for n in res.into_iter() {
-                        e.apply_ext(model.root(), &n, scope.as_ref())
+                        e.apply_ext(self.root(), &n, scope.as_ref())
                             .map_err_as_cause(|| ModelErrorDetail::Expr)?;
                     }
                 }
+                scope.remove_func(LOAD_FILE_FUNC_NAME);
             }
         }
         Ok(())
@@ -298,17 +306,16 @@ impl Model {
     /// Add `$defines`, `$hosts`, `$users`, `$procs` variables to model scope.
     /// Variables are computed from `Defines` defined in `Manifest`.
     fn set_defines(&mut self, manifest: &Manifest) {
-        let model = self;
         let defs = manifest.defines().to_node();
         if manifest.defines().is_user_defined() {
             defs.data_mut().set_file(Some(&FileInfo::new(
-                &model.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
+                &self.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
                 FileType::File,
                 FileFormat::Toml,
             )));
         }
 
-        let scope_def = model.scoped.scope_def_mut();
+        let scope_def = self.scoped.scope_def_mut();
 
         scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
         scope_def.set_var_def(
@@ -379,6 +386,12 @@ impl Model {
 
     pub fn get_task_path(&self, node_path: &Opath) -> Option<&TaskDef> {
         self.lookup.get_path(self.root(), node_path)
+    }
+
+    pub fn resolve_path<P1, P2>(&self, path: P1, current_dir: P2) -> PathBuf
+    where P1: AsRef<Path>,
+          P2: AsRef<Path>{
+        resolve_model_path(path, current_dir, self.metadata.path())
     }
 
     unsafe fn init(&self) {
@@ -620,19 +633,92 @@ unsafe impl Send for ModelRef {}
 
 unsafe impl Sync for ModelRef {}
 
-/*#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
+/// Resolve path defined in model.
+/// # Arguments
+///
+/// * `path` - path to resolve
+/// * `current_dir` - directory to resolve relative paths
+/// * `model_dir` - absolute path to model directory
+///
+/// # Returns
+/// Absolute path
+///
+/// # Example
+/// ```
+/// use std::path::PathBuf;
+/// use op_model::resolve_model_path;
+///
+/// // path relative to current dir
+/// let p = resolve_model_path("./some_file.yaml", "current_dir", "/abs/path/model_dir");
+/// assert_eq!(PathBuf::from("/abs/path/model_dir/current_dir/some_file.yaml"), p);
+///
+/// // path relative to model_dir
+/// let p = resolve_model_path("some_file.yaml", "current_dir", "/abs/path/model_dir");
+/// assert_eq!(PathBuf::from("/abs/path/model_dir/some_file.yaml"), p);
+///
+/// // absolute path
+/// let p = resolve_model_path("/some/abs/path/some_file.yaml", "current_dir", "/abs/path/model_dir");
+/// assert_eq!(PathBuf::from("/some/abs/path/some_file.yaml"), p);
+/// ```
+pub fn resolve_model_path<P1, P2, P3>(path: P1, current_dir: P2, model_dir: P3) -> PathBuf
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+    P3: AsRef<Path>,
+{
+    const PREFIX: &str = "./";
 
+    if path.as_ref().is_absolute() {
+        path.as_ref().to_owned()
+    } else if path.as_ref().starts_with(PREFIX) {
+        let path = path.as_ref().strip_prefix(PREFIX).unwrap();
+        if current_dir.as_ref().is_absolute() {
+            current_dir.as_ref().join(path)
+        } else {
+            model_dir.as_ref().join(current_dir.as_ref()).join(path)
+        }
+    } else {
+        model_dir.as_ref().join(path.as_ref())
+    }
+}
+
+#[cfg(test)]
+mod tests {
     use super::*;
 
-    #[test]
-    fn read_test() {
-        let mut metadata = Metadata::default();
-        metadata.set_id(Sha1Hash::from_str("e2ed3a7c0d98592fec674d60c7176db66ef7e09b").unwrap());
-        metadata
-            .set_path(PathBuf::from_str("/home/wiktor/Desktop/opereon/resources/model/").unwrap());
-        let model = Model::read_revision(metadata).expect("Cannot read model");
-        eprintln!("model = {}", serde_json::to_string_pretty(&model).unwrap());
+    mod resolve_model_path {
+        use super::*;
+        #[test]
+        fn relative_to_current() {
+            let p = resolve_model_path("./dir/some_file.yaml", "current_dir", "/abs/model_dir");
+            assert_eq!(PathBuf::from("/abs/model_dir/current_dir/dir/some_file.yaml"), p);
+
+            let p = resolve_model_path("./some_file.yaml", "/abs/current_dir", "/model_dir");
+            assert_eq!(PathBuf::from("/abs/current_dir/some_file.yaml"), p);
+
+            let p = resolve_model_path("./../some_file.yaml", "/abs/current_dir", "/model_dir");
+            assert_eq!(PathBuf::from("/abs/current_dir/../some_file.yaml"), p);
+        }
+
+        #[test]
+        fn relative_to_model() {
+            let p = resolve_model_path("dir/some_file.yaml", "whatever", "/abs/model_dir");
+            assert_eq!(PathBuf::from("/abs/model_dir/dir/some_file.yaml"), p);
+
+            let p = resolve_model_path("some_file.yaml", "whatever", "/abs/model_dir");
+            assert_eq!(PathBuf::from("/abs/model_dir/some_file.yaml"), p);
+
+            let p = resolve_model_path("../some_file.yaml", "whatever", "/abs/model_dir");
+            assert_eq!(PathBuf::from("/abs/model_dir/../some_file.yaml"), p);
+
+            let p = resolve_model_path("dir/../some_file.yaml", "whatever", "/abs/model_dir");
+            assert_eq!(PathBuf::from("/abs/model_dir/dir/../some_file.yaml"), p);
+        }
+
+        #[test]
+        fn absolute() {
+            let p = resolve_model_path("/abs/path/some_file.yaml", "whatever", "whatever");
+            assert_eq!(PathBuf::from("/abs/path/some_file.yaml"), p);
+        }
     }
-}*/
+}
