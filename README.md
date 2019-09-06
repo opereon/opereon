@@ -28,6 +28,38 @@ This crate contains code from crates:
 [3]: https://travis-matrix-badges.herokuapp.com/repos/opereon/opereon/branches/master/3
 [4]: https://travis-ci.org/opereon/opereon
 
+## Opereon example environment
+Example model is located in `op-cli/tests/resources/model`.
+To configure opereon example environment:
+
+- add `op` executable to `$PATH`, for example in `.bashrc` add `export PATH="[path_to_opereon_repository]/target/debug:$PATH"`
+- `chmod 600 resources/model/keys/vagrant` - change permissions of private keys used by hosts
+- `cd resources/model && git init && op commit` - initialize model git repository and make initial model commit
+- install `docker` and `docker-compose`
+- execute `./restart-env` to rebuild from scratch and start example hosts.
+- execute `./ssh-into [host] [command]` to connect/execute command via ssh on example hosts. Available hosts - `ares`, `zeus`.
+- execute `./stop-env` to stop and remove example hosts
+- **Important!** Before first use of `op` you have to manually accept example hosts fingerprints. 
+To do this simply execute `./ssh-into [host]` on each hosts and accept fingerprints.
+Hosts are configured to preserve their fingerprints so there is no need to repeat this step in normal circumstances.
+
+## Opereon system tests
+Opereon system tests are implemented as Rust integration tests in `op-cli` crate. 
+They are available when compiled with `system-tests` feature.
+Multi-host environment is simulated by docker containers used also in example environment.
+Each test creates full opereon environment - model dir, and temporary hosts.
+Tests are executed with use of latest `op` executable compilation located in `target/debug/op`.
+
+To run system tests:
+
+- `chmod 600 op-cli/tests/resources/model/keys/vagrant` - change permissions of private keys used by hosts
+- install `docker` and `docker-compose`
+- **Important!** Before running the tests for the first time you have to manually accept test hosts fingerprints.
+To do this simply execute `./ssh-into [host]` on each hosts and accept fingerprints as described in previous section.
+- **Important!** Before running tests make sure that example environment described in previous section is down (script `./stop-env`).
+This is necessary because example and test hosts binds same ssh ports.
+- execute `./system-tests.sh` located in project root to start tests.
+
 ## License
 
 Licensed under either of

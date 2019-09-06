@@ -239,6 +239,8 @@ impl Future for TaskExecOperation {
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
+                // TODO old
+
                 {
                     let s = proc.scope_mut()?;
                     s.set_var("$proc".into(), proc.node().clone().into());

@@ -70,7 +70,8 @@ impl Context {
     }
 
     pub fn exec_op(&self, args: &[&str]) -> CmdOutput {
-        self.exec_cmd("op", args)
+        let op_executable = get_target_dir().join("debug/op");
+        self.exec_cmd(&op_executable.to_str().unwrap(), args)
     }
 
     pub fn exec_ssh(&self, host: &str, args: &[&str]) -> CmdOutput {
@@ -86,18 +87,19 @@ impl Context {
             .to_string_lossy()
             .to_string();
 
-        let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key];
+        let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key, "-o", "batchmode=yes"];
         params.extend_from_slice(args);
 
         self.exec_cmd("ssh", &params)
     }
 
     pub fn exec_cmd(&self, cmd: &str, args: &[&str]) -> CmdOutput {
+//        println!("executing: {} {}", cmd, args.join(" "));
         let out = Command::new(cmd)
             .args(args)
             .current_dir(&self.model_dir)
             .output()
-            .unwrap();
+            .expect("Cannot spawn command!");
 
         let stdout = String::from_utf8_lossy(&out.stdout).to_string();
         let stderr = String::from_utf8_lossy(&out.stderr).to_string();
