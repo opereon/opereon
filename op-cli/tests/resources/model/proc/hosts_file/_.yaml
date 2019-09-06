@@ -25,3 +25,6 @@ updates:
             dst_path: /root/hosts # this should be /etc/hosts but due to docker limitation just copy file to /root/hosts: https://github.com/moby/moby/issues/22281#issuecomment-214336587
             chown: root:root
             chmod: u+rw,g+r,o+r
+        - task: command # because we can't override /etc/hosts, copy content of temporary file. This step can be skipped on non docker hosts
+          scope:
+            cmd: "cat /root/hosts > /etc/hosts"

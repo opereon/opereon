@@ -127,8 +127,7 @@ ff02::2     ip6-allrouters
     let out = ctx.exec_op(&["update"]);
     assert_out!(out);
 
-    // assertion should be for /etc/hosts file but because of docker limitations we cannot copy to /etc/hosts # https://github.com/moby/moby/issues/22281#issuecomment-214336587
-    let out = ctx.exec_ssh("ares", &["cat /root/hosts"]);
+    let out = ctx.exec_ssh("ares", &["cat /etc/hosts"]);
     assert_out!(out);
     assert_eq!(expected_etc_hosts, out.out);
 }
