@@ -9,12 +9,12 @@ build = "build.rs"
 
 [dependencies]
 kg-diag = "0.3.1"
-kg-tree = "0.1.7"
+kg-tree = "0.2.0"
 kg-utils = "0.3.1"
 op-exec = { version = "0.1.1", path = "../op-exec" }
 op-log = {path = "../op-log" }
 structopt = "0.3.0"
-futures = "0.1.28"
+futures = "0.1.29"
 serde = "1.0.99"
 serde_derive = "1.0.99"
 serde_json = "1.0.40"
@@ -23,7 +23,7 @@ toml = "0.5.3"
 uuid = { version = "0.7.4", features = ["serde"] }
 slog = "2.5.2"
 url = "2.1.0"
-chrono = "0.4.7"
+chrono = "0.4.9"
 tokio = "0.1.22"
 
 [features]

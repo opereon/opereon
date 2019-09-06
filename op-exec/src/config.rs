@@ -107,6 +107,7 @@ impl Default for QueueConfig {
 pub struct ModelConfig {
     data_dir: PathBuf,
     cache_limit: usize,
+    diff: NodeDiffOptions,
 }
 
 impl ModelConfig {
@@ -117,6 +118,10 @@ impl ModelConfig {
     pub fn cache_limit(&self) -> usize {
         self.cache_limit
     }
+
+    pub fn diff(&self) -> &NodeDiffOptions {
+        &self.diff
+    }
 }
 
 impl Default for ModelConfig {
@@ -124,6 +129,7 @@ impl Default for ModelConfig {
         ModelConfig {
             data_dir: PathBuf::from("/var/run/opereon/data"),
             cache_limit: 10,
+            diff: NodeDiffOptions::new(true, Some(5), Some(0.1)),
         }
     }
 }

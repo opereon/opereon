@@ -1,4 +1,4 @@
-use kg_tree::diff::ModelDiff;
+use kg_tree::diff::NodeDiff;
 use regex::Regex;
 
 use super::*;
@@ -237,8 +237,8 @@ impl Future for ModelDiffOperation {
         let m1 = e.model_manager_mut().resolve(&self.source)?;
         let m2 = e.model_manager_mut().resolve(&self.target)?;
         let diff = match self.method {
-            DiffMethod::Minimal => ModelDiff::minimal(m1.lock().root(), m2.lock().root()),
-            DiffMethod::Full => ModelDiff::full(m1.lock().root(), m2.lock().root())?,
+            DiffMethod::Minimal => NodeDiff::minimal(m1.lock().root(), m2.lock().root(), e.config().model().diff()),
+            DiffMethod::Full => NodeDiff::full(m1.lock().root(), m2.lock().root(), e.config().model().diff()),
         };
         Ok(Async::Ready(Outcome::NodeSet(
             to_tree(&diff).unwrap().into(),
@@ -308,15 +308,16 @@ impl Future for ModelUpdateOperation {
 
             let mut proc_ops = Vec::new();
             {
-                let (m1, m2) = {
+                let (m1, m2, opts) = {
                     let mut e = self.engine.write();
                     let m1 = e.model_manager_mut().resolve(&self.prev_model)?;
                     let m2 = e.model_manager_mut().resolve(&self.next_model)?;
-                    (m1, m2)
+                    let opts = e.config().model().diff().clone();
+                    (m1, m2, opts)
                 };
                 let model1 = m1.lock();
                 let model2 = m2.lock();
-                let mut update = ModelUpdate::new(&model1, &model2)?;
+                let mut update = ModelUpdate::new(&model1, &model2, &opts)?;
 
                 let exec_dir = Path::new(".op");
 

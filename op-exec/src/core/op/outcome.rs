@@ -7,7 +7,7 @@ use super::*;
 pub enum Outcome {
     Empty,
     NodeSet(NodeSetRef),
-    Diff(ModelDiff),
+    Diff(NodeDiff),
     File(PathBuf),
     Many(Vec<Outcome>),
 }

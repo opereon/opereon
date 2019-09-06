@@ -8,11 +8,11 @@ edition = "2018"
 [dependencies]
 kg-diag = "0.3.1"
 kg-utils = "0.3.1"
-kg-tree = "0.1.7"
+kg-tree = "0.2.0"
 kg-symbol = "0.1.10"
 kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
-kg-diag-derive = "0.3.0"
+kg-diag-derive = "0.3.1"
 slog = "2.5.2"
 libc = "0.2.62"
 walkdir = "2.2.9"
@@ -24,7 +24,7 @@ serde_yaml = "0.8.9"
 toml = "0.5.3"
 uuid = { version = "0.7.4", features = ["serde", "v1", "v3", "v4", "v5"] }
 heapsize = "0.4.2"
-chrono = { version = "0.4.7", features = ["serde"] }
+chrono = { version = "0.4.9", features = ["serde"] }
 users = "0.9.1"
 git2 = "0.10.0"
 parking_lot = "0.9.0"

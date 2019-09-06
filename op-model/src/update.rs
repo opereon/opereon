@@ -5,7 +5,7 @@ use super::*;
 #[derive(Debug)]
 pub struct ModelUpdate<'a> {
     cache: NodePathCache,
-    model_diff: ModelDiff,
+    model_diff: NodeDiff,
     file_diff: FileDiff,
     matcher1_r: NodePathMatcher,
     matcher2_a: NodePathMatcher,
@@ -15,10 +15,9 @@ pub struct ModelUpdate<'a> {
 }
 
 impl<'a> ModelUpdate<'a> {
-    pub fn new(model1: &'a Model, model2: &'a Model) -> ModelResult<ModelUpdate<'a>> {
+    pub fn new(model1: &'a Model, model2: &'a Model, opts: &NodeDiffOptions) -> ModelResult<ModelUpdate<'a>> {
         let mut cache = NodePathCache::new();
-        let model_diff = ModelDiff::full_cache(model1.root(), model2.root(), &mut cache)
-            .map_err_as_cause(|| ModelErrorDetail::ModelDiff)?;
+        let model_diff = NodeDiff::full_cache(model1.root(), model2.root(), opts, &mut cache);
         let file_diff = FileDiff::minimal(model1, model2);
         let update = ModelUpdate {
             cache,
@@ -33,14 +32,14 @@ impl<'a> ModelUpdate<'a> {
         Ok(update)
     }
 
-    pub fn model_diff(&self) -> &ModelDiff {
+    pub fn model_diff(&self) -> &NodeDiff {
         &self.model_diff
     }
 
     pub fn check_updater(
         &mut self,
         u: &ProcDef,
-    ) -> ModelResult<(Vec<&ModelChange>, Vec<&FileChange>)> {
+    ) -> ModelResult<(Vec<&NodeChange>, Vec<&FileChange>)> {
         debug_assert!(u.kind() == ProcKind::Update);
 
         self.matcher1_r.clear();
@@ -88,7 +87,7 @@ impl<'a> ModelUpdate<'a> {
                         model_changes.push(c)
                     }
                 }
-                ChangeKind::Renamed => unreachable!(),
+                ChangeKind::Moved => unreachable!(),
             }
         }
 
@@ -100,7 +99,7 @@ impl<'a> ModelUpdate<'a> {
         let updated_watches: Vec<&FileWatch> =
             fw.iter().filter(|w| w.mask().has_updated()).collect();
         let renamed_watches: Vec<&FileWatch> =
-            fw.iter().filter(|w| w.mask().has_renamed()).collect();
+            fw.iter().filter(|w| w.mask().has_moved()).collect();
 
         let mut file_changes = Vec::new();
         for c in self.file_diff.changes().iter() {
@@ -129,7 +128,7 @@ impl<'a> ModelUpdate<'a> {
                             file_changes.push(c);
                         });
                 }
-                ChangeKind::Renamed => {
+                ChangeKind::Moved => {
                     renamed_watches
                         .iter()
                         .filter(|w| w.glob().compile_matcher().is_match(c.old_path().unwrap()))
@@ -149,7 +148,7 @@ fn delta_to_change_kind(delta: git2::Delta) -> ChangeKind {
         Delta::Added => ChangeKind::Added,
         Delta::Deleted => ChangeKind::Removed,
         Delta::Modified => ChangeKind::Updated,
-        Delta::Renamed => ChangeKind::Renamed,
+        Delta::Renamed => ChangeKind::Moved,
         _ => panic!("Unsupported"),
     }
 }
