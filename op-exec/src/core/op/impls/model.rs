@@ -237,8 +237,16 @@ impl Future for ModelDiffOperation {
         let m1 = e.model_manager_mut().resolve(&self.source)?;
         let m2 = e.model_manager_mut().resolve(&self.target)?;
         let diff = match self.method {
-            DiffMethod::Minimal => NodeDiff::minimal(m1.lock().root(), m2.lock().root(), e.config().model().diff()),
-            DiffMethod::Full => NodeDiff::full(m1.lock().root(), m2.lock().root(), e.config().model().diff()),
+            DiffMethod::Minimal => NodeDiff::minimal(
+                m1.lock().root(),
+                m2.lock().root(),
+                e.config().model().diff(),
+            ),
+            DiffMethod::Full => NodeDiff::full(
+                m1.lock().root(),
+                m2.lock().root(),
+                e.config().model().diff(),
+            ),
         };
         Ok(Async::Ready(Outcome::NodeSet(
             to_tree(&diff).unwrap().into(),
@@ -360,7 +368,7 @@ impl Future for ModelUpdateOperation {
                             args.set_arg("$old".into(), &model1.root().clone().into());
 
                             let mut e = ProcExec::with_args(Utc::now(), args.build());
-                            e.prepare(&model2, p, exec_dir)?;
+                            e.prepare(&model2, p, exec_dir, &self.logger)?;
                             e.store()?;
 
                             let op: OperationRef = Context::ProcExec {
@@ -466,7 +474,7 @@ impl Future for ModelCheckOperation {
                         let id = p.id();
                         if filter_re.is_none() || filter_re.as_ref().unwrap().is_match(id) {
                             let mut e = ProcExec::new(Utc::now());
-                            e.prepare(&model, p, exec_dir)?;
+                            e.prepare(&model, p, exec_dir, &self.logger)?;
                             e.store()?;
 
                             let proc_op: OperationRef = Context::ProcExec {
@@ -587,7 +595,7 @@ impl Future for ModelProbeOperation {
                             );
 
                             let mut e = ProcExec::with_args(Utc::now(), args);
-                            e.prepare(&model, p, exec_dir)?;
+                            e.prepare(&model, p, exec_dir, &self.logger)?;
                             e.store()?;
 
                             let proc_op: OperationRef = Context::ProcExec {

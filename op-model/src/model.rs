@@ -389,8 +389,10 @@ impl Model {
     }
 
     pub fn resolve_path<P1, P2>(&self, path: P1, current_dir: P2) -> PathBuf
-    where P1: AsRef<Path>,
-          P2: AsRef<Path>{
+    where
+        P1: AsRef<Path>,
+        P2: AsRef<Path>,
+    {
         resolve_model_path(path, current_dir, self.metadata.path())
     }
 
@@ -691,7 +693,10 @@ mod tests {
         #[test]
         fn relative_to_current() {
             let p = resolve_model_path("./dir/some_file.yaml", "current_dir", "/abs/model_dir");
-            assert_eq!(PathBuf::from("/abs/model_dir/current_dir/dir/some_file.yaml"), p);
+            assert_eq!(
+                PathBuf::from("/abs/model_dir/current_dir/dir/some_file.yaml"),
+                p
+            );
 
             let p = resolve_model_path("./some_file.yaml", "/abs/current_dir", "/model_dir");
             assert_eq!(PathBuf::from("/abs/current_dir/some_file.yaml"), p);

@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::*;
+use slog::Logger;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcExec {
@@ -58,8 +59,13 @@ impl ProcExec {
         dir_name
     }
 
-    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path) -> ProtoResult<()> {
+    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path, logger: &Logger) -> ProtoResult<()> {
         let p = proc_exec_dir.join(self.get_proc_exec_dir_name());
+        debug!(
+            logger,
+            "Creating procedure execution dir: '{proc_exec_dir}'",
+            proc_exec_dir = proc_exec_dir.display()
+        );
         debug_assert!(!p.exists());
         fs::create_dir_all(&p)
             .into_diag_res()
@@ -73,6 +79,7 @@ impl ProcExec {
         model: &Model,
         proc: &ProcDef,
         proc_exec_dir: &Path,
+        logger: &Logger,
     ) -> ProtoResult<()> {
         self.name = proc.id().to_string();
         self.label = proc.label().to_string();
@@ -86,17 +93,16 @@ impl ProcExec {
         self.args.resolve(proc.root(), proc.node(), scope)?;
 
         if proc_exec_dir.is_absolute() {
-            self.create_proc_exec_dir(proc_exec_dir)?;
+            self.create_proc_exec_dir(proc_exec_dir, logger)?;
         } else {
-            self.create_proc_exec_dir(&model.metadata().path().join(proc_exec_dir))?;
+            self.create_proc_exec_dir(&model.metadata().path().join(proc_exec_dir), logger)?;
         }
-
         for s in proc.run().steps().iter() {
             let hosts = s.resolve_hosts(model, proc)?;
-            // TODO ws log warning when hosts.is_empty()
+            if hosts.is_empty() {
+                warn!(logger, "Procedure '{name}', label: '{label}' will not be executed, there is no target hosts!", name=&self.name, label=&self.label; "verbosity" => 0);
+            }
             for host in hosts {
-                //                eprintln!("s = {:?}", s.index());
-                //                eprintln!("host.hostname() = {:?}", host.hostname());
                 let step = StepExec::create(model, proc, s, &host, self)
                     .map_err_as_cause(|| ProtoErrorDetail::StepExecCreate)?;
                 self.add_step(step);

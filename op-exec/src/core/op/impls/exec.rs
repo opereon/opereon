@@ -291,7 +291,7 @@ impl Future for TaskExecOperation {
 
                         let exec_dir = Path::new(".op");
                         let mut e = ProcExec::with_args(Utc::now(), args.build());
-                        e.prepare(&curr_model, p, exec_dir)?;
+                        e.prepare(&curr_model, p, exec_dir, &self.logger)?;
                         e.store()?;
 
                         let op: OperationRef = Context::ProcExec {
@@ -333,7 +333,7 @@ impl Future for TaskExecOperation {
                             let exec_dir = Path::new(".op");
                             let mut e = ProcExec::with_args(Utc::now(), args.build());
 
-                            e.prepare(&curr_model, p, exec_dir)?;
+                            e.prepare(&curr_model, p, exec_dir, &self.logger)?;
                             e.store()?;
 
                             let op: OperationRef = Context::ProcExec {

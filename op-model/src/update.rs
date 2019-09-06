@@ -15,7 +15,11 @@ pub struct ModelUpdate<'a> {
 }
 
 impl<'a> ModelUpdate<'a> {
-    pub fn new(model1: &'a Model, model2: &'a Model, opts: &NodeDiffOptions) -> ModelResult<ModelUpdate<'a>> {
+    pub fn new(
+        model1: &'a Model,
+        model2: &'a Model,
+        opts: &NodeDiffOptions,
+    ) -> ModelResult<ModelUpdate<'a>> {
         let mut cache = NodePathCache::new();
         let model_diff = NodeDiff::full_cache(model1.root(), model2.root(), opts, &mut cache);
         let file_diff = FileDiff::minimal(model1, model2);
@@ -98,8 +102,7 @@ impl<'a> ModelUpdate<'a> {
         let added_watches: Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_added()).collect();
         let updated_watches: Vec<&FileWatch> =
             fw.iter().filter(|w| w.mask().has_updated()).collect();
-        let renamed_watches: Vec<&FileWatch> =
-            fw.iter().filter(|w| w.mask().has_moved()).collect();
+        let renamed_watches: Vec<&FileWatch> = fw.iter().filter(|w| w.mask().has_moved()).collect();
 
         let mut file_changes = Vec::new();
         for c in self.file_diff.changes().iter() {
