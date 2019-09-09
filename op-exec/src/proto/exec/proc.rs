@@ -116,6 +116,10 @@ impl ProcExec {
         self.run.add_step(step);
     }
 
+    pub fn set_prev_model(&mut self, prev_model: Option<ModelPath>) {
+        self.prev_model = prev_model;
+    }
+
     pub fn store(&self) -> ProtoResult<()> {
         for s in self.run.steps().iter() {
             s.store()?;
