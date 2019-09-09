@@ -139,14 +139,14 @@ impl ModelManager {
     }
 
     /// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
-        Self::init_git_repo(&path).map_err_as_cause(|| InitRepo {
+    pub fn init_model<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
+        self.init_git_repo(&path).map_err_as_cause(|| InitRepo {
             path: path.as_ref().to_string_lossy().to_string(),
         })?;
-        Self::init_manifest(&path).map_err_as_cause(|| InitManifest {
+        self.init_manifest(&path).map_err_as_cause(|| InitManifest {
             path: path.as_ref().to_string_lossy().to_string(),
         })?;
-        Self::init_operc(&path).map_err_as_cause(|| InitOperc {
+        self.init_operc(&path).map_err_as_cause(|| InitOperc {
             path: path.as_ref().to_string_lossy().to_string(),
         })?;
         Ok(())
@@ -195,7 +195,12 @@ impl ModelManager {
         self.get(oid.into())
     }
 
-    fn init_git_repo<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
+    fn init_git_repo<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
+        let repo_path = path.as_ref().join(".git");
+        if repo_path.exists() {
+            info!(self.logger, "Git repository ('{repo}') already exists, skipping...", repo=repo_path.display(); "verbosity"=>1);
+            return Ok(())
+        }
         use std::fmt::Write;
         let mut opts = RepositoryInitOptions::new();
         opts.no_reinit(true);
@@ -215,8 +220,13 @@ impl ModelManager {
         Ok(())
     }
 
-    fn init_manifest<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
-        let manifest_path = path.as_ref().join(PathBuf::from("op.toml"));
+    fn init_manifest<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
+        let manifest_path = path.as_ref().join("op.toml");
+        if manifest_path.exists() {
+            info!(self.logger, "Manifest file ('{manifest}') already exists, skipping...", manifest=manifest_path.display(); "verbosity"=>1);
+            return Ok(())
+        }
+
         // language=toml
         let default_manifest = r#"
 [info]
@@ -227,14 +237,20 @@ description = "Opereon model"
         Ok(())
     }
 
-    fn init_operc<P: AsRef<Path>>(path: P) -> ModelManagerResult<()> {
-        let manifest_path = path.as_ref().join(PathBuf::from(".operc"));
+    fn init_operc<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
+        let operc_path = path.as_ref().join(PathBuf::from(".operc"));
+
+        if operc_path.exists() {
+            info!(self.logger, "Config file ('{config}') already exists, skipping...", config=operc_path.display(); "verbosity"=>1);
+            return Ok(())
+        }
+
         // language=toml
         let default_operc = r#"
 [[exclude]]
 path = ".op"
 "#;
-        fs::write(manifest_path, default_operc)?;
+        fs::write(operc_path, default_operc)?;
         Ok(())
     }
 

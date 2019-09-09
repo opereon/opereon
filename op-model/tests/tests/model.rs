@@ -5,9 +5,6 @@ use op_model::DefsErrorDetail;
 use op_model::{GitErrorDetail, Metadata, Model, ModelErrorDetail, ModelErrorDetail::*};
 use slog::{o, Logger};
 
-fn discard_logger() -> Logger {
-    Logger::root(slog::Discard, o!())
-}
 
 #[test]
 fn load_manifest() {
@@ -81,7 +78,7 @@ fn read_cr_err_no_repo() {
     let mut meta = Metadata::default();
     meta.set_path(dir.clone());
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigRead{..});
     let _cause = assert_cause!(err, GitErrorDetail);
@@ -114,7 +111,7 @@ mapping = "$.find(array($item.@file_path_components[:-2]).join('.', '\"')).exten
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolve{..});
 
@@ -148,7 +145,7 @@ mapping = "unknownFunc()"
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, IncludesResolve{..});
     let _cause = assert_cause!(err, ModelErrorDetail);
@@ -174,7 +171,7 @@ path = "_default.*"
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolve{..});
     let _cause = assert_cause!(err, ModelErrorDetail);
@@ -200,7 +197,7 @@ path = "_default.*"
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, OverridesResolve{..});
     let _cause = assert_cause!(err, ModelErrorDetail);
@@ -222,7 +219,7 @@ username: <% unknownFunc(@) %>
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, InterpolationsResolve);
     let _cause = assert_cause!(err, FuncCallErrorDetail);
@@ -252,7 +249,7 @@ hostname: some.hostname
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
     let _cause = assert_cause!(err, DefsErrorDetail);
@@ -278,7 +275,7 @@ some_prop: "value"
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
     let _cause = assert_cause!(err, DefsErrorDetail);
@@ -302,7 +299,7 @@ updates:
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let res = Model::read_revision(meta, discard_logger());
+    let res = Model::read_revision(meta, discard_logger!());
 
     let (err, _detail) = assert_detail!(res, ModelErrorDetail, DefsParse{..});
     let _cause = assert_cause!(err, DefsErrorDetail);
@@ -319,7 +316,7 @@ fn read() {
     meta.set_path(dir.clone());
     meta.set_id(commit);
 
-    let model = Model::read_revision(meta, discard_logger()).unwrap_disp();
+    let model = Model::read_revision(meta, discard_logger!()).unwrap_disp();
 
     assert_eq!(1, model.hosts().len());
     assert_eq!("fedora.domain.com", model.hosts()[0].hostname());

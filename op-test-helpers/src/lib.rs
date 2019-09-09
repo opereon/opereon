@@ -12,6 +12,13 @@ pub use node::*;
 pub use copy_dir;
 
 #[macro_export]
+macro_rules! discard_logger {
+    () => {
+        slog::Logger::root(slog::Discard, slog::o!())
+    };
+}
+
+#[macro_export]
 macro_rules! write_file {
     ($path: expr, $content:expr) => {{
         use std::io::Write;

@@ -34,7 +34,7 @@ To configure opereon example environment:
 
 - add `op` executable to `$PATH`, for example in `.bashrc` add `export PATH="[path_to_opereon_repository]/target/debug:$PATH"`
 - `chmod 600 resources/model/keys/vagrant` - change permissions of private keys used by hosts
-- `cd resources/model && git init && op commit` - initialize model git repository and make initial model commit
+- `cd resources/model && op init && op commit` - initialize model git repository and make initial model commit
 - install `docker` and `docker-compose`
 - execute `./restart-env` to rebuild from scratch and start example hosts.
 - execute `./ssh-into [host] [command]` to connect/execute command via ssh on example hosts. Available hosts - `ares`, `zeus`.
