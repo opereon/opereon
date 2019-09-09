@@ -6,3 +6,5 @@
 
 /.vscode/
 .history/
+/rust-doc-parser/.idea
+/rust-doc-parser/target
