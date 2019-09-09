@@ -249,6 +249,18 @@ impl Future for TaskExecOperation {
                         None => to_tree(step_exec.host()).unwrap(),
                     };
                     s.set_var("$host".into(), host.into());
+
+                    if let Some(old) =  proc_exec.prev_model() {
+                        let old_model = self
+                            .engine
+                            .write()
+                            .model_manager_mut()
+                            .resolve(old)?;
+
+                        let old_model = old_model.lock().root().clone();
+
+                        s.set_var("$old".into(), old_model.into());
+                    }
                 }
                 {
                     let s = task.scope_mut()?;

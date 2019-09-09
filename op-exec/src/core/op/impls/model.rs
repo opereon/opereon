@@ -366,9 +366,8 @@ impl Future for ModelUpdateOperation {
                                         .into(),
                                 );
                             }
-                            args.set_arg("$old".into(), &model1.root().clone().into());
-
                             let mut e = ProcExec::with_args(Utc::now(), args.build());
+                            e.set_prev_model(Some(model1.metadata().id().into()));
                             e.prepare(&model2, p, exec_dir, &self.logger)?;
                             e.store()?;
 

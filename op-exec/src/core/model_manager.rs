@@ -41,6 +41,12 @@ impl std::str::FromStr for ModelPath {
     }
 }
 
+impl std::convert::From<Sha1Hash> for ModelPath {
+    fn from(oid: Sha1Hash) -> Self {
+        ModelPath::Revision(oid.to_string())
+    }
+}
+
 impl slog::Value for ModelPath {
     fn serialize(&self, _record: &Record, key: Key, serializer: &mut dyn Serializer) -> SlogResult {
         serializer.emit_str(key, &format!("{}", &self))
