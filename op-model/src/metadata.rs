@@ -5,6 +5,7 @@ use std::str::FromStr;
 use serde::{de, ser};
 
 use super::*;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sha1HashParseError {
@@ -172,6 +173,7 @@ pub struct Metadata {
     path: PathBuf,
     user: User,
     timestamp: DateTime<Utc>,
+    files: Vec<FileInfo>,
 }
 
 impl Metadata {
