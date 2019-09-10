@@ -123,7 +123,12 @@ impl RemoteCommandOperation {
     fn start_polling(&mut self) -> Poll<Outcome, RuntimeError> {
         self.hosts = self.resolve_hosts()?;
         let mut futs = Vec::with_capacity(self.hosts.len());
-        info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
+        {
+            let hosts = format!("{:#?}", self.hosts);
+            op_info!(1, "Executing command [{}] on hosts: \n{}", self.command, hosts);
+            info!(self.logger, "Executing command"; "command"=>self.command.clone(), "hosts"=> hosts);
+        }
+
         for host in &self.hosts {
             // FIXME ssh_session_cache_mut().get(..) is blocking call, should be implemented as Future
             match self
@@ -161,14 +166,14 @@ impl RemoteCommandOperation {
             .zip(self.futures.lock().unwrap().iter_mut())
             .map(|(host, (_, result))| (host.hostname().to_string(), result.take().unwrap()))
             .collect();
-        info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
+        op_info!(0, "Finished executing command on remote hosts!");
         for (h, out) in res.iter() {
             match out {
                 Ok(out) => {
-                    info!(self.logger, "================Host [{host}]================\n{out}", host=h, out=out; "verbosity" => 0);
+                    op_info!(0, "================Host [{host}]================\n{out}", host=h, out=out);
                 }
                 Err(err) => {
-                    info!(self.logger, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=format!("{}", err); "verbosity" => 0);
+                    op_info!(0, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=err.to_string());
                 }
             }
         }
