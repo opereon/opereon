@@ -1,166 +1,5 @@
 use super::*;
-use kg_diag::io::ResultExt;
-use slog::Logger;
 
-fn cleanup_resources(engine: &EngineRef, resource_id: Uuid) {
-    engine.write().resource_manager_mut().remove(resource_id);
-}
-
-#[derive(Debug)]
-pub struct ProcExecOperation {
-    operation: OperationRef,
-    engine: EngineRef,
-    op: OperationExec,
-    logger: Logger,
-}
-
-unsafe impl Sync for ProcExecOperation {}
-
-unsafe impl Send for ProcExecOperation {}
-
-impl ProcExecOperation {
-    pub fn new(
-        operation: OperationRef,
-        engine: EngineRef,
-        exec_path: &Path,
-    ) -> RuntimeResult<ProcExecOperation> {
-        let label = operation.read().label().to_string();
-        let logger = engine.read().logger().new(o!(
-            "label"=> label,
-            "exec_path" => format!("{}", exec_path.display()),
-        ));
-        let exec = engine.write().exec_manager_mut().get(exec_path)?;
-        let steps = {
-            let exec = exec.lock();
-
-            info!(logger, "Executing exec: [{name}] in [{path}]", name=exec.name(), path=exec_path.display(); "verbosity"=>1);
-            //            println!("{}: executing in {}", exec.name(), exec_path.display());
-
-            let mut steps = Vec::with_capacity(exec.run().steps().len());
-            for i in 0..exec.run().steps().len() {
-                let op: OperationRef = Context::StepExec {
-                    exec_path: exec_path.to_path_buf(),
-                    step_index: i,
-                }
-                .into();
-                steps.push(op);
-            }
-            steps
-        };
-
-        let op: OperationRef = Context::Sequence(steps).into();
-        let op = engine.enqueue_operation(op, false)?.into_exec();
-
-        Ok(ProcExecOperation {
-            operation,
-            engine,
-            op,
-            logger,
-        })
-    }
-}
-
-impl Future for ProcExecOperation {
-    type Item = Outcome;
-    type Error = RuntimeError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress(p);
-        }
-        if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
-            cleanup_resources(&self.engine, self.operation.read().id());
-            Ok(Async::Ready(outcome))
-        } else {
-            Ok(Async::NotReady)
-        }
-    }
-}
-
-impl OperationImpl for ProcExecOperation {
-    fn init(&mut self) -> RuntimeResult<()> {
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct StepExecOperation {
-    operation: OperationRef,
-    engine: EngineRef,
-    op: OperationExec,
-    logger: Logger,
-}
-
-impl StepExecOperation {
-    pub fn new(
-        operation: OperationRef,
-        engine: EngineRef,
-        exec_path: &Path,
-        step_index: usize,
-    ) -> RuntimeResult<StepExecOperation> {
-        let proc_exec = engine.write().exec_manager_mut().get(exec_path)?;
-
-        let label = operation.read().label().to_string();
-        let logger = engine.read().logger().new(o!(
-            "label"=> label,
-            "exec_path" => format!("{}", exec_path.display()),
-        ));
-
-        let tasks = {
-            let proc_exec = proc_exec.lock();
-            let step_exec = &proc_exec.run().steps()[step_index];
-
-            info!(logger, "Executing step on [{host}] in [{path}]", host=format!("{}",step_exec.host()), path=step_exec.path().display(); "verbosity"=>1);
-
-            let mut tasks = Vec::with_capacity(step_exec.tasks().len());
-
-            for i in 0..step_exec.tasks().len() {
-                let op: OperationRef = Context::TaskExec {
-                    exec_path: exec_path.to_owned(),
-                    step_index,
-                    task_index: i,
-                }
-                .into();
-                tasks.push(op);
-            }
-
-            tasks
-        };
-
-        let op: OperationRef = Context::Sequence(tasks).into();
-        let op = engine.enqueue_operation(op, false)?.into_exec();
-
-        Ok(StepExecOperation {
-            operation,
-            engine,
-            op,
-            logger,
-        })
-    }
-}
-
-impl Future for StepExecOperation {
-    type Item = Outcome;
-    type Error = RuntimeError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Async::Ready(Some(p)) = self.op.progress_mut().poll()? {
-            self.operation.write().update_progress(p);
-        }
-        if let Async::Ready(outcome) = self.op.outcome_mut().poll()? {
-            cleanup_resources(&self.engine, self.operation.read().id());
-            Ok(Async::Ready(outcome))
-        } else {
-            Ok(Async::NotReady)
-        }
-    }
-}
-
-impl OperationImpl for StepExecOperation {
-    fn init(&mut self) -> RuntimeResult<()> {
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 pub struct TaskExecOperation {
@@ -239,8 +78,6 @@ impl Future for TaskExecOperation {
                 let proc = curr_model.get_proc_path(proc_exec.proc_path()).unwrap();
                 let task = curr_model.get_task_path(task_exec.task_path()).unwrap();
 
-                // TODO old
-
                 {
                     let s = proc.scope_mut()?;
                     s.set_var("$proc".into(), proc.node().clone().into());
@@ -281,7 +118,6 @@ impl Future for TaskExecOperation {
                         .info(log_path, OpType::Write, FileType::File)
                         .into_diag_res()?,
                 );
-
                 info!(self.logger, "Executing task [{exec_name}] on host [{host}] ...", host=format!("{}", step_exec.host()), exec_name=task_exec.name(); "verbosity"=>1);
 
                 let scope = task.scope()?;
@@ -311,7 +147,7 @@ impl Future for TaskExecOperation {
                         let op: OperationRef = Context::ProcExec {
                             exec_path: e.path().to_path_buf(),
                         }
-                        .into();
+                            .into();
                         self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                         return self.poll();
                     }
@@ -353,7 +189,7 @@ impl Future for TaskExecOperation {
                             let op: OperationRef = Context::ProcExec {
                                 exec_path: e.path().to_path_buf(),
                             }
-                            .into();
+                                .into();
                             self.proc_op =
                                 Some(self.engine.enqueue_operation(op, false)?.into_exec());
                             return self.poll();
@@ -428,7 +264,7 @@ impl Future for TaskExecOperation {
                             chmod,
                             host: step_exec.host().clone(),
                         }
-                        .into();
+                            .into();
                         op.write().set_output(output);
                         self.proc_op = Some(self.engine.enqueue_operation(op, false)?.into_exec());
                         return self.poll();
@@ -461,7 +297,6 @@ impl Future for TaskExecOperation {
                       result = format!("{}", result);
                       "verbosity" => 0
                 );
-                //                print!("{}: {}: result: {}", step_exec.host(), task_exec, result);
 
                 if let Some(out) = task.output() {
                     if let Outcome::NodeSet(ref ns) = *result.outcome() {
@@ -477,7 +312,6 @@ impl Future for TaskExecOperation {
                 result
             };
 
-            cleanup_resources(&self.engine, self.operation.read().id());
             Ok(Async::Ready(result.into_outcome()))
         }
     }

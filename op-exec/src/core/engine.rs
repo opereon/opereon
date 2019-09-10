@@ -11,7 +11,6 @@ pub struct Engine {
     config: ConfigRef,
     model_manager: ModelManager,
     exec_manager: ExecManager,
-    resource_manager: ResourceManager,
     ssh_session_cache: SshSessionCache,
     operation_queue1: VecDeque<OperationTask>,
     operation_queue2: VecDeque<OperationTask>,
@@ -25,14 +24,12 @@ impl Engine {
     pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> Engine {
         let model_manager = ModelManager::new(model_dir, config.clone(), logger.clone());
         let exec_manager = ExecManager::new(config.clone());
-        let resource_manager = ResourceManager::new();
         let ssh_session_cache = SshSessionCache::new(config.clone());
 
         Engine {
             config,
             model_manager,
             exec_manager,
-            resource_manager,
             ssh_session_cache,
             operation_queue1: VecDeque::new(),
             operation_queue2: VecDeque::new(),
@@ -61,14 +58,6 @@ impl Engine {
 
     pub fn exec_manager_mut(&mut self) -> &mut ExecManager {
         &mut self.exec_manager
-    }
-
-    pub fn resource_manager(&self) -> &ResourceManager {
-        &self.resource_manager
-    }
-
-    pub fn resource_manager_mut(&mut self) -> &mut ResourceManager {
-        &mut self.resource_manager
     }
 
     pub fn ssh_session_cache(&self) -> &SshSessionCache {
