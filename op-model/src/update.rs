@@ -7,11 +7,13 @@ pub struct ModelUpdate<'a> {
     cache: NodePathCache,
     model_diff: NodeDiff,
     file_diff: FileDiff,
-    matcher1_r: NodePathMatcher,
-    matcher2_a: NodePathMatcher,
-    matcher2_u: NodePathMatcher,
     model1: &'a Model,
     model2: &'a Model,
+    matcher1_r: NodePathMatcher,
+    matcher1_m: NodePathMatcher,
+    matcher2_a: NodePathMatcher,
+    matcher2_u: NodePathMatcher,
+    matcher2_m: NodePathMatcher,
 }
 
 impl<'a> ModelUpdate<'a> {
@@ -21,17 +23,19 @@ impl<'a> ModelUpdate<'a> {
         opts: &NodeDiffOptions,
     ) -> ModelResult<ModelUpdate<'a>> {
         let mut cache = NodePathCache::new();
-        let model_diff = NodeDiff::full_cache(model1.root(), model2.root(), opts, &mut cache);
+        let model_diff = NodeDiff::minimal_cache(model1.root(), model2.root(), opts, &mut cache);
         let file_diff = FileDiff::minimal(model1, model2);
         let update = ModelUpdate {
             cache,
             model_diff,
             file_diff,
-            matcher1_r: NodePathMatcher::new(),
-            matcher2_a: NodePathMatcher::new(),
-            matcher2_u: NodePathMatcher::new(),
             model1,
             model2,
+            matcher1_r: NodePathMatcher::new(),
+            matcher1_m: NodePathMatcher::new(),
+            matcher2_a: NodePathMatcher::new(),
+            matcher2_u: NodePathMatcher::new(),
+            matcher2_m: NodePathMatcher::new(),
         };
         Ok(update)
     }
@@ -40,20 +44,26 @@ impl<'a> ModelUpdate<'a> {
         &self.model_diff
     }
 
+    pub fn file_diff(&self) -> &FileDiff {
+        &self.file_diff
+    }
+
     pub fn check_updater(
         &mut self,
         u: &ProcDef,
     ) -> ModelResult<(Vec<&NodeChange>, Vec<&FileChange>)> {
         debug_assert!(u.kind() == ProcKind::Update);
 
-        self.matcher1_r.clear();
-        self.matcher2_a.clear();
-        self.matcher2_u.clear();
-
         let root1 = self.model1.root();
         let scope1 = self.model1.scope()?;
         let root2 = self.model2.root();
         let scope2 = self.model2.scope()?;
+
+        self.matcher1_r.clear();
+        self.matcher1_m.clear();
+        self.matcher2_a.clear();
+        self.matcher2_u.clear();
+        self.matcher2_m.clear();
 
         for mw in u.model_watches().iter() {
             if mw.mask().has_removed() {
@@ -71,27 +81,40 @@ impl<'a> ModelUpdate<'a> {
                     .resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache)
                     .map_err_as_cause(|| ModelErrorDetail::Expr)?;
             }
+            if mw.mask().has_moved() {
+                self.matcher1_m
+                    .resolve_ext_cache(mw.path(), root1, root1, &scope1, &mut self.cache)
+                    .map_err_as_cause(|| ModelErrorDetail::Expr)?;
+                self.matcher2_m
+                    .resolve_ext_cache(mw.path(), root2, root2, &scope2, &mut self.cache)
+                    .map_err_as_cause(|| ModelErrorDetail::Expr)?;
+            }
         }
 
         let mut model_changes = Vec::new();
         for c in self.model_diff.changes().iter() {
             match c.kind() {
                 ChangeKind::Removed => {
-                    if self.matcher1_r.matches(c.path()) {
+                    if self.matcher1_r.matches(c.old_path().unwrap()) {
                         model_changes.push(c)
                     }
                 }
                 ChangeKind::Added => {
-                    if self.matcher2_a.matches(c.path()) {
+                    if self.matcher2_a.matches(c.new_path().unwrap()) {
                         model_changes.push(c)
                     }
                 }
                 ChangeKind::Updated => {
-                    if self.matcher2_u.matches(c.path()) {
+                    if self.matcher2_u.matches(c.new_path().unwrap()) {
                         model_changes.push(c)
                     }
                 }
-                ChangeKind::Moved => unreachable!(),
+                ChangeKind::Moved => {
+                    if self.matcher1_m.matches(c.old_path().unwrap())
+                        || self.matcher2_m.matches(c.new_path().unwrap()) {
+                        model_changes.push(c)
+                    }
+                },
             }
         }
 
@@ -160,7 +183,9 @@ fn delta_to_change_kind(delta: git2::Delta) -> ChangeKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileChange {
     kind: ChangeKind,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     old_path: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     new_path: Option<PathBuf>,
 }
 
