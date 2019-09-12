@@ -11,30 +11,30 @@ pub enum Context {
     },
     ModelCommit(String),
     ModelQuery {
-        model: ModelPath,
+        model: RevPath,
         expr: String,
     },
     ModelTest {
-        model: ModelPath,
+        model: RevPath,
     },
     ModelDiff {
-        prev_model: ModelPath,
-        next_model: ModelPath,
+        prev_model: RevPath,
+        next_model: RevPath,
         method: DiffMethod,
     },
     ModelUpdate {
-        prev_model: ModelPath,
-        next_model: ModelPath,
+        prev_model: RevPath,
+        next_model: RevPath,
         dry_run: bool,
     },
     ModelCheck {
-        model: ModelPath,
+        model: RevPath,
         filter: Option<String>,
         dry_run: bool,
     },
     ModelProbe {
         ssh_dest: SshDest,
-        model: ModelPath,
+        model: RevPath,
         filter: Option<String>,
         args: Vec<(String, String)>,
     },
@@ -61,7 +61,7 @@ pub enum Context {
     RemoteExec {
         expr: String,
         command: String,
-        model_path: ModelPath,
+        model_path: RevPath,
     },
     Sequence(Vec<OperationRef>),
     Parallel(Vec<OperationRef>),

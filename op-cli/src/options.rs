@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use structopt::clap::AppSettings;
 
 use display::DisplayFormat;
-use op_exec::{DiffMethod, ModelPath};
+use op_exec::{DiffMethod, RevPath};
 
 use super::*;
 
@@ -100,7 +100,7 @@ pub enum Command {
         format: DisplayFormat,
         /// Model path, defaults to current working directory
         #[structopt(short = "m", long = "model", default_value = "@")]
-        model: ModelPath,
+        model: RevPath,
         /// Query expression
         #[structopt(name = "OPATH")]
         expr: String,
@@ -122,7 +122,7 @@ pub enum Command {
         format: DisplayFormat,
         /// Model path, defaults to current working directory
         #[structopt(name = "MODEL", default_value = "@")]
-        model: ModelPath,
+        model: RevPath,
     },
     /// Compare two model versions
     #[structopt(
@@ -150,10 +150,10 @@ pub enum Command {
         method: DiffMethod,
         /// Target model path, defaults to current working directory
         #[structopt(name = "TARGET", default_value = "@")]
-        target: ModelPath,
+        target: RevPath,
         /// Source model path, defaults to current model
         #[structopt(name = "SOURCE", default_value = "HEAD")]
-        source: ModelPath,
+        source: RevPath,
     },
     /// Update model to a new version
     #[structopt(
@@ -175,10 +175,10 @@ pub enum Command {
         dry_run: bool,
         /// Target model path, defaults to current working directory
         #[structopt(name = "TARGET", default_value = "@")]
-        target: ModelPath,
+        target: RevPath,
         /// Source model path, defaults to current model(HEAD)
         #[structopt(name = "SOURCE", default_value = "HEAD")]
-        source: ModelPath,
+        source: RevPath,
     },
     /// Run checks from a model
     #[structopt(
@@ -188,7 +188,7 @@ pub enum Command {
     Check {
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
-        model: ModelPath,
+        model: RevPath,
         /// Check name filter expression
         #[structopt(short = "n", long = "name")]
         filter: Option<String>,
@@ -219,7 +219,7 @@ pub enum Command {
         args: Vec<(String, String)>,
         /// Model path, defaults to current model
         #[structopt(name = "MODEL", default_value = "@")]
-        model: ModelPath,
+        model: RevPath,
     },
     /// Execute shell command on remote host(s)
     #[structopt(
@@ -235,7 +235,7 @@ pub enum Command {
         command: Vec<String>,
         /// Model path, defaults to current working directory
         #[structopt(short = "m", long = "model", default_value = "@")]
-        model: ModelPath,
+        model: RevPath,
     },
     /// Execute prepared work package
     #[structopt(

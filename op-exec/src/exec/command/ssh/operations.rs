@@ -1,10 +1,11 @@
 use crate::{
-    AsScoped, EngineRef, Host, ModelPath, OperationImpl, OperationRef, Outcome, RuntimeError,
+    AsScoped, EngineRef, Host, OperationImpl, OperationRef, Outcome, RuntimeError,
     RuntimeResult, SourceRef, SshError, SshErrorDetail, SshResult,
 };
 use kg_diag::{DiagResultExt, IoErrorDetail};
 use kg_tree::opath::Opath;
 use op_model::{HostDef, ModelDef, ParsedModelDef, ScopedModelDef};
+use op_rev::RevPath;
 use serde::export::fmt::Debug;
 use slog::Logger;
 use std::io::BufReader;
@@ -20,7 +21,7 @@ pub struct RemoteCommandOperation {
     engine: EngineRef,
     command: String,
     expr: String,
-    model_path: ModelPath,
+    model_path: RevPath,
 
     hosts: Vec<Host>,
     futures: Arc<Mutex<Vec<(Option<ChildFuture>, Option<RuntimeResult<String>>)>>>,
@@ -40,7 +41,7 @@ impl RemoteCommandOperation {
         engine: EngineRef,
         expr: String,
         command: String,
-        model_path: ModelPath,
+        model_path: RevPath,
     ) -> RemoteCommandOperation {
         let label = operation.read().label().to_string();
         let logger = engine.read().logger().new(o!(
@@ -69,7 +70,7 @@ impl RemoteCommandOperation {
         let expr = Opath::parse(&self.expr).map_err_as_cause(|| SshErrorDetail::HostsOpathParse)?;
         let hosts_nodes = {
             let m = m.lock();
-            kg_tree::set_base_path(m.metadata().path());
+            kg_tree::set_base_path(m.rev_info().path());
             let scope = m.scope()?;
             expr.apply_ext(m.root(), m.root(), &scope)?
         };
@@ -123,7 +124,12 @@ impl RemoteCommandOperation {
     fn start_polling(&mut self) -> Poll<Outcome, RuntimeError> {
         self.hosts = self.resolve_hosts()?;
         let mut futs = Vec::with_capacity(self.hosts.len());
-        info!(self.logger, "Executing command [{command}] on hosts: \n{hosts}", command=self.command.clone(), hosts=format!("{:#?}", self.hosts); "verbosity" => 1);
+        {
+            let hosts = format!("{:#?}", self.hosts);
+            op_info!(1, "Executing command [{}] on hosts: \n{}", self.command, hosts);
+            info!(self.logger, "Executing command"; "command"=>self.command.clone(), "hosts"=> hosts);
+        }
+
         for host in &self.hosts {
             // FIXME ssh_session_cache_mut().get(..) is blocking call, should be implemented as Future
             match self
@@ -161,14 +167,14 @@ impl RemoteCommandOperation {
             .zip(self.futures.lock().unwrap().iter_mut())
             .map(|(host, (_, result))| (host.hostname().to_string(), result.take().unwrap()))
             .collect();
-        info!(self.logger, "Finished executing command on remote hosts!"; "verbosity" => 0);
+        op_info!(0, "Finished executing command on remote hosts!");
         for (h, out) in res.iter() {
             match out {
                 Ok(out) => {
-                    info!(self.logger, "================Host [{host}]================\n{out}", host=h, out=out; "verbosity" => 0);
+                    op_info!(0, "================Host [{host}]================\n{out}", host=h, out=out);
                 }
                 Err(err) => {
-                    info!(self.logger, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=format!("{}", err); "verbosity" => 0);
+                    op_info!(0, "================Host [{host}]================\nRemote command execution failed: {err}", host=h, err=err.to_string());
                 }
             }
         }

@@ -108,7 +108,7 @@ impl OperationImpl for ModelCommitOperation {
 pub struct ModelQueryOperation {
     operation: OperationRef,
     engine: EngineRef,
-    model_path: ModelPath,
+    model_path: RevPath,
     expr: String,
     logger: Logger,
 }
@@ -117,7 +117,7 @@ impl ModelQueryOperation {
     pub fn new(
         operation: OperationRef,
         engine: EngineRef,
-        model_path: ModelPath,
+        model_path: RevPath,
         expr: String,
     ) -> ModelQueryOperation {
         let label = operation.read().label().to_string();
@@ -148,7 +148,7 @@ impl Future for ModelQueryOperation {
         info!(self.logger, "Querying model...");
         let res = {
             let m = m.lock();
-            kg_tree::set_base_path(m.metadata().path());
+            kg_tree::set_base_path(m.rev_info().path());
             let scope = m.scope()?;
             expr.apply_ext(m.root(), m.root(), &scope)?
         };
@@ -167,14 +167,14 @@ impl OperationImpl for ModelQueryOperation {
 pub struct ModelTestOperation {
     operation: OperationRef,
     engine: EngineRef,
-    model_path: ModelPath,
+    model_path: RevPath,
 }
 
 impl ModelTestOperation {
     pub fn new(
         operation: OperationRef,
         engine: EngineRef,
-        model_path: ModelPath,
+        model_path: RevPath,
     ) -> ModelTestOperation {
         ModelTestOperation {
             operation,
@@ -206,8 +206,8 @@ impl OperationImpl for ModelTestOperation {
 pub struct ModelDiffOperation {
     operation: OperationRef,
     engine: EngineRef,
-    source: ModelPath,
-    target: ModelPath,
+    source: RevPath,
+    target: RevPath,
     method: DiffMethod,
 }
 
@@ -215,8 +215,8 @@ impl ModelDiffOperation {
     pub fn new(
         operation: OperationRef,
         engine: EngineRef,
-        source: ModelPath,
-        target: ModelPath,
+        source: RevPath,
+        target: RevPath,
         method: DiffMethod,
     ) -> ModelDiffOperation {
         ModelDiffOperation {
@@ -265,8 +265,8 @@ impl OperationImpl for ModelDiffOperation {
 pub struct ModelUpdateOperation {
     operation: OperationRef,
     engine: EngineRef,
-    prev_model: ModelPath,
-    next_model: ModelPath,
+    prev_model: RevPath,
+    next_model: RevPath,
     dry_run: bool,
     proc_op: Option<OperationExec>,
     logger: Logger,
@@ -276,8 +276,8 @@ impl ModelUpdateOperation {
     pub fn new(
         operation: OperationRef,
         engine: EngineRef,
-        prev_model: ModelPath,
-        next_model: ModelPath,
+        prev_model: RevPath,
+        next_model: RevPath,
         dry_run: bool,
     ) -> ModelUpdateOperation {
         let label = operation.read().label().to_string();
@@ -331,7 +331,7 @@ impl Future for ModelUpdateOperation {
                 let exec_dir = Path::new(".op");
 
                 if model2.procs().is_empty() {
-                    info!(self.logger, "Nothing to do, there is no procedures defined in model: [{model_id}]", model_id = model2.metadata().id().to_string(); "verbosity"=>0);
+                    info!(self.logger, "Nothing to do, there is no procedures defined in model: [{model_id}]", model_id = model2.rev_info().id().to_string(); "verbosity"=>0);
                 } else {
                     for p in model2.procs().iter() {
                         if p.kind() == ProcKind::Update {
@@ -367,7 +367,7 @@ impl Future for ModelUpdateOperation {
                                 );
                             }
                             let mut e = ProcExec::with_args(Utc::now(), args.build());
-                            e.set_prev_model(Some(model1.metadata().id().into()));
+                            e.set_prev_model(Some(model1.rev_info().id().into()));
                             e.prepare(&model2, p, exec_dir, &self.logger)?;
                             e.store()?;
 
@@ -400,7 +400,7 @@ impl OperationImpl for ModelUpdateOperation {
 pub struct ModelCheckOperation {
     operation: OperationRef,
     engine: EngineRef,
-    model_path: ModelPath,
+    model_path: RevPath,
     filter: Option<String>,
     dry_run: bool,
     proc_op: Option<OperationExec>,
@@ -411,7 +411,7 @@ impl ModelCheckOperation {
     pub fn new(
         operation: OperationRef,
         engine: EngineRef,
-        model_path: ModelPath,
+        model_path: RevPath,
         filter: Option<String>,
         dry_run: bool,
     ) -> ModelCheckOperation {
@@ -513,7 +513,7 @@ pub struct ModelProbeOperation {
     operation: OperationRef,
     engine: EngineRef,
     ssh_dest: SshDest,
-    model_path: ModelPath,
+    model_path: RevPath,
     filter: Option<String>,
     proc_op: Option<OperationExec>,
     logger: Logger,
@@ -524,7 +524,7 @@ impl ModelProbeOperation {
         operation: OperationRef,
         engine: EngineRef,
         ssh_dest: SshDest,
-        model_path: ModelPath,
+        model_path: RevPath,
         filter: Option<String>,
         _args: &[(String, String)],
     ) -> ModelProbeOperation {

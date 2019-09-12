@@ -2,10 +2,7 @@ use std::any::TypeId;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
-
-use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
@@ -60,7 +57,7 @@ pub enum ModelErrorDetail {
 pub struct Model {
     #[serde(flatten)]
     scoped: Scoped,
-    metadata: Metadata,
+    rev_info: RevInfo,
     hosts: Vec<HostDef>,
     users: Vec<UserDef>,
     procs: Vec<ProcDef>,
@@ -74,8 +71,8 @@ impl Model {
     pub fn empty() -> Model {
         let root = NodeRef::object(Properties::new());
         Model {
-            metadata: Metadata::default(),
             scoped: Scoped::new(&root, &root, ScopeDef::new()),
+            rev_info: RevInfo::default(),
             hosts: Vec::new(),
             users: Vec::new(),
             procs: Vec::new(),
@@ -99,24 +96,25 @@ impl Model {
         Ok(manifest)
     }
 
-    pub fn read_revision(metadata: Metadata, logger: Logger) -> ModelResult<Model> {
-        let manifest = Model::load_manifest(metadata.path())?;
+    pub fn read(rev_info: RevInfo, logger: Logger) -> ModelResult<Model> {
+        let manifest = Model::load_manifest(rev_info.path())?;
 
-        let logger = logger.new(o!("model_id"=> metadata.id().to_string()));
+        let logger = logger.new(o!("model_id" => rev_info.id().to_string()));
 
-        kg_tree::set_base_path(metadata.path());
+        kg_tree::set_base_path(rev_info.path());
 
         let mut m = Model {
-            metadata,
+            rev_info,
             logger,
             ..Model::empty()
         };
 
-        let cr = ConfigResolver::scan_revision(m.metadata.path(), &m.metadata.id())
+        let cr = ConfigResolver::scan(m.rev_info.path())
+            .into_diag_res()
             .map_err_as_cause(|| ModelErrorDetail::ConfigRead)?;
 
-        m.root().data_mut().set_file(Some(&FileInfo::new(
-            m.metadata.path(),
+        m.root().data_mut().set_file(Some(FileInfo::new(
+            m.rev_info.path(),
             FileType::Dir,
             FileFormat::Binary,
         )));
@@ -146,88 +144,67 @@ impl Model {
 
     /// Walk through each entry in model directory, resolve matching `Includes` and apply changes to model tree
     fn resolve_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
-        let commit = self.metadata.id();
-        let model_dir = self.metadata.path().to_owned();
+        use walkdir::WalkDir;
 
-        let git = GitManager::new(&model_dir)?;
-        let odb = git.odb()?;
-        let tree = git.get_tree(&commit)?;
+        for e in WalkDir::new(self.rev_info.path())
+            .min_depth(1)
+            .sort_by(|a, b| a.path().cmp(b.path()))
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+            let path_abs = e.path();
+            let path = path_abs.strip_prefix(self.rev_info.path()).unwrap();
 
-        let mut walk_err = None;
-        tree.walk(TreeWalkMode::PreOrder, |parent_path, entry| {
-            let entry_name = entry.name().unwrap();
-
-            let file_type: FileType = match entry.kind().unwrap() {
-                ObjectType::Tree => FileType::Dir,
-                ObjectType::Blob => FileType::File,
-                _ => {
-                    warn!(self.logger, "Unknown git object type, skipping : {obj_path}", obj_path = format!("{}/{}", parent_path, entry_name) ;"verbosity" => 0);
-                    return TreeWalkResult::Ok;
-                }
-            };
-
-            if file_type.is_file()
-                && (entry_name == DEFAULT_MANIFEST_FILENAME
-                    || entry_name == DEFAULT_CONFIG_FILENAME)
-            {
-                return TreeWalkResult::Ok;
+            if path.starts_with(".op/") {
+                continue;
             }
 
-            let path = PathBuf::from_str(parent_path).unwrap().join(entry_name);
-            let path_abs = model_dir.join(&path);
+            let file_type: FileType = e.file_type().into();
+
+            if file_type == FileType::File {
+                let file_name = path.file_name().unwrap();
+                if file_name == DEFAULT_MANIFEST_FILENAME || file_name == DEFAULT_CONFIG_FILENAME {
+                    continue;
+                }
+            }
+
             let config = cr.resolve(&path_abs);
 
-            let inner = || -> ModelResult<()> {
-                if let Some(inc) = config.find_include(&path, file_type) {
-                    let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
+            if let Some(inc) = config.find_include(&path, file_type) {
+                let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                    let obj = odb
-                        .read(entry.id())
-                        .map_err(|err| GitErrorDetail::GetFile {
-                            file: entry.name().unwrap().into(),
-                            err,
-                        })?;
+                let data = FileBuffer::open(&path_abs)?;
 
-                    let n = NodeRef::binary(obj.data());
-                    n.data_mut().set_file(Some(&file_info));
+                let n = NodeRef::binary(data.into_data());
+                n.data_mut().set_file(Some(file_info.clone()));
 
-                    scope.set_func(
-                        LOAD_FILE_FUNC_NAME.into(),
-                        Box::new(LoadFileFunc::new(model_dir.clone(), PathBuf::from(parent_path), commit)),
-                    );
+                let parent_path = path_abs.parent().unwrap();
 
-                    let item = inc
-                        .item()
-                        .apply_one_ext(self.root(), &n, scope.as_ref())
-                        .map_err_as_cause(|| ModelErrorDetail::Expr)?;
+                scope.set_func(
+                    LOAD_FILE_FUNC_NAME.into(),
+                    Box::new(LoadFileFunc::new(self.rev_info.path().into(), parent_path.into())),
+                );
 
-                    if item.data().file().is_none() {
-                        item.data_mut().set_file(Some(&file_info));
-                    }
+                let item = inc
+                    .item()
+                    .apply_one_ext(self.root(), &n, scope.as_ref())
+                    .map_err_as_cause(|| ModelErrorDetail::Expr)?;
 
-                    scope.set_var("item".into(), NodeSet::One(item));
-
-                    inc.mapping()
-                        .apply_ext(self.root(), self.root(), scope.as_ref())
-                        .map_err_as_cause(|| ModelErrorDetail::Expr)?;
-                    // do not leak temporary scope items
-                    scope.remove_var("item");
-                    scope.remove_func(LOAD_FILE_FUNC_NAME);
+                if item.data().file().is_none() {
+                    item.data_mut().set_file(Some(file_info));
                 }
-                Ok(())
-            };
 
-            if let Err(err) = inner() {
-                walk_err = Some(err);
-                TreeWalkResult::Abort
-            } else {
-                TreeWalkResult::Ok
+                scope.set_var("item".into(), NodeSet::One(item));
+
+                inc.mapping()
+                    .apply_ext(self.root(), self.root(), scope.as_ref())
+                    .map_err_as_cause(|| ModelErrorDetail::Expr)?;
             }
-        })
-        .map_err(|err| GitErrorDetail::Custom { err })?;
-        if let Some(err) = walk_err {
-            return Err(err);
         }
+
+        // do not leak temporary scope items
+        scope.remove_var("item");
+        scope.remove_func(LOAD_FILE_FUNC_NAME);
+
         Ok(())
     }
 
@@ -283,9 +260,8 @@ impl Model {
                 scope.set_func(
                     LOAD_FILE_FUNC_NAME.into(),
                     Box::new(LoadFileFunc::new(
-                        self.metadata().path().into(),
+                        self.rev_info().path().into(),
                         current.data().dir().into(),
-                        self.metadata().id(),
                     )),
                 );
                 for (p, e) in config.overrides().iter() {
@@ -308,8 +284,8 @@ impl Model {
     fn set_defines(&mut self, manifest: &Manifest) {
         let defs = manifest.defines().to_node();
         if manifest.defines().is_user_defined() {
-            defs.data_mut().set_file(Some(&FileInfo::new(
-                &self.metadata.path().join(DEFAULT_MANIFEST_FILENAME),
+            defs.data_mut().set_file(Some(FileInfo::new(
+                self.rev_info.path().join(DEFAULT_MANIFEST_FILENAME),
                 FileType::File,
                 FileFormat::Toml,
             )));
@@ -332,16 +308,12 @@ impl Model {
         );
     }
 
-    pub fn metadata(&self) -> &Metadata {
-        &self.metadata
+    pub fn rev_info(&self) -> &RevInfo {
+        &self.rev_info
     }
 
-    pub fn metadata_mut(&mut self) -> &mut Metadata {
-        &mut self.metadata
-    }
-
-    pub fn set_metadata(&mut self, metadata: Metadata) {
-        self.metadata = metadata;
+    pub fn set_rev_info(&mut self, rev_info: RevInfo) {
+        self.rev_info = rev_info;
     }
 
     pub fn hosts(&self) -> &[HostDef] {
@@ -393,7 +365,7 @@ impl Model {
         P1: AsRef<Path>,
         P2: AsRef<Path>,
     {
-        resolve_model_path(path, current_dir, self.metadata.path())
+        resolve_model_path(path, current_dir, self.rev_info.path())
     }
 
     unsafe fn init(&self) {
@@ -457,7 +429,7 @@ impl Model {
 
         let mut m = Model {
             scoped: Scoped::new(self.root(), self.root(), self.scoped.scope_def().clone()),
-            metadata: self.metadata.clone(),
+            rev_info: self.rev_info.clone(),
             hosts: self.hosts.clone(),
             users: self.users.clone(),
             procs: self.procs.clone(),
@@ -593,10 +565,9 @@ impl ModelRef {
         m
     }
 
-    /// Read model for provided metadata.
-    /// Returns error if `metadata.path()` is not model dir
-    pub fn read(metadata: Metadata, logger: Logger) -> ModelResult<ModelRef> {
-        Ok(Self::new(Model::read_revision(metadata, logger)?))
+    /// Read model for provided revision info.
+    pub fn read(rev_info: RevInfo, logger: Logger) -> ModelResult<ModelRef> {
+        Ok(Self::new(Model::read(rev_info, logger)?))
     }
 
     pub fn lock(&self) -> ReentrantMutexGuard<Model> {

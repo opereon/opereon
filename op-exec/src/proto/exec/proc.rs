@@ -9,9 +9,9 @@ pub struct ProcExec {
     name: String,
     label: String,
     kind: ProcKind,
-    curr_model: ModelPath,
+    curr_model: RevPath,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    prev_model: Option<ModelPath>,
+    prev_model: Option<RevPath>,
     proc_path: Opath,
     #[serde(skip_serializing_if = "Arguments::is_empty", default)]
     args: Arguments,
@@ -27,7 +27,7 @@ impl ProcExec {
             name: String::new(),
             label: String::new(),
             kind: ProcKind::default(),
-            curr_model: ModelPath::Current,
+            curr_model: RevPath::Current,
             prev_model: None,
             proc_path: Opath::null(),
             args: Arguments::new(),
@@ -42,7 +42,7 @@ impl ProcExec {
             name: String::new(),
             label: String::new(),
             kind: ProcKind::default(),
-            curr_model: ModelPath::Current,
+            curr_model: RevPath::Current,
             prev_model: None,
             proc_path: Opath::null(),
             args,
@@ -85,7 +85,7 @@ impl ProcExec {
         self.label = proc.label().to_string();
         self.kind = proc.kind();
 
-        self.curr_model = ModelPath::Revision(model.metadata().id().to_string());
+        self.curr_model = RevPath::Revision(model.rev_info().id().to_string());
 
         self.proc_path = proc.node().path();
 
@@ -95,7 +95,7 @@ impl ProcExec {
         if proc_exec_dir.is_absolute() {
             self.create_proc_exec_dir(proc_exec_dir, logger)?;
         } else {
-            self.create_proc_exec_dir(&model.metadata().path().join(proc_exec_dir), logger)?;
+            self.create_proc_exec_dir(&model.rev_info().path().join(proc_exec_dir), logger)?;
         }
         for s in proc.run().steps().iter() {
             let hosts = s.resolve_hosts(model, proc)?;
@@ -116,7 +116,7 @@ impl ProcExec {
         self.run.add_step(step);
     }
 
-    pub fn set_prev_model(&mut self, prev_model: Option<ModelPath>) {
+    pub fn set_prev_model(&mut self, prev_model: Option<RevPath>) {
         self.prev_model = prev_model;
     }
 
@@ -166,11 +166,11 @@ impl ProcExec {
         self.kind
     }
 
-    pub fn curr_model(&self) -> &ModelPath {
+    pub fn curr_model(&self) -> &RevPath {
         &self.curr_model
     }
 
-    pub fn prev_model(&self) -> Option<&ModelPath> {
+    pub fn prev_model(&self) -> Option<&RevPath> {
         self.prev_model.as_ref()
     }
 

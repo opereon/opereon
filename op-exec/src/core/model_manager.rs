@@ -5,53 +5,10 @@ use super::*;
 use crate::ConfigRef;
 use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
 use kg_utils::collections::LruCache;
-use op_model::{ModelRef, Sha1Hash, DEFAULT_MANIFEST_FILENAME};
+use op_model::{ModelRef, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase", tag = "type", content = "arg")]
-pub enum ModelPath {
-    /// Current working directory
-    Current,
-    /// Git revision string http://git-scm.com/docs/git-rev-parse.html#_specifying_revisions
-    Revision(String),
-    /// Path to model directory. Currently unimplemented.
-    Path(PathBuf),
-}
-
-impl std::fmt::Display for ModelPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ModelPath::Current => write!(f, "@"),
-            ModelPath::Revision(ref id) => write!(f, "id: {}", id),
-            ModelPath::Path(ref path) => write!(f, "{}", path.display()),
-        }
-    }
-}
-
-impl std::str::FromStr for ModelPath {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<ModelPath, Self::Err> {
-        Ok(match s {
-            "@" | "@current" => ModelPath::Current,
-            _ => ModelPath::Revision(s.to_string()),
-        })
-    }
-}
-
-impl std::convert::From<Sha1Hash> for ModelPath {
-    fn from(oid: Sha1Hash) -> Self {
-        ModelPath::Revision(oid.to_string())
-    }
-}
-
-impl slog::Value for ModelPath {
-    fn serialize(&self, _record: &Record, key: Key, serializer: &mut dyn Serializer) -> SlogResult {
-        serializer.emit_str(key, &format!("{}", &self))
-    }
-}
 
 pub type ModelManagerError = BasicDiag;
 pub type ModelManagerResult<T> = Result<T, ModelManagerError>;
@@ -77,21 +34,20 @@ pub enum ModelManagerErrorDetail {
 #[derive(Debug)]
 pub struct ModelManager {
     config: ConfigRef,
-    model_cache: LruCache<Sha1Hash, ModelRef>,
-    /// Path do model dir.
-    model_dir: PathBuf,
+    model_cache: LruCache<Oid, ModelRef>,
+    repo_dir: PathBuf,
     initialized: bool,
     logger: slog::Logger,
 }
 
 impl ModelManager {
-    pub fn new(model_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
+    pub fn new(repo_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
         let model_cache = LruCache::new(config.model().cache_limit());
-        let logger = logger.new(o!("model_dir" => model_dir.display().to_string()));
+
         ModelManager {
             config,
             model_cache,
-            model_dir,
+            repo_dir,
             initialized: false,
             logger,
         }
@@ -100,7 +56,7 @@ impl ModelManager {
     /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
     /// # Returns
     /// path to manifest dir.
-    pub fn search_manifest(start_dir: &Path) -> ModelManagerResult<PathBuf> {
+    fn search_manifest(start_dir: &Path) -> ModelManagerResult<PathBuf> {
         let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
 
         let mut parent = Some(start_dir);
@@ -110,8 +66,12 @@ impl ModelManager {
             let manifest = curr_dir.join(&manifest_filename);
 
             match fs::metadata(manifest) {
-                Ok(_) => {
-                    return Ok(curr_dir.to_owned());
+                Ok(m) => {
+                    if m.is_file() {
+                        return Ok(curr_dir.to_owned());
+                    } else {
+                        return Err(ModelManagerErrorDetail::ManifestNotFound.into())
+                    }
                 }
                 Err(err) => {
                     if err.kind() != std::io::ErrorKind::NotFound {
@@ -135,10 +95,12 @@ impl ModelManager {
             return Ok(());
         }
 
-        debug!(self.logger, "Initializing model manager");
-        let model_dir = Self::search_manifest(&self.model_dir)?;
-        info!(self.logger, "Model dir found {}", model_dir.display());
-        self.model_dir = model_dir;
+        let repo_dir = Self::search_manifest(&self.repo_dir)?;
+        let logger = self.logger.new(o!("repo_dir" => repo_dir.display().to_string()));
+        self.logger = logger;
+
+        info!(self.logger, "Repository dir found {}", repo_dir.display());
+        self.repo_dir = repo_dir;
         self.initialized = true;
 
         Ok(())
@@ -169,13 +131,13 @@ impl ModelManager {
         self.get(oid)
     }
 
-    pub fn get(&mut self, id: Sha1Hash) -> ModelManagerResult<ModelRef> {
+    pub fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
         self.init()?;
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
         }
 
-        let mut meta = Metadata::default();
+        let mut meta = RevInfo::new(id, self.model_dir());
 
         meta.set_id(id);
         meta.set_path(self.model_dir().to_owned());
@@ -185,12 +147,12 @@ impl ModelManager {
         Ok(model)
     }
 
-    pub fn resolve(&mut self, model_path: &ModelPath) -> ModelManagerResult<ModelRef> {
+    pub fn resolve(&mut self, model_path: &RevPath) -> ModelManagerResult<ModelRef> {
         self.init()?;
         match *model_path {
-            ModelPath::Current => self.current(),
-            ModelPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
-            ModelPath::Path(ref _path) => unimplemented!(),
+            RevPath::Current => self.current(),
+            RevPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
+            RevPath::Path(ref _path) => unimplemented!(),
         }
     }
 
@@ -260,18 +222,18 @@ path = ".op"
         Ok(())
     }
 
-    fn resolve_revision_str(&self, spec: &str) -> ModelManagerResult<Sha1Hash> {
+    fn resolve_revision_str(&self, spec: &str) -> ModelManagerResult<Oid> {
         let git = GitManager::new(self.model_dir())?;
         let id = git.resolve_revision_str(spec)?;
         Ok(id)
     }
 
     fn cache_model(&mut self, m: ModelRef) {
-        let id = m.lock().metadata().id();
+        let id = m.lock().rev_info().id();
         self.model_cache.insert(id, m);
     }
 
     fn model_dir(&self) -> &Path {
-        &self.model_dir
+        &self.repo_dir
     }
 }

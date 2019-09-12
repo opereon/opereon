@@ -16,12 +16,11 @@ use display::DisplayFormat;
 use futures::stream::Stream;
 use kg_diag::BasicDiag;
 use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef, ModelPath};
+use op_exec::{ConfigRef, Context as ExecContext, EngineRef, RevPath};
 use op_exec::{SshAuth, SshDest};
-use op_log::{build_cli_drain, build_file_drain};
+use op_log::{build_file_drain, CliLogger};
 use options::*;
-use slog::Duplicate;
-use slog::FnValue;
+use slog::{FnValue, o, error};
 use std::sync::atomic::*;
 use std::sync::Arc;
 use tokio::runtime;
@@ -32,8 +31,8 @@ pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
 
-fn make_model_path_absolute(path: &mut ModelPath) {
-    if let ModelPath::Path(ref mut path) = path {
+fn make_model_path_absolute(path: &mut RevPath) {
+    if let RevPath::Path(ref mut path) = path {
         *path = path.canonicalize().unwrap();
     }
 }
@@ -47,18 +46,20 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
         config.log().log_path().to_path_buf(),
         (*config.log().level()).into(),
     );
-    let cli_drain = build_cli_drain(verbosity);
 
-    let drain = Duplicate::new(file_drain, cli_drain);
+
 
     let logger = slog::Logger::root(
-        drain.fuse(),
+        file_drain.fuse(),
         o!("module" =>
          FnValue(move |info| {
               info.module()
          })
         ),
     );
+
+    let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
+    op_log::set_logger(cli_logger);
     logger
 }
 /// start engine and execute provided operation. Returns exit code
@@ -107,7 +108,8 @@ fn local_run(
         .map_err(move |err| {
             use kg_diag::Diag;
             code.store(err.detail().code(), Ordering::Relaxed);
-            error!(logger, "Operation execution error:\n{}", err; "verbosity" => 0);
+            error!(logger, "Operation execution error"; "err" => err.to_string());
+            op_error!(0, "Operation execution error:\n{}", err);
         })
         .then(move |_| {
             engine.stop();

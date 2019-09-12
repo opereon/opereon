@@ -1,11 +1,10 @@
-use std::cell::{Ref, RefCell};
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use super::*;
 
-use git2::{ObjectType, TreeWalkMode, TreeWalkResult};
+use std::cell::{RefCell, Ref};
+use std::collections::BTreeMap;
+
 use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 
-use super::*;
 
 pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
 
@@ -264,60 +263,24 @@ pub struct ConfigResolver {
 }
 
 impl ConfigResolver {
-    pub fn scan_revision(model_dir: &Path, commit_hash: &Sha1Hash) -> ModelResult<ConfigResolver> {
-        let git = GitManager::new(model_dir)?;
-        let odb = git.odb()?;
-        let commit_tree = git.get_tree(commit_hash)?;
+    fn new(model_dir: &Path) -> ConfigResolver {
+        debug_assert!(model_dir.is_absolute());
+
+        ConfigResolver {
+            model_dir: model_dir.to_path_buf(),
+            configs: BTreeMap::new(),
+        }
+    }
+
+    pub fn scan(model_dir: &Path) -> IoResult<ConfigResolver> {
+        use walkdir::WalkDir;
 
         let mut cr = ConfigResolver::new(&model_dir);
-
-        let mut walk_err = None;
-
-        commit_tree
-            .walk(TreeWalkMode::PreOrder, |parent_path, entry| {
-                if entry.kind() != Some(ObjectType::Blob)
-                    || entry.name() != Some(DEFAULT_CONFIG_FILENAME)
-                {
-                    return TreeWalkResult::Ok;
-                }
-
-                let mut inner = || -> ModelResult<()> {
-                    let obj = odb
-                        .read(entry.id())
-                        .map_err(|err| GitErrorDetail::GetFile {
-                            file: entry.name().unwrap().into(),
-                            err,
-                        })?;
-
-                    let file_path = model_dir
-                        .join(parent_path)
-                        .join(entry.name().unwrap())
-                        .to_string_lossy()
-                        .to_string();
-
-                    let content = String::from_utf8(obj.data().to_vec()).map_err(|_err| {
-                        ModelErrorDetail::ConfigUtf8 {
-                            file_path: file_path.clone(),
-                        }
-                    })?;
-
-                    let config: Config = kg_tree::serial::toml::from_str(&content)
-                        .map_err_as_cause(|| ModelErrorDetail::MalformedConfigFile { file_path })?;
-                    cr.add_file(&model_dir.join(parent_path), config);
-                    Ok(())
-                };
-
-                if let Err(err) = inner() {
-                    walk_err = Some(err);
-                    TreeWalkResult::Abort
-                } else {
-                    TreeWalkResult::Ok
-                }
-            })
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        if let Some(err) = walk_err {
-            return Err(err);
+        for e in WalkDir::new(&model_dir).into_iter().filter_map(|e| e.ok()) {
+            let ft = e.file_type();
+            if ft.is_dir() {
+                cr.scan_dir(e.path())?;
+            }
         }
 
         let mut configs = BTreeMap::new();
@@ -357,12 +320,18 @@ impl ConfigResolver {
         Ok(cr)
     }
 
-    fn new(model_dir: &Path) -> ConfigResolver {
-        debug_assert!(model_dir.is_absolute());
+    fn scan_dir(&mut self, dir: &Path) -> IoResult<()> {
+        debug_assert!(dir.starts_with(&self.model_dir));
+        let mut content = String::new();
 
-        ConfigResolver {
-            model_dir: model_dir.to_path_buf(),
-            configs: BTreeMap::new(),
+        match fs::read_to_string(dir.join(DEFAULT_CONFIG_FILENAME), &mut content){
+            Err(ref err) if err.kind() == ::std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err),
+            Ok(_) => {
+                let config: Config = toml::from_str(&content).unwrap();
+                self.add_file(dir, config);
+                Ok(())
+            }
         }
     }
 
@@ -375,12 +344,6 @@ impl ConfigResolver {
 
     pub fn resolve(&self, path: &Path) -> &Config {
         debug_assert!(path.starts_with(&self.model_dir));
-
-        //        let path = if !path.is_dir() {
-        //            path.parent().unwrap()
-        //        } else {
-        //            path
-        //        };
 
         let path = path.strip_prefix(&self.model_dir).unwrap();
 
