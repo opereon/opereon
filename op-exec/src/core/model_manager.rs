@@ -8,6 +8,7 @@ use kg_utils::collections::LruCache;
 use op_model::{ModelRef, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
+use parking_lot::ReentrantMutex;
 
 
 pub type ModelManagerError = BasicDiag;
@@ -36,7 +37,7 @@ pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Oid, ModelRef>,
     repo_dir: PathBuf,
-    initialized: bool,
+    repo_manager: ReentrantMutex<Option<Box<dyn FileVersionManager>>>,
     logger: slog::Logger,
 }
 
@@ -48,7 +49,7 @@ impl ModelManager {
             config,
             model_cache,
             repo_dir,
-            initialized: false,
+            repo_manager: ReentrantMutex::new(None),
             logger,
         }
     }
@@ -237,3 +238,7 @@ path = ".op"
         &self.repo_dir
     }
 }
+
+unsafe impl Send for ModelManager {}
+
+unsafe impl Sync for ModelManager {}

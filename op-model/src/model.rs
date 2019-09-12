@@ -154,7 +154,7 @@ impl Model {
             let path_abs = e.path();
             let path = path_abs.strip_prefix(self.rev_info.path()).unwrap();
 
-            if path.starts_with(".op/") {
+            if path.starts_with(DEFAULT_WORK_DIR_PATH) {
                 continue;
             }
 

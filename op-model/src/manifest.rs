@@ -1,6 +1,5 @@
 use super::*;
 
-pub static DEFAULT_MANIFEST_FILENAME: &'static str = "op.toml";
 
 #[inline(always)]
 fn user_defined() -> bool {

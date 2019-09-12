@@ -22,8 +22,11 @@ use kg_tree::*;
 use kg_utils::collections::LinkedHashMap;
 use op_rev::*;
 
+pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
+pub static DEFAULT_MANIFEST_FILENAME: &'static str = "op.toml";
+pub static DEFAULT_WORK_DIR_PATH: &'static str = ".op/";
+
 pub use self::config::*;
-use self::defs::Scoped;
 pub use self::defs::*;
 pub use self::load_file::*;
 pub use self::manifest::*;

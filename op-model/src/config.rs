@@ -6,8 +6,6 @@ use std::collections::BTreeMap;
 use globset::{Candidate, Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 
 
-pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
-
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Include {
     path: PathBuf,
@@ -277,6 +275,13 @@ impl ConfigResolver {
 
         let mut cr = ConfigResolver::new(&model_dir);
         for e in WalkDir::new(&model_dir).into_iter().filter_map(|e| e.ok()) {
+            let path_abs = e.path();
+            let path = path_abs.strip_prefix(&model_dir).unwrap();
+
+            if path.starts_with(DEFAULT_WORK_DIR_PATH) {
+                continue;
+            }
+
             let ft = e.file_type();
             if ft.is_dir() {
                 cr.scan_dir(e.path())?;

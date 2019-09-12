@@ -19,7 +19,7 @@ mod impls;
 pub use self::meta::*;
 pub use self::impls::*;
 
-pub trait FileVersionManager {
+pub trait FileVersionManager: std::fmt::Debug {
     fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag>;
 
     fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag>;
