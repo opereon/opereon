@@ -32,11 +32,6 @@ pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
 
-fn make_model_path_absolute(path: &mut RevPath) {
-    /*if let RevPath::Path(ref mut path) = path {
-        *path = path.canonicalize().unwrap();
-    }*/
-}
 
 fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
@@ -47,8 +42,6 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
         config.log().log_path().to_path_buf(),
         (*config.log().level()).into(),
     );
-
-
 
     let logger = slog::Logger::root(
         file_drain.fuse(),
@@ -63,6 +56,7 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
     op_log::set_logger(cli_logger);
     logger
 }
+
 /// start engine and execute provided operation. Returns exit code
 fn local_run(
     current_dir: PathBuf,
@@ -169,33 +163,24 @@ fn main() {
         }
         Command::Query {
             expr,
-            mut model,
+            model,
             format,
         } => {
             disp_format = format;
-
-            make_model_path_absolute(&mut model);
-
             ExecContext::ModelQuery { model, expr }
         }
-        Command::Test { format, mut model } => {
+        Command::Test { format, model } => {
             disp_format = format;
-
-            make_model_path_absolute(&mut model);
-
             ExecContext::ModelTest { model }
         }
         Command::Diff {
             format,
-            mut source,
-            mut target,
+            source,
+            target,
             method,
         } => {
             // FIXME fails when id provided instead of path (because of canonicalize)
             disp_format = format;
-
-            make_model_path_absolute(&mut source);
-            make_model_path_absolute(&mut target);
 
             ExecContext::ModelDiff {
                 prev_model: source,
@@ -205,15 +190,11 @@ fn main() {
         }
         Command::Update {
             format,
-            mut source,
-            mut target,
+            source,
+            target,
             dry_run,
         } => {
             disp_format = format;
-
-            make_model_path_absolute(&mut source);
-            make_model_path_absolute(&mut target);
-
             ExecContext::ModelUpdate {
                 prev_model: source,
                 next_model: target,
@@ -222,16 +203,13 @@ fn main() {
         }
         Command::Exec { path } => {
             make_path_absolute(&path);
-
             ExecContext::ProcExec { exec_path: path }
         }
         Command::Check {
-            mut model,
+            model,
             filter,
             dry_run,
         } => {
-            make_model_path_absolute(&mut model);
-
             ExecContext::ModelCheck {
                 model,
                 filter,
@@ -239,15 +217,13 @@ fn main() {
             }
         }
         Command::Probe {
-            mut model,
+            model,
             url,
             password,
             identity_file,
             filter,
             args,
         } => {
-            make_model_path_absolute(&mut model);
-
             let ssh_auth = if let Some(password) = password {
                 SshAuth::Password { password }
             } else if let Some(identity_file) = identity_file {
@@ -291,5 +267,6 @@ fn main() {
             -1
         }
     };
+
     std::process::exit(exit_code)
 }

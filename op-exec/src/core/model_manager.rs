@@ -1,31 +1,8 @@
-use git2::RepositoryInitOptions;
-
-use self::ModelManagerErrorDetail::*;
 use super::*;
-use crate::ConfigRef;
-use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
-use kg_utils::collections::LruCache;
-use op_model::{ModelRef, DEFAULT_MANIFEST_FILENAME};
-use slog::{Key, Record, Result as SlogResult, Serializer};
-use std::path::{Path, PathBuf};
-use parking_lot::ReentrantMutex;
+
 use std::ops::DerefMut;
 
-
-pub type ModelManagerError = BasicDiag;
-pub type ModelManagerResult<T> = Result<T, ModelManagerError>;
-
-#[derive(Debug, Display, Detail)]
-pub enum ModelManagerErrorDetail {
-    #[display(fmt = "cannot init manifest file in '{path}'")]
-    InitManifest { path: String },
-
-    #[display(fmt = "cannot init git repository in '{path}'")]
-    InitRepo { path: String },
-
-    #[display(fmt = "cannot init .operc file in '{path}'")]
-    InitOperc { path: String },
-}
+pub type ModelManagerResult<T> = Result<T, BasicDiag>;
 
 #[derive(Debug)]
 pub struct ModelManager {
@@ -100,7 +77,7 @@ impl ModelManager {
     pub fn get_file_diff(&mut self, old_rev: &RevPath, new_rev: &RevPath) -> ModelManagerResult<FileDiff> {
         self.init()?;
 
-        let mut repo_manager = self.repo_manager_mut();
+        let repo_manager = self.repo_manager_mut();
         let old_id = repo_manager.resolve(old_rev)?;
         let new_id = repo_manager.resolve(new_rev)?;
         repo_manager.get_file_diff(old_id, new_id)
