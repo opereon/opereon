@@ -9,6 +9,7 @@ use op_model::{ModelRef, DEFAULT_MANIFEST_FILENAME};
 use slog::{Key, Record, Result as SlogResult, Serializer};
 use std::path::{Path, PathBuf};
 use parking_lot::ReentrantMutex;
+use std::ops::DerefMut;
 
 
 pub type ModelManagerError = BasicDiag;
@@ -16,12 +17,6 @@ pub type ModelManagerResult<T> = Result<T, ModelManagerError>;
 
 #[derive(Debug, Display, Detail)]
 pub enum ModelManagerErrorDetail {
-    #[display(fmt = "manifest file not found")]
-    ManifestNotFound,
-
-    #[display(fmt = "cannot find manifest file")]
-    ManifestSearch,
-
     #[display(fmt = "cannot init manifest file in '{path}'")]
     InitManifest { path: String },
 
@@ -36,78 +31,25 @@ pub enum ModelManagerErrorDetail {
 pub struct ModelManager {
     config: ConfigRef,
     model_cache: LruCache<Oid, ModelRef>,
-    repo_dir: PathBuf,
-    repo_manager: ReentrantMutex<Option<Box<dyn FileVersionManager>>>,
+    repo_path: PathBuf,
+    repo_manager: Option<Box<dyn FileVersionManager>>,
     logger: slog::Logger,
 }
 
 impl ModelManager {
-    pub fn new(repo_dir: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
+    pub fn new(repo_path: PathBuf, config: ConfigRef, logger: slog::Logger) -> ModelManager {
         let model_cache = LruCache::new(config.model().cache_limit());
 
         ModelManager {
             config,
             model_cache,
-            repo_dir,
-            repo_manager: ReentrantMutex::new(None),
+            repo_path,
+            repo_manager: None,
             logger,
         }
     }
 
-    /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
-    /// # Returns
-    /// path to manifest dir.
-    fn search_manifest(start_dir: &Path) -> ModelManagerResult<PathBuf> {
-        let manifest_filename = PathBuf::from(DEFAULT_MANIFEST_FILENAME);
-
-        let mut parent = Some(start_dir);
-
-        while parent.is_some() {
-            let curr_dir = parent.unwrap();
-            let manifest = curr_dir.join(&manifest_filename);
-
-            match fs::metadata(manifest) {
-                Ok(m) => {
-                    if m.is_file() {
-                        return Ok(curr_dir.to_owned());
-                    } else {
-                        return Err(ModelManagerErrorDetail::ManifestNotFound.into())
-                    }
-                }
-                Err(err) => {
-                    if err.kind() != std::io::ErrorKind::NotFound {
-                        return Err(err)
-                            .into_diag_res()
-                            .map_err_as_cause(|| ModelManagerErrorDetail::ManifestSearch);
-                    } else {
-                        parent = curr_dir.parent();
-                    }
-                }
-            }
-        }
-
-        Err(ModelManagerErrorDetail::ManifestNotFound.into())
-    }
-
-    /// Initialize model manager.
-    /// This method can be called multiple times.
-    pub fn init(&mut self) -> ModelManagerResult<()> {
-        if self.initialized {
-            return Ok(());
-        }
-
-        let repo_dir = Self::search_manifest(&self.repo_dir)?;
-        let logger = self.logger.new(o!("repo_dir" => repo_dir.display().to_string()));
-        self.logger = logger;
-
-        info!(self.logger, "Repository dir found {}", repo_dir.display());
-        self.repo_dir = repo_dir;
-        self.initialized = true;
-
-        Ok(())
-    }
-
-    /// Creates new model. Initializes git repository, manifest file etc.
+    /*/// Creates new model. Initializes git repository, manifest file etc.
     pub fn init_model<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
         self.init_git_repo(&path).map_err_as_cause(|| InitRepo {
             path: path.as_ref().to_string_lossy().to_string(),
@@ -119,114 +61,81 @@ impl ModelManager {
             path: path.as_ref().to_string_lossy().to_string(),
         })?;
         Ok(())
-    }
+    }*/
 
     /// Commit current model
     pub fn commit(&mut self, message: &str) -> ModelManagerResult<ModelRef> {
         self.init()?;
 
-        let git = GitManager::new(self.model_dir())?;
-
-        let oid = git.commit(message)?;
-
+        let oid = self.repo_manager_mut().commit(message)?;
         self.get(oid)
     }
 
     pub fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
         self.init()?;
+
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
         }
 
-        let mut meta = RevInfo::new(id, self.model_dir());
-
-        meta.set_id(id);
-        meta.set_path(self.model_dir().to_owned());
-
-        let model = ModelRef::read(meta, self.logger.clone())?;
+        let rev_info = self.repo_manager_mut().checkout(id)?;
+        let model = ModelRef::read(rev_info, self.logger.clone())?;
         self.cache_model(model.clone());
         Ok(model)
     }
 
-    pub fn resolve(&mut self, model_path: &RevPath) -> ModelManagerResult<ModelRef> {
+    pub fn resolve(&mut self, rev_path: &RevPath) -> ModelManagerResult<ModelRef> {
         self.init()?;
-        match *model_path {
-            RevPath::Current => self.current(),
-            RevPath::Revision(ref rev) => self.get(self.resolve_revision_str(rev)?),
-            RevPath::Path(ref _path) => unimplemented!(),
-        }
+
+        let oid = self.repo_manager_mut().resolve(rev_path)?;
+        self.get(oid)
     }
 
-    /// Returns current model - model represented by content of the git index.
-    /// This method loads model on each call.
+    /// Returns current model
     pub fn current(&mut self) -> ModelManagerResult<ModelRef> {
-        let oid = GitManager::new(self.model_dir())?.update_index()?;
-        self.get(oid.into())
+        //let oid = GitManager::new(self.model_dir())?.update_index()?;
+        self.get(Oid::nil())
     }
 
-    fn init_git_repo<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
-        let repo_path = path.as_ref().join(".git");
-        if repo_path.exists() {
-            info!(self.logger, "Git repository ('{repo}') already exists, skipping...", repo=repo_path.display(); "verbosity"=>1);
-            return Ok(())
-        }
-        use std::fmt::Write;
-        let mut opts = RepositoryInitOptions::new();
-        opts.no_reinit(true);
+    pub fn get_file_diff(&mut self, old_rev: &RevPath, new_rev: &RevPath) -> ModelManagerResult<FileDiff> {
+        self.init()?;
 
-        GitManager::init_new_repository(&path, &opts)?;
-
-        // ignore ./op directory
-        let excludes = path.as_ref().join(PathBuf::from(".git/info/exclude"));
-        let mut content = fs::read_string(&excludes)?;
-        // language=gitignore
-        let ignore_content = r#"
-# Opereon tmp directory
-.op/
-"#;
-        writeln!(&mut content, "{}", ignore_content).map_err(IoErrorDetail::from)?;
-        fs::write(excludes, content)?;
-        Ok(())
+        let mut repo_manager = self.repo_manager_mut();
+        let old_id = repo_manager.resolve(old_rev)?;
+        let new_id = repo_manager.resolve(new_rev)?;
+        repo_manager.get_file_diff(old_id, new_id)
     }
 
-    fn init_manifest<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
-        let manifest_path = path.as_ref().join("op.toml");
-        if manifest_path.exists() {
-            info!(self.logger, "Manifest file ('{manifest}') already exists, skipping...", manifest=manifest_path.display(); "verbosity"=>1);
-            return Ok(())
+    pub fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
+        let repo_manager = op_rev::create_repository(&repo_path)?;
+
+        let logger = self.logger.new(o!("repo_path" => repo_path.display().to_string()));
+        self.logger = logger;
+
+        info!(self.logger, "created repository {}", repo_path.display());
+        self.repo_path = repo_path;
+        self.repo_manager = Some(repo_manager);
+
+        let rev_info = RevInfo::new(Oid::nil(), self.repo_path.clone());
+        let model = ModelRef::create(rev_info, self.logger.clone())?;
+        self.cache_model(model.clone());
+        Ok(model)
+    }
+
+    fn init(&mut self) -> ModelManagerResult<()> {
+        if self.repo_manager.is_some() {
+            return Ok(());
         }
 
-        // language=toml
-        let default_manifest = r#"
-[info]
-authors = [""]
-description = "Opereon model"
-"#;
-        fs::write(manifest_path, default_manifest)?;
+        let repo_path = Model::resolve_manifest_dir(&self.repo_path)?;
+        let logger = self.logger.new(o!("repo_path" => repo_path.display().to_string()));
+        self.logger = logger;
+
+        info!(self.logger, "opened repository {}", repo_path.display());
+        self.repo_path = repo_path;
+        self.repo_manager = Some(op_rev::open_repository(&self.repo_path)?);
+
         Ok(())
-    }
-
-    fn init_operc<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
-        let operc_path = path.as_ref().join(PathBuf::from(".operc"));
-
-        if operc_path.exists() {
-            info!(self.logger, "Config file ('{config}') already exists, skipping...", config=operc_path.display(); "verbosity"=>1);
-            return Ok(())
-        }
-
-        // language=toml
-        let default_operc = r#"
-[[exclude]]
-path = ".op"
-"#;
-        fs::write(operc_path, default_operc)?;
-        Ok(())
-    }
-
-    fn resolve_revision_str(&self, spec: &str) -> ModelManagerResult<Oid> {
-        let git = GitManager::new(self.model_dir())?;
-        let id = git.resolve_revision_str(spec)?;
-        Ok(id)
     }
 
     fn cache_model(&mut self, m: ModelRef) {
@@ -234,11 +143,7 @@ path = ".op"
         self.model_cache.insert(id, m);
     }
 
-    fn model_dir(&self) -> &Path {
-        &self.repo_dir
+    fn repo_manager_mut(&mut self) -> &mut dyn FileVersionManager {
+        self.repo_manager.as_mut().unwrap().deref_mut()
     }
 }
-
-unsafe impl Send for ModelManager {}
-
-unsafe impl Sync for ModelManager {}

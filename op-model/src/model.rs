@@ -9,7 +9,7 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use super::load_file::LoadFileFunc;
 use super::*;
 use kg_diag::{BasicDiag, Severity};
-use slog::{o, warn, Logger};
+
 
 const LOAD_FILE_FUNC_NAME: &str = "loadFile";
 
@@ -19,17 +19,20 @@ pub type ModelResult<T> = Result<T, ModelError>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1000)]
 pub enum ModelErrorDetail {
-    #[display(fmt = "cannot parse config file: '{file_path}'")]
-    MalformedConfigFile { file_path: String },
-
     #[display(fmt = "cannot load model config")]
     ConfigRead,
 
-    #[display(fmt = "cannot parse manifest file '{file_path}'")]
-    MalformedManifest { file_path: String },
+    #[display(fmt = "cannot parse config file '{p}'", p = "path.display()")]
+    ConfigParse { path: PathBuf },
 
-    #[display(fmt = "cannot read manifest file")]
-    ManifestRead,
+    #[display(fmt = "cannot read manifest file '{p}'", p = "path.display()")]
+    ManifestRead { path: PathBuf },
+
+    #[display(fmt = "cannot parse manifest file '{p}'", p = "path.display()")]
+    ManifestParse { path: PathBuf },
+
+    #[display(fmt = "manifest file not found in '{p}' or parent directories", p = "path.display()")]
+    ManifestResolve { path: PathBuf },
 
     #[display(fmt = "cannot resolve includes")]
     IncludesResolve,
@@ -39,9 +42,6 @@ pub enum ModelErrorDetail {
 
     #[display(fmt = "cannot parse defs")]
     DefsParse,
-
-    #[display(fmt = "config file '{file_path}' is not valid utf-8")]
-    ConfigUtf8 { file_path: String },
 
     #[display(fmt = "cannot resolve interpolations")]
     InterpolationsResolve,
@@ -81,18 +81,49 @@ impl Model {
         }
     }
 
+    /// Travels up the directory structure to find first occurrence of `op.toml` manifest file.
+    /// # Returns
+    /// path to manifest dir.
+    pub fn resolve_manifest_dir(start_dir: &Path) -> ModelResult<PathBuf> {
+        let manifest_filename = Path::new(DEFAULT_MANIFEST_FILENAME);
+
+        let mut parent = Some(start_dir);
+
+        while parent.is_some() {
+            let curr_dir = parent.unwrap();
+            let manifest = curr_dir.join(&manifest_filename);
+
+            match fs::metadata(manifest) {
+                Ok(m) => {
+                    if m.is_file() {
+                        return Ok(curr_dir.to_owned());
+                    } else {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        parent = curr_dir.parent();
+                    } else {
+                        return Err(BasicDiag::with_cause(
+                            ModelErrorDetail::ManifestResolve { path: start_dir.into() },
+                            BasicDiag::from(err)));
+                    }
+                }
+            }
+        }
+
+        Err(ModelErrorDetail::ManifestResolve { path: start_dir.into() }.into())
+    }
+
     pub fn load_manifest(model_dir: &Path) -> ModelResult<Manifest> {
         let path = model_dir.join(PathBuf::from(DEFAULT_MANIFEST_FILENAME));
         let mut content = String::new();
         fs::read_to_string(&path, &mut content)
             .into_diag_res()
-            .map_err_as_cause(|| ModelErrorDetail::ManifestRead)?;
-        let manifest: Manifest =
-            kg_tree::serial::toml::from_str(&content).map_err_as_cause(|| {
-                ModelErrorDetail::MalformedManifest {
-                    file_path: path.to_string_lossy().to_string(),
-                }
-            })?;
+            .map_err_as_cause(|| ModelErrorDetail::ManifestRead { path: path.clone() })?;
+        let manifest: Manifest = kg_tree::serial::toml::from_str(&content)
+            .map_err_as_cause(|| ModelErrorDetail::ManifestParse { path: path.clone() })?;
         Ok(manifest)
     }
 
@@ -140,6 +171,12 @@ impl Model {
             .map_err_as_cause(|| ModelErrorDetail::DefsParse)?;
 
         return Ok(m);
+    }
+
+    pub fn create(rev_info: RevInfo, logger: Logger) -> ModelResult<Model> {
+        init_manifest(rev_info.path(), &logger)?;
+        init_config(rev_info.path(), &logger)?;
+        Self::read(rev_info, logger)
     }
 
     /// Walk through each entry in model directory, resolve matching `Includes` and apply changes to model tree
@@ -568,6 +605,11 @@ impl ModelRef {
     /// Read model for provided revision info.
     pub fn read(rev_info: RevInfo, logger: Logger) -> ModelResult<ModelRef> {
         Ok(Self::new(Model::read(rev_info, logger)?))
+    }
+
+    /// Create a new model for provided revision info.
+    pub fn create(rev_info: RevInfo, logger: Logger) -> ModelResult<ModelRef> {
+        Ok(Self::new(Model::create(rev_info, logger)?))
     }
 
     pub fn lock(&self) -> ReentrantMutexGuard<Model> {

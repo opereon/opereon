@@ -213,6 +213,10 @@ impl EngineRef {
     }
 }
 
+unsafe impl Send for EngineRef {}
+
+unsafe impl Sync for EngineRef {}
+
 impl Future for EngineRef {
     type Item = ();
     type Error = ();

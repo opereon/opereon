@@ -105,10 +105,6 @@ impl GitManager {
         writeln!(&mut content, ".op/").map_err(IoErrorDetail::from)?;
         fs::write(excludes, content)?;
 
-        let revs_path = path.join(".op/revs");
-        fs::create_dir_all(&revs_path)?;
-        fs::clear_dir_all(&revs_path)?;
-
         Ok(GitManager {
             path,
             repo,

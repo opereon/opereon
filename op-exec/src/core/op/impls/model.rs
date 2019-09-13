@@ -59,7 +59,7 @@ impl Future for ModelInitOperation {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let mut e = self.engine.write();
-        e.model_manager_mut().init_model(&self.path)?;
+        e.model_manager_mut().create_model(self.path.clone())?;
         Ok(Async::Ready(Outcome::Empty))
     }
 }
@@ -317,16 +317,17 @@ impl Future for ModelUpdateOperation {
 
             let mut proc_ops = Vec::new();
             {
-                let (m1, m2, opts) = {
+                let (m1, m2, opts, file_diff) = {
                     let mut e = self.engine.write();
                     let m1 = e.model_manager_mut().resolve(&self.prev_model)?;
                     let m2 = e.model_manager_mut().resolve(&self.next_model)?;
                     let opts = e.config().model().diff().clone();
-                    (m1, m2, opts)
+                    let file_diff = e.model_manager_mut().get_file_diff(&self.prev_model, &self.next_model)?;
+                    (m1, m2, opts, file_diff)
                 };
                 let model1 = m1.lock();
                 let model2 = m2.lock();
-                let mut update = ModelUpdate::new(&model1, &model2, &opts)?;
+                let mut update = ModelUpdate::new(&model1, &model2, &opts, file_diff)?;
 
                 let exec_dir = Path::new(".op");
 

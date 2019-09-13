@@ -28,3 +28,14 @@ pub trait FileVersionManager: std::fmt::Debug {
 
     fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag>;
 }
+
+
+pub fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager>, BasicDiag> {
+    let git = GitManager::open(repo_path)?;
+    Ok(Box::new(git))
+}
+
+pub fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager>, BasicDiag> {
+    let git = GitManager::create(repo_path)?;
+    Ok(Box::new(git))
+}

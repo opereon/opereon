@@ -15,8 +15,9 @@ use crate::slog::Drain;
 use display::DisplayFormat;
 use futures::stream::Stream;
 use kg_diag::BasicDiag;
+use op_rev::{RevPath};
 use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef, RevPath};
+use op_exec::{ConfigRef, Context as ExecContext, EngineRef, DiffMethod};
 use op_exec::{SshAuth, SshDest};
 use op_log::{build_file_drain, CliLogger};
 use options::*;
@@ -32,9 +33,9 @@ pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
 
 fn make_model_path_absolute(path: &mut RevPath) {
-    if let RevPath::Path(ref mut path) = path {
+    /*if let RevPath::Path(ref mut path) = path {
         *path = path.canonicalize().unwrap();
-    }
+    }*/
 }
 
 fn make_path_absolute(path: &Path) -> PathBuf {

@@ -12,7 +12,8 @@ kg-diag = "0.4.0"
 kg-tree = "0.2.0"
 kg-utils = "0.3.1"
 op-exec = { version = "0.1.1", path = "../op-exec" }
-op-log = {path = "../op-log" }
+op-rev = { version = "0.1.1", path = "../op-rev" }
+op-log = { version = "0.1.0", path = "../op-log" }
 structopt = "0.3.0"
 futures = "0.1.29"
 serde = "1.0.99"
