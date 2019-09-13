@@ -26,20 +26,6 @@ impl ModelManager {
         }
     }
 
-    /*/// Creates new model. Initializes git repository, manifest file etc.
-    pub fn init_model<P: AsRef<Path>>(&self, path: P) -> ModelManagerResult<()> {
-        self.init_git_repo(&path).map_err_as_cause(|| InitRepo {
-            path: path.as_ref().to_string_lossy().to_string(),
-        })?;
-        self.init_manifest(&path).map_err_as_cause(|| InitManifest {
-            path: path.as_ref().to_string_lossy().to_string(),
-        })?;
-        self.init_operc(&path).map_err_as_cause(|| InitOperc {
-            path: path.as_ref().to_string_lossy().to_string(),
-        })?;
-        Ok(())
-    }*/
-
     /// Commit current model
     pub fn commit(&mut self, message: &str) -> ModelManagerResult<ModelRef> {
         self.init()?;
@@ -70,8 +56,7 @@ impl ModelManager {
 
     /// Returns current model
     pub fn current(&mut self) -> ModelManagerResult<ModelRef> {
-        //let oid = GitManager::new(self.model_dir())?.update_index()?;
-        self.get(Oid::nil())
+        self.resolve(&RevPath::Current)
     }
 
     pub fn get_file_diff(&mut self, old_rev: &RevPath, new_rev: &RevPath) -> ModelManagerResult<FileDiff> {

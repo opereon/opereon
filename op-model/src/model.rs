@@ -183,6 +183,8 @@ impl Model {
     fn resolve_includes(&mut self, cr: &ConfigResolver, scope: &ScopeMut) -> ModelResult<()> {
         use walkdir::WalkDir;
 
+        let load_file_sym = Symbol::from(LOAD_FILE_FUNC_NAME);
+
         for e in WalkDir::new(self.rev_info.path())
             .min_depth(1)
             .sort_by(|a, b| a.path().cmp(b.path()))
@@ -209,15 +211,24 @@ impl Model {
             if let Some(inc) = config.find_include(&path, file_type) {
                 let file_info = FileInfo::new(path_abs, file_type, FileFormat::Binary);
 
-                let data = FileBuffer::open(&path_abs)?;
+                let n = match file_type {
+                    FileType::File => {
+                        let data = FileBuffer::open(&path_abs)?;
+                        NodeRef::binary(data.into_data())
+                    }
+                    FileType::Dir => {
+                        NodeRef::null()
+                    }
+                    _ => return Err(ModelErrorDetail::IncludesResolve.into())
+                };
 
-                let n = NodeRef::binary(data.into_data());
                 n.data_mut().set_file(Some(file_info.clone()));
 
                 let parent_path = path_abs.parent().unwrap();
 
+
                 scope.set_func(
-                    LOAD_FILE_FUNC_NAME.into(),
+                    load_file_sym.clone(),
                     Box::new(LoadFileFunc::new(self.rev_info.path().into(), parent_path.into())),
                 );
 
@@ -240,7 +251,7 @@ impl Model {
 
         // do not leak temporary scope items
         scope.remove_var("item");
-        scope.remove_func(LOAD_FILE_FUNC_NAME);
+        scope.remove_func(&load_file_sym);
 
         Ok(())
     }

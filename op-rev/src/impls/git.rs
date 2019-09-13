@@ -16,23 +16,14 @@ pub enum GitErrorDetail {
     #[display(fmt = "cannot create git repository: {err}")]
     CreateRepository { err: git2::Error },
 
-    #[display(fmt = "cannot get git object database: {err}")]
-    GetDatabase { err: git2::Error },
-
     #[display(fmt = "cannot create commit: {err}")]
     Commit { err: git2::Error },
 
+    #[display(fmt = "cannot checkout tree {rev_id}: {err}")]
+    Checkout { rev_id: Oid, err: git2::Error },
+
     #[display(fmt = "cannot get git index: {err}")]
     GetIndex { err: git2::Error },
-
-    #[display(
-        fmt = "cannot get git file '{file_display}': {err}",
-        file_display = "file.display()"
-    )]
-    GetFile { file: PathBuf, err: git2::Error },
-
-    #[display(fmt = "cannot find git object: {err}")]
-    FindObject { err: git2::Error },
 
     #[display(fmt = "cannot resolve git reference: {err}")]
     ResolveReference { err: git2::Error },
@@ -121,9 +112,7 @@ impl GitManager {
             Ok(head) => head,
             Err(err) => match err.code() {
                 git2::ErrorCode::UnbornBranch => return Ok(None),
-                _ => {
-                    return Err(GitErrorDetail::FindObject { err }).into_diag_res();
-                }
+                _ => return Err(GitErrorDetail::Custom { err }).into_diag_res(),
             },
         };
 
@@ -142,7 +131,7 @@ impl GitManager {
         let obj = self
             .repo()
             .find_object(oid.into(), None)
-            .map_err(|err| GitErrorDetail::FindObject { err })?;
+            .map_err(|err| GitErrorDetail::Custom { err })?;
 
         let tree = obj
             .peel_to_tree()
@@ -177,31 +166,6 @@ impl GitManager {
 
         Ok(oid)
     }
-
-    /// Searches `tree` for object under `path` and returns its data.
-    fn read_obj_data<P: AsRef<Path>>(&self, tree: &git2::Tree, path: P) -> GitResult<Vec<u8>> {
-        let odb = self
-            .repo()
-            .odb()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        let entry = tree.get_path_ext(path.as_ref())?;
-        let obj = odb
-            .read(entry.id())
-            .map_err(|err| GitErrorDetail::GetFile {
-                file: path.as_ref().to_path_buf(),
-                err,
-            })?;
-
-        Ok(obj.data().to_owned())
-    }
-
-    fn odb(&self) -> GitResult<git2::Odb> {
-        self.repo()
-            .odb()
-            .map_err(|err| GitErrorDetail::Custom { err })
-            .into_diag_res()
-    }
 }
 
 impl std::fmt::Debug for GitManager {
@@ -227,7 +191,28 @@ impl FileVersionManager for GitManager {
     }
 
     fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
-        unimplemented!()
+        if rev_id.is_nil() {
+            Ok(RevInfo::new(rev_id, self.path.clone()))
+        } else {
+            let mut checkout_path = self.path.join(".op/revs");
+            checkout_path.push(&format!("{:12}", rev_id));
+
+            if checkout_path.is_dir() {
+                Ok(RevInfo::new(rev_id, checkout_path))
+            } else {
+                fs::create_dir_all(&checkout_path)?;
+
+                let tree = self.get_tree(rev_id.into())?;
+                let mut opts = CheckoutBuilder::new();
+                opts.target_dir(&checkout_path);
+                opts.recreate_missing(true);
+                self.repo.checkout_tree(tree.as_object(), Some(&mut opts))
+                    .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
+
+                eprintln!("after checkout '{}'", checkout_path.display());
+                Ok(RevInfo::new(rev_id, checkout_path))
+            }
+        }
     }
 
     fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag> {
@@ -310,7 +295,7 @@ impl Into<git2::Oid> for Oid {
     }
 }
 
-trait TreeExt {
+/*trait TreeExt {
     fn get_path_ext(&self, path: &Path) -> GitResult<git2::TreeEntry>;
 }
 
@@ -323,7 +308,7 @@ impl TreeExt for git2::Tree<'_> {
             })
             .into_diag_res()
     }
-}
+}*/
 
 impl From<git2::DiffDelta<'_>> for FileChange {
     fn from(diff_delta: git2::DiffDelta) -> Self {

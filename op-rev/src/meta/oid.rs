@@ -49,8 +49,22 @@ impl DerefMut for Oid {
 
 impl std::fmt::Display for Oid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for &b in self.0.iter() {
-            write!(f, "{:02x}", b)?;
+        if let Some(mut width) = f.width() {
+            for &b in self.0.iter() {
+                if width >= 2 {
+                    write!(f, "{:02x}", b)?;
+                    width -= 2;
+                } else if width == 1 {
+                    write!(f, "{:01x}", (b >> 4))?;
+                    break;
+                } else {
+                    break;
+                }
+            }
+        } else {
+            for &b in self.0.iter() {
+                write!(f, "{:02x}", b)?;
+            }
         }
         Ok(())
     }
@@ -107,5 +121,24 @@ impl<'de> de::Deserialize<'de> for Oid {
                 )),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_compatible_with_git() {
+        let oid_str = "0123456789abcdef0123456789abcdef01234567";
+
+        let git_oid1: git2::Oid = git2::Oid::from_str(oid_str).unwrap();
+        let oid1: Oid = git_oid1.into();
+
+        let oid2: Oid = Oid::from_str(oid_str).unwrap();
+        let git_oid2: git2::Oid = oid2.into();
+
+        assert_eq!(oid1, oid2);
+        assert_eq!(git_oid1, git_oid2);
     }
 }

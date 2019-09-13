@@ -1,5 +1,9 @@
 #![feature(box_syntax, specialization, raw)]
 
+#[cfg(test)]
+#[macro_use]
+extern crate indoc;
+
 #[macro_use]
 extern crate serde_derive;
 

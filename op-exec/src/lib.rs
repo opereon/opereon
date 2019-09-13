@@ -1,5 +1,3 @@
-//#![deny(warnings)]
-
 #![feature(box_syntax, specialization, integer_atomics)]
 
 #[macro_use]
