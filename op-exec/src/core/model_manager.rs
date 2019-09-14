@@ -27,11 +27,11 @@ impl ModelManager {
     }
 
     /// Commit current model
-    pub fn commit(&mut self, message: &str) -> ModelManagerResult<ModelRef> {
+    pub fn commit(&mut self, message: &str) -> ModelManagerResult<Oid> {
         self.init()?;
 
         let oid = self.repo_manager_mut().commit(message)?;
-        self.get(oid)
+        Ok(oid)
     }
 
     pub fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {

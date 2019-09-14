@@ -203,13 +203,13 @@ impl FileVersionManager for GitManager {
                 fs::create_dir_all(&checkout_path)?;
 
                 let tree = self.get_tree(rev_id.into())?;
+
                 let mut opts = CheckoutBuilder::new();
                 opts.target_dir(&checkout_path);
                 opts.recreate_missing(true);
                 self.repo.checkout_tree(tree.as_object(), Some(&mut opts))
                     .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
 
-                eprintln!("after checkout '{}'", checkout_path.display());
                 Ok(RevInfo::new(rev_id, checkout_path))
             }
         }
@@ -250,21 +250,37 @@ impl FileVersionManager for GitManager {
 
     fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
         //FIXME (jc) error handling
-        let old: git2::Oid = old_rev_id.into();
-        let new: git2::Oid = new_rev_id.into();
 
-        let old_commit = self.repo().find_object(old, None).expect("Cannot find commit");
-        let new_commit = self.repo().find_object(new, None).expect("Cannot find commit");
+        if old_rev_id.is_nil() {
+            unimplemented!(); // Cannot compare workdir as old tree against new tree, only the other way around
+        }
 
-        let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
-        let new_tree = new_commit.peel_to_tree().expect("Cannot get commit tree");
+        let mut diff = {
+            let mut opts = git2::DiffOptions::new();
+            opts.minimal(true);
 
-        let mut opts = git2::DiffOptions::new();
-        opts.minimal(true);
+            if new_rev_id.is_nil() {
+                let old: git2::Oid = old_rev_id.into();
+                let old_commit = self.repo().find_object(old, None).expect("Cannot find commit");
+                let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
 
-        let mut diff = self.repo()
-            .diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
-            .expect("Cannot get diff");
+                self.repo()
+                    .diff_tree_to_workdir(Some(&old_tree), Some(&mut opts))
+                    .expect("Cannot get diff")
+            } else {
+                let old: git2::Oid = old_rev_id.into();
+                let old_commit = self.repo().find_object(old, None).expect("Cannot find commit");
+                let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
+
+                let new: git2::Oid = new_rev_id.into();
+                let new_commit = self.repo().find_object(new, None).expect("Cannot find commit");
+                let new_tree = new_commit.peel_to_tree().expect("Cannot get commit tree");
+
+                self.repo()
+                    .diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
+                    .expect("Cannot get diff")
+            }
+        };
 
         let mut find_opts = git2::DiffFindOptions::new();
         find_opts.renames(true);
@@ -295,20 +311,6 @@ impl Into<git2::Oid> for Oid {
     }
 }
 
-/*trait TreeExt {
-    fn get_path_ext(&self, path: &Path) -> GitResult<git2::TreeEntry>;
-}
-
-impl TreeExt for git2::Tree<'_> {
-    fn get_path_ext(&self, path: &Path) -> Result<git2::TreeEntry, BasicDiag> {
-        self.get_path(path)
-            .map_err(|err| GitErrorDetail::GetFile {
-                file: path.to_owned(),
-                err,
-            })
-            .into_diag_res()
-    }
-}*/
 
 impl From<git2::DiffDelta<'_>> for FileChange {
     fn from(diff_delta: git2::DiffDelta) -> Self {
