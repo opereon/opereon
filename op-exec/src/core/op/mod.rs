@@ -10,7 +10,6 @@ use uuid::Uuid;
 use super::*;
 
 pub use self::context::Context;
-pub use self::impls::DiffMethod;
 pub use self::impls::OperationImpl;
 use self::impls::{create_operation_impl, OperationImplType};
 pub use self::outcome::Outcome;

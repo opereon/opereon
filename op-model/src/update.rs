@@ -22,7 +22,7 @@ impl<'a> ModelUpdate<'a> {
         file_diff: FileDiff,
     ) -> ModelResult<ModelUpdate<'a>> {
         let mut cache = NodePathCache::new();
-        let model_diff = NodeDiff::minimal_cache(model1.root(), model2.root(), opts, &mut cache);
+        let model_diff = NodeDiff::diff_cache(model1.root(), model2.root(), opts, &mut cache);
         let update = ModelUpdate {
             cache,
             model_diff,

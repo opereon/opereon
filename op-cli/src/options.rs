@@ -137,15 +137,6 @@ pub enum Command {
             default_value = "yaml"
         )]
         format: DisplayFormat,
-        /// Diff method
-        #[structopt(
-            short = "m",
-            long = "method",
-            possible_values = &["minimal","full"],
-            case_insensitive = true,
-            default_value = "minimal"
-        )]
-        method: DiffMethod,
         /// Target model path, defaults to current working directory
         #[structopt(name = "TARGET", default_value = "@")]
         target: RevPath,

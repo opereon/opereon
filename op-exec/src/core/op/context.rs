@@ -20,7 +20,6 @@ pub enum Context {
     ModelDiff {
         prev_model: RevPath,
         next_model: RevPath,
-        method: DiffMethod,
     },
     ModelUpdate {
         prev_model: RevPath,

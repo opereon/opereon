@@ -17,24 +17,6 @@ pub enum ModelOpErrorDetail {
     QueryOp,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum DiffMethod {
-    Minimal,
-    Full,
-}
-
-impl std::str::FromStr for DiffMethod {
-    type Err = String; //FIXME (jc) use some better error implementation
-
-    fn from_str(s: &str) -> Result<DiffMethod, Self::Err> {
-        match s {
-            "minimal" => Ok(DiffMethod::Minimal),
-            "full" => Ok(DiffMethod::Full),
-            _ => Err("unknown diff method".to_string()),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct ModelInitOperation {
@@ -208,7 +190,6 @@ pub struct ModelDiffOperation {
     engine: EngineRef,
     source: RevPath,
     target: RevPath,
-    method: DiffMethod,
 }
 
 impl ModelDiffOperation {
@@ -217,14 +198,12 @@ impl ModelDiffOperation {
         engine: EngineRef,
         source: RevPath,
         target: RevPath,
-        method: DiffMethod,
     ) -> ModelDiffOperation {
         ModelDiffOperation {
             operation,
             engine,
             source,
             target,
-            method,
         }
     }
 }
@@ -237,17 +216,12 @@ impl Future for ModelDiffOperation {
         let mut e = self.engine.write();
         let m1 = e.model_manager_mut().resolve(&self.source)?;
         let m2 = e.model_manager_mut().resolve(&self.target)?;
-        let diff = match self.method {
-            DiffMethod::Minimal => NodeDiff::minimal(
+        let diff = {
+            NodeDiff::diff(
                 m1.lock().root(),
                 m2.lock().root(),
                 e.config().model().diff(),
-            ),
-            DiffMethod::Full => NodeDiff::full(
-                m1.lock().root(),
-                m2.lock().root(),
-                e.config().model().diff(),
-            ),
+            )
         };
         Ok(Async::Ready(Outcome::NodeSet(
             to_tree(&diff).unwrap().into(),

@@ -17,7 +17,7 @@ use futures::stream::Stream;
 use kg_diag::BasicDiag;
 use op_rev::{RevPath};
 use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef, DiffMethod};
+use op_exec::{ConfigRef, Context as ExecContext, EngineRef};
 use op_exec::{SshAuth, SshDest};
 use op_log::{build_file_drain, CliLogger};
 use options::*;
@@ -177,7 +177,6 @@ fn main() {
             format,
             source,
             target,
-            method,
         } => {
             // FIXME fails when id provided instead of path (because of canonicalize)
             disp_format = format;
@@ -185,7 +184,6 @@ fn main() {
             ExecContext::ModelDiff {
                 prev_model: source,
                 next_model: target,
-                method,
             }
         }
         Command::Update {

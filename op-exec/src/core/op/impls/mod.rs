@@ -2,7 +2,6 @@ use super::*;
 
 use self::config::*;
 use self::exec::*;
-pub use self::model::DiffMethod;
 use self::model::*;
 use self::parallel::*;
 use self::sequence::*;
@@ -55,13 +54,11 @@ pub fn create_operation_impl(
         Context::ModelDiff {
             ref prev_model,
             ref next_model,
-            method,
         } => Box::new(ModelDiffOperation::new(
             operation.clone(),
             engine.clone(),
             prev_model.clone(),
             next_model.clone(),
-            method,
         )),
         Context::ModelUpdate {
             ref prev_model,
