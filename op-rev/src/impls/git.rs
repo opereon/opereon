@@ -7,6 +7,7 @@ use kg_diag::{BasicDiag, IntoDiagRes};
 
 pub type GitResult<T> = Result<T, BasicDiag>;
 
+//FIXME (jc) promote common file version manager errors to lib.rs
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1100)]
 pub enum GitErrorDetail {
@@ -51,8 +52,8 @@ pub struct GitManager {
 
 impl GitManager {
     /// Open existing git repository and return `GitManager`
-    pub fn open<P: Into<PathBuf>>(repo_dir: P) -> GitResult<Self> {
-        let path = repo_dir.into();
+    pub fn open<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
+        let path = fs::canonicalize(repo_dir.as_ref())?;
         let repo = git2::Repository::open(&path)
             .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
         Ok(GitManager {
@@ -62,10 +63,10 @@ impl GitManager {
     }
 
     /// Create a new git repository and return `GitManager`
-    pub fn create<P: Into<PathBuf>>(repo_dir: P) -> GitResult<Self> {
+    pub fn create<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
         use std::fmt::Write;
 
-        let path = repo_dir.into();
+        let path = fs::canonicalize(repo_dir.as_ref())?;
 
         let mut opts = git2::RepositoryInitOptions::new();
         opts.no_reinit(true);

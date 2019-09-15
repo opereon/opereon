@@ -43,7 +43,7 @@ run:
     let node: NodeRef = node!(node, yaml);
     let mut path = PathBuf::from("/path/to/source/file.yaml");
     let f = FileInfo::new(&path, FileType::File, "yaml".into());
-    node.data_mut().set_file(Some(&f));
+    node.data_mut().set_file(Some(f));
     let model: Model = Model::empty();
 
     let def = ProcDef::parse(&model, model.as_scoped(), &node).unwrap_disp();

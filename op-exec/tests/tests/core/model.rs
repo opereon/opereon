@@ -1,6 +1,5 @@
 use super::*;
 use op_exec::{ModelManager, ConfigRef};
-use op_exec::ModelManagerErrorDetail;
 use std::fs::File;
 use kg_diag::io::fs::{create_dir, read_string};
 
