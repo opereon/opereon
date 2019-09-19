@@ -46,8 +46,8 @@ fn search_manifest_not_found() {
 
     let (_err, _detail) = assert_detail!(
         res,
-        ModelManagerErrorDetail,
-        ModelManagerErrorDetail::ManifestNotFound
+        ModelErrorDetail,
+        ModelErrorDetail::ManifestNotFound
     );
 }
 
