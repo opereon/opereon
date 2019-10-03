@@ -29,7 +29,7 @@ fn non_existing_file() {
 fn non_existing_repo() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Sha1Hash::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -48,7 +48,7 @@ fn non_existing_repo() {
 fn bad_args_num() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Sha1Hash::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -72,7 +72,7 @@ fn bad_commit_oid() {
     let func = LoadFileFunc::new(
         dir.clone(),
         "".into(),
-        Sha1Hash::from_str("9306be9441bec94c673a494f05ffa389c1243d58").unwrap(),
+        Oid::from_str("9306be9441bec94c673a494f05ffa389c1243d58").unwrap(),
     );
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
@@ -92,7 +92,7 @@ fn bad_commit_oid() {
 fn arg_resolve_err() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Sha1Hash::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();

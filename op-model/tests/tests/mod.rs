@@ -1,5 +1,6 @@
 use super::*;
-use op_model::Sha1Hash;
+use op_rev::Oid;
+
 use std::path::Path;
 /// Creates `NodeRef`
 macro_rules! node {
@@ -23,7 +24,7 @@ macro_rules! node {
     }};
 }
 
-pub fn initial_commit(path: &Path) -> Sha1Hash {
+pub fn initial_commit(path: &Path) -> Oid {
     op_test_helpers::initial_commit(path).into()
 }
 

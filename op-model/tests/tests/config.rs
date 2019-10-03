@@ -24,7 +24,7 @@ fn resolver_scan_revision() {
 #[test]
 fn resolver_scan_bad_git_path() {
     let (_tmp, dir) = get_tmp_dir();
-    let res = ConfigResolver::scan_revision(&dir, &Sha1Hash::nil());
+    let res = ConfigResolver::scan_revision(&dir, &Oid::nil());
 
     let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::OpenRepository{..});
 }

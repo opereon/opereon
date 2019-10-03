@@ -72,8 +72,7 @@ mod tests {
             indoc!(
                 r#"---
                 id: "0000000000000000000000000000000000000000"
-                path: /home/example
-                "#
+                path: /home/example"#
             )
         );
     }
