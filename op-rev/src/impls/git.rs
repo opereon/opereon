@@ -76,7 +76,7 @@ impl GitManager {
 
         let mut config = repo.config().unwrap();
 
-        // TODO parametrize
+        // TODO parameterize
         config
             .set_str("user.name", "opereon")
             .map_err(|err| GitErrorDetail::SetConfig {

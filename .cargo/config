@@ -1,1 +1,12 @@
-paths = ["kg-diag/kg-diag"]
+paths = [
+    "kg-diag/kg-diag",
+    "kg-diag/kg-diag-derive",
+    "kg-display/kg-display",
+    "kg-display/kg-display-derive",
+    "kg-js",
+    "kg-lang",
+    "kg-symbol",
+    "kg-template",
+    "kg-tree",
+    "kg-utils"
+]
