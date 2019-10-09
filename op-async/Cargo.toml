@@ -1,0 +1,9 @@
+[package]
+name = "op-async"
+version = "0.1.1"
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
+workspace = ".."
+edition = "2018"
+
+[dependencies]
+tokio = "0.2.0-alpha.6"
