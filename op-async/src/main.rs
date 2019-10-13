@@ -19,19 +19,41 @@ struct Operation {
     id: Uuid,
     name: String,
     progress: f64,
+    waker: Option<Waker>,
 }
 
 impl Operation {
-    fn new(name: &str) -> OperationRef {
-        OperationRef::new(Operation {
+    fn new<S: Into<String>>(name: S) -> Operation {
+        Operation {
             id: Uuid::new_v4(),
             name: name.into(),
             progress: 0.0,
-        })
+            waker: None,
+        }
     }
 }
 
-type OperationRef = SyncRef<Operation>;
+#[derive(Clone)]
+struct OperationRef(SyncRef<Operation>);
+
+impl Deref for OperationRef {
+    type Target = SyncRef<Operation>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl OperationRef {
+    fn new<S: Into<String>>(name: S) -> OperationRef {
+        OperationRef(SyncRef::new(Operation::new(name)))
+    }
+
+    fn id(&self) -> Uuid {
+        self.0.read().id
+    }
+}
 
 struct Engine {
     operation_queue1: VecDeque<OperationRef>,
@@ -51,7 +73,15 @@ impl Engine {
     }
 
     fn enqueue_op(&mut self, op: OperationRef) {
-        self.operation_queue1.push_back(op);
+        self.operation_queue1.push_back(op.clone());
+        self.operations.insert(op.id(), op);
+        if let Some(ref w) = self.waker {
+            w.wake_by_ref();
+        }
+    }
+
+    fn finish_op(&mut self, op: &OperationRef) {
+        self.operations.remove(&op.id());
         if let Some(ref w) = self.waker {
             w.wake_by_ref();
         }
@@ -102,7 +132,9 @@ impl Future for EngineMainTask {
     type Output = EngineResult;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.engine.read().waker.is_none() {
+        println!("engine task poll: {}", std::thread::current().name().unwrap());
+
+        {
             let mut e = self.engine.write();
             e.waker = Some(cx.waker().clone());
         }
@@ -115,14 +147,17 @@ impl Future for EngineMainTask {
             }
         }
 
-        Poll::Ready(EngineResult { code: 0 })
+        if self.engine.read().operations.is_empty() {
+            Poll::Ready(EngineResult { code: 0 })
+        } else {
+            Poll::Pending
+        }
     }
 }
 
 struct OperationTask {
     engine: EngineRef,
     operation: OperationRef,
-    waker: Option<Waker>,
     interval: Interval,
 }
 
@@ -131,7 +166,6 @@ impl OperationTask {
         OperationTask {
             engine,
             operation,
-            waker: None,
             interval: Interval::new_interval(Duration::from_secs(3)),
         }
     }
@@ -141,14 +175,17 @@ impl Future for OperationTask {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.waker.is_none() {
-            self.waker = Some(cx.waker().clone());
+        println!("operation task poll: {} [{}]", self.operation.read().name, std::thread::current().name().unwrap());
+
+        {
+            let mut o = self.operation.write();
+            o.waker = Some(cx.waker().clone());
         }
 
         match self.interval.poll_next_unpin(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(_) => {
-                self.engine.write().operations.remove(&self.operation.read().id);
+                self.engine.write().finish_op(&self.operation);
                 Poll::Ready(())
             }
         }
@@ -163,7 +200,14 @@ fn main() -> EngineResult {
         builder.name_prefix("op-").build().unwrap()
     };
 
-    engine.write().enqueue_op(Operation::new("ddd"));
+    {
+        let mut e = engine.write();
+        e.enqueue_op(OperationRef::new("ddd1"));
+        e.enqueue_op(OperationRef::new("ddd2"));
+        e.enqueue_op(OperationRef::new("ddd3"));
+        e.enqueue_op(OperationRef::new("ddd4"));
+        e.enqueue_op(OperationRef::new("ddd5"));
+    }
 
     runtime.block_on(async move {
         engine.main_task().await
