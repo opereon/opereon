@@ -72,19 +72,21 @@ impl Engine {
         }
     }
 
+    fn wake(&mut self) {
+        if let Some(w) = self.waker.take() {
+            w.wake();
+        }
+    }
+
     fn enqueue_op(&mut self, op: OperationRef) {
         self.operation_queue1.push_back(op.clone());
         self.operations.insert(op.id(), op);
-        if let Some(ref w) = self.waker {
-            w.wake_by_ref();
-        }
+        self.wake();
     }
 
     fn finish_op(&mut self, op: &OperationRef) {
         self.operations.remove(&op.id());
-        if let Some(ref w) = self.waker {
-            w.wake_by_ref();
-        }
+        self.wake();
     }
 }
 
