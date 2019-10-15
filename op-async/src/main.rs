@@ -15,8 +15,14 @@ use std::ops::Deref;
 use tokio::timer::Interval;
 use std::time::Duration;
 
+mod progress;
+use progress::*;
+
+
 struct Operation {
     id: Uuid,
+    parent: Uuid,
+    operations: Vec<Uuid>,
     name: String,
     progress: f64,
     waker: Option<Waker>,
@@ -26,9 +32,17 @@ impl Operation {
     fn new<S: Into<String>>(name: S) -> Operation {
         Operation {
             id: Uuid::new_v4(),
+            parent: Uuid::nil(),
+            operations: Vec::new(),
             name: name.into(),
             progress: 0.0,
             waker: None,
+        }
+    }
+
+    fn wake(&mut self) {
+        if let Some(w) = self.waker.take() {
+            w.wake();
         }
     }
 }
@@ -60,6 +74,7 @@ struct Engine {
     operation_queue2: VecDeque<OperationRef>,
     operations: LinkedHashMap<Uuid, OperationRef>,
     waker: Option<Waker>,
+    progress_callbacks: Vec<Box<dyn Fn(OperationRef)>>,
 }
 
 impl Engine {
@@ -69,6 +84,7 @@ impl Engine {
             operation_queue2: VecDeque::new(),
             operations: LinkedHashMap::new(),
             waker: None,
+            progress_callbacks: Vec::new(),
         }
     }
 
@@ -157,18 +173,28 @@ impl Future for EngineMainTask {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum OperationState {
+    Init,
+    Progress,
+    Done,
+}
+
 struct OperationTask {
     engine: EngineRef,
     operation: OperationRef,
-    interval: Interval,
+    op_state: OperationState,
+    op_impl: Box<dyn OperationImpl>,
 }
 
 impl OperationTask {
-    fn new(engine: EngineRef, operation: OperationRef) -> OperationTask {
+    fn new(engine: EngineRef, operation: OperationRef, op_impl: Box<dyn OperationImpl>) -> OperationTask {
         OperationTask {
             engine,
             operation,
-            interval: Interval::new_interval(Duration::from_secs(3)),
+            op_state: OperationState::Init,
+            op_impl,
+//            interval: Interval::new_interval(Duration::from_secs(3)),
         }
     }
 }
@@ -184,6 +210,18 @@ impl Future for OperationTask {
             o.waker = Some(cx.waker().clone());
         }
 
+        match self.op_state {
+            OperationState::Init => {
+
+            }
+            OperationState::Progress => {
+
+            }
+            OperationState::Done => {
+
+            }
+        }
+
         match self.interval.poll_next_unpin(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(_) => {
@@ -193,6 +231,14 @@ impl Future for OperationTask {
         }
     }
 }
+
+
+trait OperationImpl {
+    fn poll_init(&mut self, engine: &EngineRef, operation: &OperationRef) -> Poll<()>,
+    fn poll_progress(&mut self, engine: &EngineRef, operation: &OperationRef) -> Poll<()>,
+    fn poll_done(&mut self, engine: &EngineRef, operation: &OperationRef) -> Poll<()>,
+}
+
 
 fn main() -> EngineResult {
     let engine = EngineRef::new(Engine::new());
@@ -211,7 +257,7 @@ fn main() -> EngineResult {
         e.enqueue_op(OperationRef::new("ddd5"));
     }
 
-    runtime.block_on(async move {
+    runtime.block_on(async {
         engine.main_task().await
     })
 }
