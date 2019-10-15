@@ -25,7 +25,7 @@ pub struct Progress {
     min: f64,
     max: f64,
     unit: Unit,
-    file_name: Option<String>,
+    label: Option<String>,
 }
 
 impl Progress {
@@ -36,13 +36,13 @@ impl Progress {
             min,
             max,
             unit,
-            file_name: None,
+            label: None,
         }
     }
 
     pub fn with_file_name<S: Into<String>>(min: f64, max: f64, unit: Unit, file_name: S) -> Progress {
         Progress {
-            file_name: Some(file_name.into()),
+            label: Some(file_name.into()),
             ..Progress::new(min, max, unit)
         }
     }
@@ -111,8 +111,8 @@ impl Progress {
         self.unit
     }
 
-    pub fn file_name(&self) -> Option<&String> {
-        self.file_name.as_ref()
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_ref().map(String::as_str)
     }
 
     pub(super) fn counter(&self) -> u32 {
@@ -128,7 +128,7 @@ impl Default for Progress {
             min: 0.,
             max: 999999999999.,
             unit: Unit::Scalar,
-            file_name: None,
+            label: None,
         }
     }
 }
