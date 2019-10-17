@@ -13,7 +13,7 @@ impl Unit {
             Unit::Scalar => "",
             Unit::Percent => "%",
             Unit::Bytes => "B",
-            Unit::Seconds => "sec",
+            Unit::Seconds => "s",
         }
     }
 }
@@ -21,29 +21,29 @@ impl Unit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Progress {
     counter: u32,
-    value: f64,
-    min: f64,
-    max: f64,
     unit: Unit,
+    value: f64,
+    max: f64,
+    speed: Option<f64>,
     label: Option<String>,
 }
 
 impl Progress {
-    pub fn new(min: f64, max: f64, unit: Unit) -> Progress {
+    pub fn new(max: f64, unit: Unit) -> Progress {
         Progress {
             counter: 0,
-            value: min,
-            min,
-            max,
             unit,
+            value: 0.,
+            max,
+            speed: None,
             label: None,
         }
     }
 
-    pub fn with_file_name<S: Into<String>>(min: f64, max: f64, unit: Unit, file_name: S) -> Progress {
+    pub fn with_label<S: Into<String>>(max: f64, unit: Unit, label: S) -> Progress {
         Progress {
-            label: Some(file_name.into()),
-            ..Progress::new(min, max, unit)
+            label: Some(label.into()),
+            ..Progress::new(max, unit)
         }
     }
 
@@ -83,8 +83,8 @@ impl Progress {
     pub fn set_value(&mut self, mut value: f64) -> bool {
         if value > self.max {
             value = self.max;
-        } else if value < self.min {
-            value = self.min;
+        } else if value < 0. {
+            value = 0.;
         }
         if (self.value - value).abs() > std::f64::EPSILON {
             self.value = value;
@@ -97,10 +97,6 @@ impl Progress {
 
     pub fn set_value_done(&mut self) -> bool {
         self.set_value(self.max)
-    }
-
-    pub fn min(&self) -> f64 {
-        self.min
     }
 
     pub fn max(&self) -> f64 {
@@ -124,10 +120,10 @@ impl Default for Progress {
     fn default() -> Self {
         Progress {
             counter: 0,
+            unit: Unit::Percent,
             value: 0.,
-            min: 0.,
-            max: 999999999999.,
-            unit: Unit::Scalar,
+            max: 100.,
+            speed: None,
             label: None,
         }
     }
@@ -135,6 +131,7 @@ impl Default for Progress {
 
 impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} / {} {}", self.value, self.max, self.unit.symbol())
+        let symbol = self.unit.symbol();
+        write!(f, "{}{} / {}{}", self.value, symbol, self.max, symbol)
     }
 }
