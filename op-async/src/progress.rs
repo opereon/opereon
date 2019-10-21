@@ -23,27 +23,29 @@ pub struct Progress {
     counter: u32,
     unit: Unit,
     value: f64,
+    min: f64,
     max: f64,
     speed: Option<f64>,
     label: Option<String>,
 }
 
 impl Progress {
-    pub fn new(max: f64, unit: Unit) -> Progress {
+    pub fn new(min: f64, max: f64, unit: Unit) -> Progress {
         Progress {
             counter: 0,
             unit,
-            value: 0.,
+            value: min,
+            min,
             max,
             speed: None,
             label: None,
         }
     }
 
-    pub fn with_label<S: Into<String>>(max: f64, unit: Unit, label: S) -> Progress {
+    pub fn with_label<S: Into<String>>(min: f64, max: f64, unit: Unit, label: S) -> Progress {
         Progress {
             label: Some(label.into()),
-            ..Progress::new(max, unit)
+            ..Progress::new(min, max, unit)
         }
     }
 
@@ -83,8 +85,8 @@ impl Progress {
     pub fn set_value(&mut self, mut value: f64) -> bool {
         if value > self.max {
             value = self.max;
-        } else if value < 0. {
-            value = 0.;
+        } else if value < self.min {
+            value = self.min;
         }
         if (self.value - value).abs() > std::f64::EPSILON {
             self.value = value;
@@ -97,6 +99,10 @@ impl Progress {
 
     pub fn set_value_done(&mut self) -> bool {
         self.set_value(self.max)
+    }
+
+    pub fn min(&self) -> f64 {
+        self.min
     }
 
     pub fn max(&self) -> f64 {
@@ -122,6 +128,7 @@ impl Default for Progress {
             counter: 0,
             unit: Unit::Percent,
             value: 0.,
+            min: 0.,
             max: 100.,
             speed: None,
             label: None,
@@ -132,6 +139,6 @@ impl Default for Progress {
 impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let symbol = self.unit.symbol();
-        write!(f, "{}{} / {}{}", self.value, symbol, self.max, symbol)
+        write!(f, "{}{} / {}{}", self.value, symbol, (self.max - self.min), symbol)
     }
 }

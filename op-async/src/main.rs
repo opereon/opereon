@@ -4,19 +4,18 @@
 extern crate serde_derive;
 
 use std::collections::VecDeque;
-
-use tokio::prelude::*;
-use tokio::runtime;
-use uuid::Uuid;
-
-use kg_utils::collections::LinkedHashMap;
-use kg_utils::sync::*;
+use std::future::Future;
 use std::task::{Context, Poll, Waker};
 use std::pin::Pin;
 use std::process::Termination;
 use std::ops::Deref;
-use tokio::timer::Interval;
 use std::time::Duration;
+use tokio::prelude::*;
+use tokio::runtime;
+use tokio::timer::Interval;
+use uuid::Uuid;
+use kg_utils::collections::LinkedHashMap;
+use kg_utils::sync::*;
 
 mod progress;
 use progress::*;
@@ -48,6 +47,18 @@ impl Operation {
             w.wake();
         }
     }
+
+    fn set_waker(&mut self, waker: Waker) {
+        self.waker = Some(waker);
+    }
+
+    fn parent(&self) -> Option<Uuid> {
+        if self.parent.is_nil() {
+            None
+        } else {
+            Some(self.parent)
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -69,6 +80,10 @@ impl OperationRef {
 
     fn id(&self) -> Uuid {
         self.0.read().id
+    }
+
+    fn set_waker(&self, waker: Waker) {
+        self.write().set_waker(waker);
     }
 }
 
@@ -103,14 +118,14 @@ impl Operations {
 
 struct Core {
     waker: Option<Waker>,
-    progress_callbacks: Vec<Box<dyn FnMut(&EngineRef, &OperationRef)>>,
+    progress_callback: Option<Box<dyn FnMut(&EngineRef, &OperationRef)>>,
 }
 
 impl Core {
     fn new() -> Core {
         Core {
             waker: None,
-            progress_callbacks: Vec::new(),
+            progress_callback: None,
         }
     }
 
@@ -118,6 +133,10 @@ impl Core {
         if let Some(w) = self.waker.take() {
             w.wake();
         }
+    }
+
+    fn set_waker(&mut self, waker: Waker) {
+        self.waker = Some(waker);
     }
 }
 
@@ -140,12 +159,28 @@ struct EngineRef {
 }
 
 impl EngineRef {
-    fn new() -> EngineRef {
+    pub fn new() -> EngineRef {
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
             services: SyncRef::new(Services::new()),
         }
+    }
+
+    pub fn run(&self) -> EngineResult {
+        let runtime = {
+            let mut builder = runtime::Builder::new();
+            builder.name_prefix("op-").build().unwrap()
+        };
+
+        runtime.block_on(async {
+            self.main_task().await
+        })
+    }
+
+    pub fn operations(&self) -> SyncRefMapReadGuard<LinkedHashMap<Uuid, OperationRef>> {
+        let ops = self.operations.read();
+        SyncRefReadGuard::map(ops, |o| &o.operations)
     }
 
     fn main_task(&self) -> EngineMainTask {
@@ -154,35 +189,30 @@ impl EngineRef {
         }
     }
 
-    fn operations(&self) -> SyncRefMapReadGuard<LinkedHashMap<Uuid, OperationRef>> {
-        let ops = self.operations.read();
-        SyncRefReadGuard::map(ops, |o| &o.operations)
-    }
-
     fn set_waker(&self, waker: Waker) {
-        self.core.write().waker = Some(waker);
+        self.core.write().set_waker(waker);
     }
 
-    #[inline]
-    fn enqueue_operation(&self, op: OperationRef) {
-        self.operations.write().add_operation(op.clone());
+    pub fn enqueue_operation(&self, operation: OperationRef) {
+        self.operations.write().add_operation(operation.clone());
         self.core.write().wake();
     }
 
-    #[inline]
-    fn finish_operation(&self, op: &OperationRef) {
-        self.operations.write().remove_operation(op);
+    fn finish_operation(&self, operation: &OperationRef) {
+        if operation.read().parent().is_some() {
+
+        } else {
+            self.operations.write().remove_operation(operation);
+        }
         self.core.write().wake();
     }
 
-    #[inline]
-    fn register_progress_cb<F: FnMut(&EngineRef, &OperationRef) + 'static>(&self, callback: F) {
-        self.core.write().progress_callbacks.push(Box::new(callback));
+    pub fn register_progress_cb<F: FnMut(&EngineRef, &OperationRef) + 'static>(&self, callback: F) {
+        self.core.write().progress_callback = Some(Box::new(callback));
     }
 
-    #[inline]
     fn notify_progress(&self, operation: &OperationRef) {
-        for cb in self.core.write().progress_callbacks.iter_mut() {
+        if let Some(ref mut cb) = self.core.write().progress_callback {
             cb(&self, operation);
         }
     }
@@ -271,12 +301,12 @@ impl Future for OperationTask {
         let engine = unsafe { transmute::<&'_ EngineRef, &'_ EngineRef>(&self.engine) };
         let operation = unsafe { transmute::<&'_ OperationRef, &'_ OperationRef>(&self.operation) };
 
-        let progress_counter;
+        let progress_counter1;
 
         {
             let mut o = operation.write();
-            o.waker = Some(cx.waker().clone());
-            progress_counter = o.progress.counter();
+            o.set_waker(cx.waker().clone());
+            progress_counter1 = o.progress.counter();
         }
 
         //TODO: unwind panics
@@ -310,7 +340,7 @@ impl Future for OperationTask {
 
         let progress_counter2 = operation.read().progress.counter();
 
-        if progress_counter != progress_counter2 {
+        if progress_counter1 != progress_counter2 {
             engine.notify_progress(operation);
         }
 
@@ -341,8 +371,7 @@ impl TestOp {
 
 impl OperationImpl for TestOp {
     fn poll_init(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
-        //println!("init: {}", operation.read().name);
-        self.interval.poll_next_unpin(cx).map(|_| ())
+        Poll::Ready(())
     }
 
     fn poll_progress(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
@@ -366,8 +395,7 @@ impl OperationImpl for TestOp {
     }
 
     fn poll_done(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
-        //println!("done: {}", operation.read().name);
-        self.interval.poll_next_unpin(cx).map(|_| ())
+        Poll::Ready(())
     }
 }
 
@@ -395,24 +423,16 @@ fn print_output(output: &str, first: bool) {
 fn main() -> EngineResult {
     let engine = EngineRef::new();
 
-    let runtime = {
-        let mut builder = runtime::Builder::new();
-        builder.name_prefix("op-").build().unwrap()
-    };
-
     engine.enqueue_operation(OperationRef::new("ddd1"));
     engine.enqueue_operation(OperationRef::new("ddd2"));
     engine.enqueue_operation(OperationRef::new("ddd3"));
     engine.enqueue_operation(OperationRef::new("ddd4"));
-    engine.enqueue_operation(OperationRef::new("ddd5"));
-
-    print_progress(&engine, true);
 
     engine.register_progress_cb(|e, o| {
         print_progress(e, false);
     });
 
-    runtime.block_on(async {
-        engine.main_task().await
-    })
+    print_progress(&engine, true);
+
+    engine.run()
 }

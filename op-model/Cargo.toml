@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 kg-diag = "0.4.0"
-kg-utils = "0.3.1"
+kg-utils = "0.4.0"
 kg-tree = "0.2.0"
 kg-symbol = "0.1.10"
 kg-display = "0.1.2"
@@ -15,7 +15,7 @@ kg-display-derive = "0.1.1"
 kg-diag-derive = "0.4.0"
 op-rev = { version = "0.1.1", path = "../op-rev" }
 slog = "2.5.2"
-libc = "0.2.62"
+libc = "0.2.65"
 walkdir = "2.2.9"
 globset = "0.4.4"
 serde = "1.0.101"
