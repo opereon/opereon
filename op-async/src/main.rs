@@ -268,6 +268,7 @@ enum OperationState {
     Init,
     Progress,
     Done,
+    Cancel,
 }
 
 struct OperationTask {
@@ -330,6 +331,13 @@ impl Future for OperationTask {
                 }
             },
             OperationState::Done => match self.op_impl.as_mut().poll_done(cx, engine, operation) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(_) => {
+                    engine.finish_operation(operation);
+                    Poll::Ready(())
+                }
+            },
+            OperationState::Cancel => match self.op_impl.as_mut().poll_cancel(cx, engine, operation) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => {
                     engine.finish_operation(operation);
