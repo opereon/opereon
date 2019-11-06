@@ -350,9 +350,19 @@ impl Future for OperationTask {
 
 
 trait OperationImpl: Send {
-    fn poll_init(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()>;
+    fn poll_init(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+        Poll::Ready(())
+    }
+
     fn poll_progress(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()>;
-    fn poll_done(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()>;
+
+    fn poll_done(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+        Poll::Ready(())
+    }
+
+    fn poll_cancel(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+        Poll::Ready(())
+    }
 }
 
 struct TestOp {

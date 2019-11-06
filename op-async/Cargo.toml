@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 kg-utils = "0.4.0"
 tokio = "0.2.0-alpha.6"
-uuid = { version = "0.8.0", features = ["v1", "v3", "v4", "v5", "serde"] }
-serde = "1.0.101"
-serde_derive = "1.0.101"
+uuid = { version = "0.8.1", features = ["v1", "v3", "v4", "v5", "serde"] }
+serde = "1.0.102"
+serde_derive = "1.0.102"
