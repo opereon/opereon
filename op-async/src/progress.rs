@@ -18,13 +18,14 @@ impl Unit {
     }
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Progress {
     counter: u32,
     unit: Unit,
-    value: f64,
     min: f64,
     max: f64,
+    value: f64,
     speed: Option<f64>,
     label: Option<String>,
 }
@@ -39,13 +40,6 @@ impl Progress {
             max,
             speed: None,
             label: None,
-        }
-    }
-
-    pub fn with_label<S: Into<String>>(min: f64, max: f64, unit: Unit, label: S) -> Progress {
-        Progress {
-            label: Some(label.into()),
-            ..Progress::new(min, max, unit)
         }
     }
 
@@ -117,6 +111,32 @@ impl Progress {
         self.label.as_ref().map(String::as_str)
     }
 
+    pub fn set_label<S: Into<String>>(&mut self, label: S) {
+        self.label = Some(label.into())
+    }
+
+    pub fn speed(&self) -> Option<f64> {
+        self.speed
+    }
+
+    pub fn set_speed(&mut self, speed: f64) {
+        self.speed = Some(speed)
+    }
+
+    pub fn update(&mut self, u: ProgressUpdate) {
+        if u.value.is_finite() {
+            self.set_value(u.value);
+        } else {
+            self.set_value_done();
+        }
+        if u.speed.is_some() {
+            self.speed = u.speed;
+        }
+        if u.label.is_some() {
+            self.label = u.label;
+        }
+    }
+
     pub(super) fn counter(&self) -> u32 {
         self.counter
     }
@@ -140,5 +160,41 @@ impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let symbol = self.unit.symbol();
         write!(f, "{}{} / {}{}", self.value, symbol, (self.max - self.min), symbol)
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgressUpdate {
+    value: f64,
+    speed: Option<f64>,
+    label: Option<String>,
+}
+
+impl ProgressUpdate {
+    pub fn new(value: f64) -> ProgressUpdate {
+        ProgressUpdate {
+            value,
+            speed: None,
+            label: None,
+        }
+    }
+
+    pub fn done() -> ProgressUpdate {
+        ProgressUpdate {
+            value: std::f64::NAN,
+            speed: None,
+            label: None,
+        }
+    }
+
+    pub fn with_speed(mut self, speed: f64) -> ProgressUpdate {
+        self.speed = Some(speed);
+        self
+    }
+
+    pub fn with_label<S: Into<String>>(mut self, label: S) -> ProgressUpdate {
+        self.label = Some(label.into());
+        self
     }
 }

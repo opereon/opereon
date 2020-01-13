@@ -7,7 +7,9 @@ edition = "2018"
 
 [dependencies]
 kg-utils = "0.4.0"
-tokio = "0.2.0-alpha.6"
+futures = "0.3.1"
+tokio = { version = "0.2.6", features = ["full"] }
 uuid = { version = "0.8.1", features = ["v1", "v3", "v4", "v5", "serde"] }
 serde = "1.0.102"
 serde_derive = "1.0.102"
+rand = "0.7.2"

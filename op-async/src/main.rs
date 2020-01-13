@@ -10,9 +10,9 @@ use std::pin::Pin;
 use std::process::Termination;
 use std::ops::Deref;
 use std::time::Duration;
+use futures::prelude::*;
 use tokio::prelude::*;
-use tokio::runtime;
-use tokio::timer::Interval;
+use tokio::time::Interval;
 use uuid::Uuid;
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::*;
@@ -168,11 +168,12 @@ impl EngineRef {
     }
 
     pub fn run(&self) -> EngineResult {
-        let runtime = {
-            let mut builder = runtime::Builder::new();
-            builder.name_prefix("op-").build().unwrap()
-        };
-
+        let mut runtime = tokio::runtime::Builder::new()
+            .enable_all()
+            .threaded_scheduler()
+            .thread_name("engine")
+            .build()
+            .unwrap();
         runtime.block_on(async {
             self.main_task().await
         })
@@ -245,11 +246,11 @@ impl Future for EngineMainTask {
         if !self.engine.operations.read().operation_queue1.is_empty() {
             let mut ops = self.engine.operations.write();
             while let Some(op) = ops.operation_queue1.pop_front() {
-                let task = OperationTask::new(
+                let op_task = OperationTask::new(
                     self.engine.clone(),
                     op,
                     TestOp::new());
-                tokio::spawn(task);
+                tokio::spawn(op_task);
             }
             ops.swap_queues();
         }
@@ -279,12 +280,12 @@ struct OperationTask {
 }
 
 impl OperationTask {
-    fn new(engine: EngineRef, operation: OperationRef, op_impl: Pin<Box<dyn OperationImpl>>) -> OperationTask {
+    fn new(engine: EngineRef, operation: OperationRef, op_impl: Box<dyn OperationImpl>) -> OperationTask {
         OperationTask {
             engine,
             operation,
             op_state: OperationState::Init,
-            op_impl,
+            op_impl: op_impl.into(),
         }
     }
 }
@@ -321,12 +322,18 @@ impl Future for OperationTask {
                 }
             },
             OperationState::Progress => match self.op_impl.as_mut().poll_progress(cx, engine, operation) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => {
-                    self.op_state = OperationState::Done;
+                Poll::Pending => {
                     let mut o = operation.write();
-                    o.progress.set_value_done();
                     o.wake();
+                    Poll::Pending
+                },
+                Poll::Ready(u) => {
+                    let mut o = operation.write();
+                    o.progress.update(u);
+                    o.wake();
+                    if o.progress.is_done() {
+                        self.op_state = OperationState::Done;
+                    }
                     Poll::Pending
                 }
             },
@@ -358,17 +365,17 @@ impl Future for OperationTask {
 
 
 trait OperationImpl: Send {
-    fn poll_init(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+    fn poll_init(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
         Poll::Ready(())
     }
 
-    fn poll_progress(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()>;
+    fn poll_progress(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<ProgressUpdate>;
 
-    fn poll_done(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+    fn poll_done(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
         Poll::Ready(())
     }
 
-    fn poll_cancel(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+    fn poll_cancel(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
         Poll::Ready(())
     }
 }
@@ -379,41 +386,31 @@ struct TestOp {
 }
 
 impl TestOp {
-    fn new() -> Pin<Box<Self>> {
-        Box::pin(TestOp {
-            interval: Interval::new_interval(Duration::from_secs(1)),
-            count: 5,
+    fn new() -> Box<Self> {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        Box::new(TestOp {
+            interval: tokio::time::interval(Duration::from_secs(rng.gen_range(1, 3))),
+            count: rng.gen_range(1, 5),
         })
     }
 }
 
 impl OperationImpl for TestOp {
-    fn poll_init(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
-        Poll::Ready(())
-    }
-
-    fn poll_progress(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
+    fn poll_progress(mut self: Pin<&mut Self>, cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<ProgressUpdate> {
         //println!("progress: {}", operation.read().name);
         if self.count > 0 {
-            match self.interval.poll_next_unpin(cx) {
+            let interval = Pin::new(&mut self.interval);
+            match interval.poll_next(cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => {
                     self.count -= 1;
-                    {
-                        let mut o = operation.write();
-                        o.progress.set_value((5.0 - self.count as f64) * 20.0);
-                        o.wake();
-                    }
-                    Poll::Pending
+                    Poll::Ready(ProgressUpdate::new((5.0 - self.count as f64) * 20.0))
                 }
             }
         } else {
-            Poll::Ready(())
+            Poll::Ready(ProgressUpdate::done())
         }
-    }
-
-    fn poll_done(mut self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<()> {
-        Poll::Ready(())
     }
 }
 
