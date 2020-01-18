@@ -1,0 +1,9 @@
+[package]
+name = "op-arena"
+version = "0.1.0"
+authors = ["jchlapinski <jakub.chlapinski@kodegenix.pl>"]
+workspace = ".."
+edition = "2018"
+
+[dependencies]
+bytes = "0.5.3"
