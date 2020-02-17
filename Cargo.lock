@@ -925,13 +925,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "op-arena"
-version = "0.1.0"
-dependencies = [
- "bytes 0.5.3",
-]
-
-[[package]]
 name = "op-async"
 version = "0.1.1"
 dependencies = [
