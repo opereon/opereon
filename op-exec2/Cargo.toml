@@ -1,0 +1,46 @@
+[package]
+name = "op-exec2"
+version = "0.1.1"
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
+workspace = ".."
+edition = "2018"
+
+[dependencies]
+kg-diag = "0.4.0"
+kg-diag-derive = "0.4.0"
+kg-display-derive = "0.1.1"
+kg-utils = "0.4.0"
+kg-tree = "0.2.0"
+kg-template = "0.1.2"
+kg-symbol= "0.1.10"
+kg-lang = "0.1.1"
+op-model = { version = "0.1.1", path = "../op-model" }
+op-rev = { version = "0.1.1", path = "../op-rev" }
+op-log = { version = "0.1.0", path = "../op-log" }
+tokio = { version = "0.2.11", features = ["full"] }
+os_pipe = "0.9.1"
+time = "0.2.2"
+chrono = { version = "0.4.10", features = ["serde"] }
+serde = "1.0.104"
+serde_derive = "1.0.104"
+serde_json = "1.0.44"
+serde_yaml = "0.8.11"
+toml = "0.5.6"
+rmp-serde = "0.14.0"
+libc = "0.2.66"
+regex = "1.3.3"
+uuid = { version = "0.8.1", features = ["v1", "v3", "v4", "v5", "serde"] }
+bytes = "0.5.3"
+lazy_static = "1.4.0"
+rand = "0.7.3"
+walkdir = "2.3.1"
+slog = "2.5.2"
+users = "0.9.1"
+url = "2.1.1"
+git2 = "0.11.0"
+parking_lot = "0.10.0"
+
+[dev-dependencies]
+tempfile = "3.1.0"
+pretty_assertions = "0.6.1"
+op-test-helpers = { version = "0.1.0", path = "../op-test-helpers" }
