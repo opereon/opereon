@@ -3,14 +3,16 @@ use super::*;
 use std::time::Instant;
 use std::sync::Arc;
 use parking_lot::Mutex;
+use std::io::Error;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(u8)]
 pub enum EntryKind {
-    In,
-    Out,
-    Err,
-    Status,
-    Command,
+    Out     = 0x01,
+    Err     = 0x02,
+    In      = 0x04,
+    Status  = 0x08,
+    Command = 0x10,
 }
 
 
@@ -169,6 +171,32 @@ impl std::fmt::Display for Output {
     }
 }
 
+/*
+pub struct OutputLogReader {
+    log: OutputLog,
+    kind_mask: u8,
+    entry_index: usize,
+    entry_offset: usize,
+}
+
+impl OutputLogReader {
+    pub fn new(log: &OutputLog, kind_mask: u8) -> OutputLogReader {
+        OutputLogReader {
+            log: log.clone(),
+            kind_mask,
+            entry_index: 0,
+            entry_offset: 0,
+        }
+    }
+}
+
+impl std::io::Read for OutputLogReader {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let log = self.log.lock()
+    }
+}
+*/
+
 
 #[cfg(test)]
 mod tests {
@@ -177,8 +205,8 @@ mod tests {
     #[test]
     fn display_outlog() {
         let log = OutputLog::new();
-        log.log_command(b"echo 'dupa'").unwrap();
-        log.log_out(b"dupa").unwrap();
+        log.log_command(b"echo 'test'").unwrap();
+        log.log_out(b"test").unwrap();
         log.log_err(b"unknown error").unwrap();
         log.log_status(Some(0)).unwrap();
         log.log_status(None).unwrap();
