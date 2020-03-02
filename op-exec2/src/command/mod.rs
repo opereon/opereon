@@ -1,8 +1,8 @@
 use super::*;
 
-use tokio::process::Command;
-use tokio::io::{BufReader, AsyncBufReadExt};
-
+use tokio::process::{Command, Child};
+use tokio::io::{BufReader, AsyncRead, AsyncBufRead, AsyncBufReadExt};
+use futures::future::try_join;
 use std::process::Stdio;
 
 async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::Error> {
@@ -12,29 +12,37 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
 
     let mut child = command.spawn()?;
 
-    let mut stdout = BufReader::new(child.stdout.take().unwrap()).lines();
-    let mut stderr = BufReader::new(child.stderr.take().unwrap()).lines();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut stderr = BufReader::new(child.stderr.take().unwrap());
     drop(child.stdin.take());
 
-    tokio::spawn(async move {
-        while let Ok(Some(line)) = stdout.next_line().await {
+    async fn status(mut child: Child) -> Result<(), std::io::Error> {
+        let status = child.await?;
+        println!("status: {}", status);
+        Ok(())
+    }
+
+    async fn stdout_read<R: AsyncRead + Unpin>(mut s: BufReader<R>) -> Result<(), std::io::Error> {
+        let mut stdout = s.lines();
+        while let Some(line) = stdout.next_line().await? {
             println!("out: {}", line);
         }
         println!("out: ---");
-    });
+        Ok(())
+    }
 
-    tokio::spawn(async move {
-        while let Ok(Some(line)) = stderr.next_line().await {
+    async fn stderr_read<R: AsyncRead + Unpin>(mut s: BufReader<R>) -> Result<(), std::io::Error> {
+        let mut stderr = s.lines();
+        while let Some(line) = stderr.next_line().await? {
             println!("err: {}", line);
         }
         println!("err: ---");
-    });
+        Ok(())
+    };
 
-    let status = child.await?;
+    try_join(stdout_read(stdout), stderr_read(stderr)).await?;
 
-    println!("status: {}", status);
-
-    Ok(())
+    status(child).await
 }
 
 #[cfg(test)]
@@ -43,8 +51,8 @@ mod tests {
 
     #[test]
     fn ssh_command() {
-        let mut cmd = Command::new("/usr/bin/cat");
-        cmd.arg("/etc/hosts");
+        let mut cmd = Command::new("/usr/bin/bash");
+        cmd.arg("-c").arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2; sleep 0.1; done;");
 
         let log = OutputLog::new();
 
