@@ -12,17 +12,17 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
 
     let mut child = command.spawn()?;
 
-    let mut stdout = BufReader::new(child.stdout.take().unwrap());
-    let mut stderr = BufReader::new(child.stderr.take().unwrap());
+    let stdout = BufReader::new(child.stdout.take().unwrap());
+    let stderr = BufReader::new(child.stderr.take().unwrap());
     drop(child.stdin.take());
 
-    async fn status(mut child: Child) -> Result<(), std::io::Error> {
+    async fn status(child: Child) -> Result<(), std::io::Error> {
         let status = child.await?;
         println!("status: {}", status);
         Ok(())
     }
 
-    async fn stdout_read<R: AsyncRead + Unpin>(mut s: BufReader<R>) -> Result<(), std::io::Error> {
+    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
         let mut stdout = s.lines();
         while let Some(line) = stdout.next_line().await? {
             println!("out: {}", line);
@@ -31,7 +31,7 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
         Ok(())
     }
 
-    async fn stderr_read<R: AsyncRead + Unpin>(mut s: BufReader<R>) -> Result<(), std::io::Error> {
+    async fn stderr_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
         let mut stderr = s.lines();
         while let Some(line) = stderr.next_line().await? {
             println!("err: {}", line);
