@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn ssh_command() {
         let mut cmd = Command::new("/usr/bin/bash");
-        cmd.arg("-c").arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2; sleep 0.1; done;");
+        cmd.arg("-c").arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2;  done;");
 
         let log = OutputLog::new();
 
