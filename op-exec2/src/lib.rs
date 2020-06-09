@@ -35,5 +35,6 @@ use kg_utils::collections::{LinkedHashMap, LruCache};
 mod command;
 mod outlog;
 mod rsync;
+mod utils;
 
 pub use self::outlog::{EntryKind, OutputLog};

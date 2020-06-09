@@ -13,6 +13,7 @@ use std::sync::{MutexGuard, Arc, Mutex};
 use os_pipe::pipe;
 use crate::rsync::RsyncParseErrorDetail::Custom;
 use futures::future::try_join;
+use crate::utils::lines;
 
 type Loaded = u64;
 
@@ -125,10 +126,10 @@ fn parse_progress<R: BufRead>(mut out: R) -> RsyncParseResult<()> {
             //     .write()
             //     .update_progress_step_value(file_idx, loaded_bytes);
 
-            //            eprintln!("File: {} : {}/{}", file_name, loaded_bytes, file_size, );
+            // eprintln!("File: {} : {}", file_name, loaded_bytes);
 
             if progress_info.len() == 6 {
-                //                            eprintln!("file_completed: {:?}", file_name);
+                // eprintln!("file_completed: {:?}", file_name);
                 // operation.write().update_progress_step_value_done(file_idx);
                 file_idx += 1;
                 file_completed = true;
@@ -221,11 +222,13 @@ async fn rsync_copy(
     drop(child.stdin.take());
 
     async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
-        let mut stdout = s.lines();
+        let mut stdout = lines(s);
         while let Some(line) = stdout.next_line().await? {
             println!("out: {:?}", line);
         }
         println!("out: ---");
+        //parse_progress(stdout);
+
         Ok(())
     }
 
@@ -433,7 +436,7 @@ mod tests {
     #[test]
     fn rsync_copy_test() {
         let cfg = RsyncConfig::default();
-        let mut params = RsyncParams::new("./", "./test_file.txt", "./target_dir/");
+        let mut params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
