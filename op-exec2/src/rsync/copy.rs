@@ -80,27 +80,21 @@ fn read_until<R: BufRead + ?Sized>(
     }
 }
 
-fn parse_progress<R: BufRead>(mut out: R) -> RsyncParseResult<()> {
-    let mut file_name: String;
+async fn parse_progress<R: AsyncRead + Unpin>(mut out: BufReader<R>) -> RsyncParseResult<()> {
+    let mut lines = lines(out);
+    let mut file_name: String = String::new();
     let mut file_completed = true;
     let mut file_idx = 0;
 
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
 
-    let mut buf = Vec::new();
-
-    let delimiter = |b| b == b'\n' || b == b'\r';
-
     // skip first line: "sending incremental file list"
-    read_until(&mut out, delimiter, &mut buf)?;
-    buf.clear();
+    lines.next_line().await.map_err_to_diag()?;
 
-    while read_until(&mut out, delimiter, &mut buf)? != 0 {
-        let line = String::from_utf8_lossy(buf.as_slice());
+    while let Some(line) = lines.next_line().await.map_err_to_diag()? {
         // skip parsing when line is empty
         if line == "\n" || line == "\r" || line.is_empty() {
-            buf.clear();
             continue;
         }
         // skip \n or \r at the end of line
@@ -126,15 +120,14 @@ fn parse_progress<R: BufRead>(mut out: R) -> RsyncParseResult<()> {
             //     .write()
             //     .update_progress_step_value(file_idx, loaded_bytes);
 
-            // eprintln!("File: {} : {}", file_name, loaded_bytes);
+            eprintln!("File: {} : {}", file_name, loaded_bytes);
 
             if progress_info.len() == 6 {
-                // eprintln!("file_completed: {:?}", file_name);
+                eprintln!("File completed: {:?}", file_name);
                 // operation.write().update_progress_step_value_done(file_idx);
                 file_idx += 1;
                 file_completed = true;
             }
-            buf.clear();
             continue;
         }
 
@@ -158,11 +151,9 @@ fn parse_progress<R: BufRead>(mut out: R) -> RsyncParseResult<()> {
 
             file_completed = true;
             file_idx += 1;
-            buf.clear();
             continue;
         }
         file_completed = false;
-        buf.clear()
     }
     Ok(())
 }
@@ -221,28 +212,21 @@ async fn rsync_copy(
     let stderr = BufReader::new(child.stderr.take().unwrap());
     drop(child.stdin.take());
 
-    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
-        let mut stdout = lines(s);
-        while let Some(line) = stdout.next_line().await? {
-            println!("out: {:?}", line);
-        }
-        println!("out: ---");
-        //parse_progress(stdout);
-
+    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> RsyncResult<()> {
+        parse_progress(s).await?;
         Ok(())
     }
 
-    async fn stderr_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
+    async fn stderr_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> RsyncResult<()> {
         let mut stderr = s.lines();
-        while let Some(line) = stderr.next_line().await? {
+        while let Some(line) = stderr.next_line().await.map_err_to_diag()? {
             println!("err: {:?}", line);
         }
         println!("err: ---");
         Ok(())
     }
-    ;
 
-    try_join(stdout_read(stdout), stderr_read(stderr)).await.map_err_to_diag()?;
+    try_join(stdout_read(stdout), stderr_read(stderr)).await?;
 
     let status = child.await.map_err_to_diag()?;
     log.log_status(status.code())?;
