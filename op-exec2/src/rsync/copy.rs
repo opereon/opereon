@@ -158,7 +158,7 @@ async fn parse_progress<R: AsyncRead + Unpin>(mut out: BufReader<R>) -> RsyncPar
     Ok(())
 }
 
-async fn rsync_copy(
+pub async fn rsync_copy(
     config: &RsyncConfig,
     params: &RsyncParams,
     log: &OutputLog,
@@ -389,7 +389,9 @@ mod tests {
     #[test]
     fn rsync_copy_test() {
         let cfg = RsyncConfig::default();
-        let mut params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let mut params = RsyncParams::new("./",
+                                          "./../target/debug/incremental",
+                                          "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");

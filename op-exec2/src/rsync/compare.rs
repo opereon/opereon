@@ -248,8 +248,8 @@ fn build_compare_cmd(
     }
     Ok(rsync_cmd)
 }
-/**
-pub fn rsync_compare(
+
+pub async fn rsync_compare(
     config: &RsyncConfig,
     params: &RsyncParams,
     checksum: bool,
@@ -257,7 +257,7 @@ pub fn rsync_compare(
 ) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = build_compare_cmd(config, params, checksum)?;
     // log.log_cmd(&format!("{:?}", rsync_cmd))?;
-    let output = rsync_cmd.output().map_err(RsyncErrorDetail::spawn_err)?;
+    let output = rsync_cmd.output().await.map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
         status,
@@ -281,7 +281,6 @@ pub fn rsync_compare(
         }
     }
 }
-*/
 
 fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
     let mut diffs = Vec::new();
@@ -341,5 +340,22 @@ mod tests {
         let cmd = build_compare_cmd(&cfg, &params, false).unwrap_disp();
 
         assert_eq!(expected, format!("{:?}", cmd));
+    }
+
+    #[test]
+    fn rsync_compare_test() {
+        let cfg = RsyncConfig::default();
+        let mut params = RsyncParams::new("./",
+                                          "./../target/debug/incremental",
+                                          "./../target/debug2");
+        let log = OutputLog::new();
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        rt.block_on(async move {
+            let diffs = rsync_compare(&cfg, &params, false, &log).await.expect("error");
+            eprintln!("diffs = {:#?}", diffs);
+            println!("{}", log)
+        });
     }
 }
