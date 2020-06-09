@@ -163,34 +163,6 @@ async fn rsync_copy(
     params: &RsyncParams,
     log: &OutputLog,
 ) -> RsyncResult<()> {
-    // let out_log = log.clone();
-    // let err_log = log.clone();
-    // let run_stdout = move || {
-    //     let buf = BufReader::new(stdout);
-    //
-    //     for line in buf.lines() {
-    //         match line {
-    //             Ok(line) => out_log.log_stdout(line.as_bytes())?,
-    //             Err(err) => return Err(err).map_err_to_diag(),
-    //         }
-    //     }
-    //     Ok(())
-    // };
-    //
-    // let run_stderr = move || {
-    //     let buf = BufReader::new(stderr);
-    //
-    //     for line in buf.lines() {
-    //         match line {
-    //             Ok(line) => err_log.log_stderr(line.as_bytes())?,
-    //             Err(err) => return Err(err).map_err_to_diag(),
-    //         }
-    //     }
-    //     Ok(())
-    // };
-    //
-    // let hout: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stdout);
-    // let herr: JoinHandle<RsyncResult<()>> = std::thread::spawn(run_stderr);
     let mut child = {
         let mut rsync_cmd = params.to_cmd(config);
         rsync_cmd
@@ -230,9 +202,6 @@ async fn rsync_copy(
 
     let status = child.await.map_err_to_diag()?;
     log.log_status(status.code())?;
-
-    // hout.join().expect("panic while reading stdout")?;
-    // herr.join().expect("panic while reading stderr")?;
 
     Ok(())
 }
