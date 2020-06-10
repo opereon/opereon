@@ -406,7 +406,7 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
 
         let script = SourceRef::Source(r#"
-        echo 'printing cdw'
+        echo 'printing cwd'
         pwd
 
         echo 'printing arguments...'
