@@ -162,7 +162,7 @@ pub async fn rsync_copy(
     config: &RsyncConfig,
     params: &RsyncParams,
     log: &OutputLog,
-) -> RsyncResult<()> {
+) -> RsyncResult<ExitStatus> {
     let mut child = {
         let mut rsync_cmd = params.to_cmd(config);
         rsync_cmd
@@ -177,7 +177,7 @@ pub async fn rsync_copy(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        // log.log_cmd(&format!("{:?}", rsync_cmd))?;
+        log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
         rsync_cmd.spawn().map_err(RsyncErrorDetail::spawn_err)?
     };
     let stdout = BufReader::new(child.stdout.take().unwrap());
@@ -203,7 +203,7 @@ pub async fn rsync_copy(
     let status = child.await.map_err_to_diag()?;
     log.log_status(status.code())?;
 
-    Ok(())
+    Ok(status)
 }
 
 /**

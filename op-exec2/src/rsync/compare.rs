@@ -256,7 +256,7 @@ pub async fn rsync_compare(
     log: &OutputLog,
 ) -> RsyncResult<Vec<DiffInfo>> {
     let mut rsync_cmd = build_compare_cmd(config, params, checksum)?;
-    // log.log_cmd(&format!("{:?}", rsync_cmd))?;
+    log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
     let output = rsync_cmd.output().await.map_err(RsyncErrorDetail::spawn_err)?;
 
     let Output {
@@ -265,8 +265,8 @@ pub async fn rsync_compare(
         stderr,
     } = output;
 
-    // log.log_stdout(stdout.as_slice())?;
-    // log.log_stderr(stderr.as_slice())?;
+    log.log_out(stdout.as_slice())?;
+    log.log_err(stderr.as_slice())?;
 
     log.log_status(status.code())?;
     match status.code() {
