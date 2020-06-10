@@ -324,33 +324,6 @@ impl SshSessionRef {
     }
 }
 
-async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(
-    stdout: BufReader<R1>,
-    stderr: BufReader<R2>,
-) -> SshResult<()> {
-    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
-        let mut stdout = lines(s);
-        while let Some(line) = stdout.next_line().await? {
-            println!("out: {:?}", line);
-        }
-        println!("out: ---");
-        Ok(())
-    }
-
-    async fn stderr_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
-        let mut stderr = lines(s);
-        while let Some(line) = stderr.next_line().await? {
-            println!("err: {:?}", line);
-        }
-        println!("err: ---");
-        Ok(())
-    };
-    try_join(stdout_read(stdout), stderr_read(stderr))
-        .await
-        .map_err_to_diag()?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

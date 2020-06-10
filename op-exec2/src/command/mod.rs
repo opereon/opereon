@@ -5,10 +5,12 @@ use std::pin::Pin;
 use std::process::Stdio;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
+use kg_diag::io::ResultExt;
 
 use utils::lines;
 
 mod ssh;
+mod local;
 
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;
@@ -20,6 +22,13 @@ pub enum CommandErrorDetail {
 
     #[display(fmt = "malformed command output")]
     MalformedOutput,
+}
+
+impl CommandErrorDetail {
+    pub fn spawn_err(err: std::io::Error) -> CommandError {
+        let err = IoErrorDetail::from(err);
+        CommandErrorDetail::CommandSpawn.with_cause(BasicDiag::from(err))
+    }
 }
 
 pub type EnvVars = LinkedHashMap<String, String>;
@@ -232,12 +241,12 @@ impl std::fmt::Display for CommandBuilder {
     }
 }
 
-async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::Error> {
+async fn execute(mut command: Command, log: &OutputLog) -> CommandResult<()> {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     command.stdin(Stdio::null());
 
-    let mut child = command.spawn()?;
+    let mut child = command.spawn().map_err_to_diag()?;
 
     let stdout = BufReader::new(child.stdout.take().unwrap());
     let stderr = BufReader::new(child.stderr.take().unwrap());
@@ -248,7 +257,26 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
         println!("status: {}", status);
         Ok(())
     }
+    handle_out(stdout, stderr).await?;
+    status(child).await.map_err_to_diag()?;
+    Ok(())
+}
 
+async fn execute_pty(
+    command: std::process::Command,
+    log: &OutputLog,
+) -> Result<(), std::io::Error> {
+    let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
+    while let Ok(line) = session.read_line() {
+        println!("out: {:?}", line);
+    }
+    Ok(())
+}
+
+async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(
+    stdout: BufReader<R1>,
+    stderr: BufReader<R2>,
+) -> CommandResult<()> {
     async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
         let mut stdout = lines(s);
         while let Some(line) = stdout.next_line().await? {
@@ -266,20 +294,9 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
         println!("err: ---");
         Ok(())
     };
-
-    try_join(stdout_read(stdout), stderr_read(stderr)).await?;
-
-    status(child).await
-}
-
-async fn execute_pty(
-    command: std::process::Command,
-    log: &OutputLog,
-) -> Result<(), std::io::Error> {
-    let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
-    while let Ok(line) = session.read_line() {
-        println!("out: {:?}", line);
-    }
+    try_join(stdout_read(stdout), stderr_read(stderr))
+        .await
+        .map_err_to_diag()?;
     Ok(())
 }
 
