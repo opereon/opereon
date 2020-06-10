@@ -5,17 +5,18 @@ mod config;
 
 use config::LocalConfig;
 
-async fn run_command(cmd: &str,
-                     args: &[String],
-                     env: Option<&EnvVars>,
-                     cwd: Option<&Path>,
-                     run_as: Option<&str>,
-                     config: &LocalConfig,
-                     log: &OutputLog, ) -> CommandResult<ExitStatus> {
+async fn run_command(
+    cmd: &str,
+    args: &[String],
+    env: Option<&EnvVars>,
+    cwd: Option<&Path>,
+    run_as: Option<&str>,
+    config: &LocalConfig,
+    log: &OutputLog,
+) -> CommandResult<ExitStatus> {
     let mut builder = if let Some(user) = run_as {
         let mut builder = CommandBuilder::new(config.runas_cmd());
-        builder.arg("-u")
-            .arg(user);
+        builder.arg("-u").arg(user);
 
         if let Some(env) = env {
             let envs = env.keys().map(|s| &**s).collect::<Vec<_>>().join(",");
@@ -93,8 +94,8 @@ mod tests {
                 &cfg,
                 &log,
             )
-                .await
-                .expect("Error");
+            .await
+            .expect("Error");
             eprintln!("status = {:?}", status);
             eprintln!("log = {}", log);
         });

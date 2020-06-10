@@ -1,16 +1,16 @@
 use super::*;
 
 use futures::future::try_join;
+use kg_diag::io::ResultExt;
 use std::pin::Pin;
 use std::process::Stdio;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
-use kg_diag::io::ResultExt;
 
 use utils::lines;
 
-mod ssh;
 mod local;
+mod ssh;
 
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;
