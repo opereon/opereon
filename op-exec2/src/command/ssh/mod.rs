@@ -1,13 +1,13 @@
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Stdio, ExitStatus};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use os_pipe::pipe;
 
 use super::*;
-use std::io::{SeekFrom, Write, Seek};
+use std::io::{Seek, SeekFrom, Write};
 
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
@@ -92,9 +92,7 @@ pub struct SshSession {
 impl SshSession {
     pub fn new(dest: SshDest, config: SshConfig) -> SshSession {
         let id = dest.to_id_string();
-        let socket_path = config
-            .socket_dir()
-            .join(id.clone() + ".sock");
+        let socket_path = config.socket_dir().join(id.clone() + ".sock");
 
         SshSession {
             opened: Cell::new(false),
@@ -201,7 +199,6 @@ impl SshSession {
         }
     }
 
-
     async fn run_command(
         &mut self,
         cmd: &str,
@@ -227,7 +224,8 @@ impl SshSession {
 
         log.log_in(format!("{:?}", ssh_cmd).as_bytes())?;
 
-        ssh_cmd.stdin(Stdio::null())
+        ssh_cmd
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -236,7 +234,6 @@ impl SshSession {
         let stdout = BufReader::new(child.stdout.take().unwrap());
         let stderr = BufReader::new(child.stderr.take().unwrap());
         drop(child.stdin.take());
-
 
         // TODO ws handle stdout and stderr
         handle_out(stdout, stderr).await?;
@@ -327,8 +324,10 @@ impl SshSessionRef {
     }
 }
 
-
-async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(stdout: BufReader<R1>, stderr: BufReader<R2>) -> SshResult<()> {
+async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(
+    stdout: BufReader<R1>,
+    stderr: BufReader<R2>,
+) -> SshResult<()> {
     async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
         let mut stdout = lines(s);
         while let Some(line) = stdout.next_line().await? {
@@ -345,9 +344,10 @@ async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(stdout: BufRea
         }
         println!("err: ---");
         Ok(())
-    }
-    ;
-    try_join(stdout_read(stdout), stderr_read(stderr)).await.map_err_to_diag()?;
+    };
+    try_join(stdout_read(stdout), stderr_read(stderr))
+        .await
+        .map_err_to_diag()?;
     Ok(())
 }
 
@@ -377,7 +377,9 @@ mod tests {
 
     #[test]
     fn run_command_test() {
-        let auth = SshAuth::PublicKey { identity_file: "/home/wiktor/.ssh/id_rsa".into() };
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
         let cfg = SshConfig::default();
 
@@ -389,7 +391,10 @@ mod tests {
             sess.open().await.expect("Cannot open session");
             let log = OutputLog::new();
 
-            let status = sess.run_command("ls", &["-al".into()], &log).await.expect("Error");
+            let status = sess
+                .run_command("ls", &["-al".into()], &log)
+                .await
+                .expect("Error");
             eprintln!("status = {:?}", status);
             eprintln!("log = {}", log);
         });
@@ -397,7 +402,9 @@ mod tests {
 
     #[test]
     fn run_script_test() {
-        let auth = SshAuth::PublicKey { identity_file: "/home/wiktor/.ssh/id_rsa".into() };
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
         let cfg = SshConfig::default();
 
@@ -405,7 +412,8 @@ mod tests {
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
 
-        let script = SourceRef::Source(r#"
+        let script = SourceRef::Source(
+            r#"
         echo 'printing cwd'
         pwd
 
@@ -419,21 +427,30 @@ mod tests {
         echo $TEST_ENV_VAR
         exit 2
 
-        "#);
+        "#,
+        );
 
         let mut env = EnvVars::new();
 
-        env.insert("TEST_ENV_VAR".into(), "This is environment variable content ".into());
+        env.insert(
+            "TEST_ENV_VAR".into(),
+            "This is environment variable content ".into(),
+        );
 
         rt.block_on(async move {
             sess.open().await.expect("Error opening session");
             let log = OutputLog::new();
 
-            let status = sess.run_script(script,
-                                         &["-some_argument".into()],
-                                         Some(&env),
-                                         Some(&PathBuf::from("/home")),
-                                         None).await.expect("Error");
+            let status = sess
+                .run_script(
+                    script,
+                    &["-some_argument".into()],
+                    Some(&env),
+                    Some(&PathBuf::from("/home")),
+                    None,
+                )
+                .await
+                .expect("Error");
             eprintln!("status = {:?}", status);
             eprintln!("log = {}", log);
         });

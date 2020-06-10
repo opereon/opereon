@@ -1,21 +1,19 @@
 use super::*;
 
-use std::time::Instant;
-use std::sync::Arc;
 use parking_lot::Mutex;
 use std::io::Error;
-
+use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
 pub enum EntryKind {
-    Out     = 0x01,
-    Err     = 0x02,
-    In      = 0x04,
-    Status  = 0x08,
+    Out = 0x01,
+    Err = 0x02,
+    In = 0x04,
+    Status = 0x08,
     Command = 0x10,
 }
-
 
 #[derive(Clone, Default)]
 pub struct OutputLog(Option<Arc<Mutex<Output>>>);
@@ -38,7 +36,12 @@ impl OutputLog {
         }
     }
 
-    pub fn log_entry_disp<T: std::fmt::Display>(&self, kind: EntryKind, timestamp: Instant, data: T) -> IoResult<()> {
+    pub fn log_entry_disp<T: std::fmt::Display>(
+        &self,
+        kind: EntryKind,
+        timestamp: Instant,
+        data: T,
+    ) -> IoResult<()> {
         if let Some(ref o) = self.0 {
             let mut o = o.lock();
             o.log_entry_disp(kind, timestamp, data)
@@ -46,7 +49,6 @@ impl OutputLog {
             Ok(())
         }
     }
-
 
     pub fn log_entry_now(&self, kind: EntryKind, data: &[u8]) -> IoResult<()> {
         self.log_entry(kind, Instant::now(), data)
@@ -87,14 +89,11 @@ impl std::fmt::Display for OutputLog {
     }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 struct Position {
     offset: usize,
     length: usize,
 }
-
-
 
 impl std::fmt::Display for EntryKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -108,20 +107,17 @@ impl std::fmt::Display for EntryKind {
     }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 struct Entry {
     pos: Position,
-    kind : EntryKind,
+    kind: EntryKind,
     timestamp: Instant,
 }
-
 
 struct Output {
     buf: Vec<u8>,
     entries: Vec<Entry>,
 }
-
 
 impl Output {
     fn new() -> Output {
@@ -144,7 +140,12 @@ impl Output {
         Ok(())
     }
 
-    fn log_entry_disp<T: std::fmt::Display>(&mut self, kind: EntryKind, timestamp: Instant, data: T) -> IoResult<()> {
+    fn log_entry_disp<T: std::fmt::Display>(
+        &mut self,
+        kind: EntryKind,
+        timestamp: Instant,
+        data: T,
+    ) -> IoResult<()> {
         use std::io::Write;
         let mut entry = Entry {
             pos: Position {
@@ -197,7 +198,6 @@ impl std::io::Read for OutputLogReader {
     }
 }
 */
-
 
 #[cfg(test)]
 mod tests {

@@ -6,14 +6,14 @@ use std::time::Duration;
 use regex::Regex;
 
 use super::compare::State;
-use tokio::io::{BufReader, AsyncBufReadExt, AsyncRead};
 use super::*;
-use slog::Logger;
-use std::sync::{MutexGuard, Arc, Mutex};
-use os_pipe::pipe;
 use crate::rsync::RsyncParseErrorDetail::Custom;
-use futures::future::try_join;
 use crate::utils::lines;
+use futures::future::try_join;
+use os_pipe::pipe;
+use slog::Logger;
+use std::sync::{Arc, Mutex, MutexGuard};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 
 type Loaded = u64;
 
@@ -389,9 +389,8 @@ mod tests {
     #[test]
     fn rsync_copy_test() {
         let cfg = RsyncConfig::default();
-        let mut params = RsyncParams::new("./",
-                                          "./../target/debug/incremental",
-                                          "./../target/debug2");
+        let mut params =
+            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");

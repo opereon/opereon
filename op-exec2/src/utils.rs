@@ -1,7 +1,7 @@
-use tokio::io::{BufReader, AsyncRead, AsyncBufRead, AsyncBufReadExt};
 use futures::task::{Context, Poll};
 use std::pin::Pin;
 use tokio::future::poll_fn;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 
 #[pin_project]
 #[must_use = "streams do nothing unless polled"]

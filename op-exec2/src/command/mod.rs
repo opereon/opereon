@@ -1,12 +1,12 @@
 use super::*;
 
-use tokio::process::{Command, Child};
-use tokio::io::{BufReader, AsyncRead, AsyncBufRead, AsyncBufReadExt};
 use futures::future::try_join;
-use std::process::Stdio;
 use std::pin::Pin;
+use std::process::Stdio;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::process::{Child, Command};
 
-use utils::{lines};
+use utils::lines;
 
 mod ssh;
 
@@ -232,7 +232,6 @@ impl std::fmt::Display for CommandBuilder {
     }
 }
 
-
 async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::Error> {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -273,7 +272,10 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
     status(child).await
 }
 
-async fn execute_pty(command: std::process::Command, log: &OutputLog) -> Result<(), std::io::Error> {
+async fn execute_pty(
+    command: std::process::Command,
+    log: &OutputLog,
+) -> Result<(), std::io::Error> {
     let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
     while let Ok(line) = session.read_line() {
         println!("out: {:?}", line);
@@ -288,7 +290,8 @@ mod tests {
     #[test]
     fn ssh_command() {
         let mut cmd = Command::new("/usr/bin/bash");
-        cmd.arg("-c").arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2;  done;");
+        cmd.arg("-c")
+            .arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2;  done;");
 
         let log = OutputLog::new();
 
