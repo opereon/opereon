@@ -256,7 +256,7 @@ impl SshSession {
             return SshErrorDetail::closed();
         }
 
-        let mut usr_cmd = if let Some(user) = run_as {
+        let mut builder = if let Some(user) = run_as {
             let mut cmd = CommandBuilder::new(self.config().runas_cmd());
             cmd.arg("-u").arg(user).arg(self.config().shell_cmd());
             cmd
@@ -265,9 +265,9 @@ impl SshSession {
             cmd
         };
 
-        usr_cmd.arg("/dev/stdin");
+        builder.arg("/dev/stdin");
 
-        let usr_cmd = usr_cmd.to_string();
+        let usr_cmd = builder.to_string();
 
         let (r_in, mut w_in) = pipe().unwrap();
         let _r = r_in.try_clone().unwrap();
