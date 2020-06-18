@@ -203,6 +203,10 @@ impl SshSession {
         &mut self,
         cmd: &str,
         args: &[String],
+        // TODO ws is this necessary?
+        // env: Option<&EnvVars>,
+        // cwd: Option<&Path>,
+        // run_as: Option<&str>,
         log: &OutputLog,
     ) -> SshResult<ExitStatus> {
         if !self.opened.get() {
@@ -251,6 +255,7 @@ impl SshSession {
         env: Option<&EnvVars>,
         cwd: Option<&Path>,
         run_as: Option<&str>,
+        log: &OutputLog,
     ) -> SshResult<ExitStatus> {
         if !self.opened.get() {
             return SshErrorDetail::closed();
@@ -271,6 +276,7 @@ impl SshSession {
 
         let (r_in, mut w_in) = pipe().unwrap();
         let _r = r_in.try_clone().unwrap();
+        log.log_in(usr_cmd.as_bytes())?;
 
         let mut ssh_cmd = self
             .ssh_cmd(true)
@@ -421,6 +427,7 @@ mod tests {
                     Some(&env),
                     Some(&PathBuf::from("/home")),
                     None,
+                    &log
                 )
                 .await
                 .expect("Error");
