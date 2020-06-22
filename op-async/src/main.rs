@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate serde_derive;
 
+use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::task::{Context, Poll, Waker};
@@ -18,6 +19,7 @@ use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::*;
 
 mod progress;
+
 use progress::*;
 
 
@@ -28,6 +30,7 @@ struct Operation {
     name: String,
     progress: Progress,
     waker: Option<Waker>,
+    op_state: OperationState,
 }
 
 impl Operation {
@@ -39,6 +42,7 @@ impl Operation {
             name: name.into(),
             progress: Progress::default(),
             waker: None,
+            op_state: OperationState::Init
         }
     }
 
@@ -140,9 +144,7 @@ impl Core {
     }
 }
 
-struct Services {
-
-}
+struct Services {}
 
 impl Services {
     fn new() -> Services {
@@ -246,11 +248,7 @@ impl Future for EngineMainTask {
         if !self.engine.operations.read().operation_queue1.is_empty() {
             let mut ops = self.engine.operations.write();
             while let Some(op) = ops.operation_queue1.pop_front() {
-                let op_task = OperationTask::new(
-                    self.engine.clone(),
-                    op,
-                    TestOp::new());
-                tokio::spawn(op_task);
+                tokio::spawn(get_operation_fut(self.engine.clone(), op, TestOp::new()));
             }
             ops.swap_queues();
         }
@@ -272,111 +270,34 @@ enum OperationState {
     Cancel,
 }
 
-struct OperationTask {
-    engine: EngineRef,
-    operation: OperationRef,
-    op_state: OperationState,
-    op_impl: Pin<Box<dyn OperationImpl>>,
-}
+async fn get_operation_fut(engine: EngineRef, operation: OperationRef, mut op_impl: Box<dyn OperationImpl>) {
+    op_impl.init(&engine, &operation).await;
 
-impl OperationTask {
-    fn new(engine: EngineRef, operation: OperationRef, op_impl: Box<dyn OperationImpl>) -> OperationTask {
-        OperationTask {
-            engine,
-            operation,
-            op_state: OperationState::Init,
-            op_impl: op_impl.into(),
-        }
+    while !operation.write().progress.is_done() {
+        let u = op_impl.next_progress(&engine, &operation).await;
+        operation.write().progress.update(u);
+        engine.notify_progress(&operation);
     }
+
+    op_impl.done(&engine, &operation).await;
+
+    engine.finish_operation(&operation);
 }
 
-impl Future for OperationTask {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        use std::mem::transmute;
-
-        //println!("operation task poll: {} [{}]", self.operation.read().name, std::thread::current().name().unwrap());
-
-        // It is safe to take references below, because only `self.op_impl` is borrowed as mutable
-        // transmuting lifetimes to silence the borrow checker
-        let engine = unsafe { transmute::<&'_ EngineRef, &'_ EngineRef>(&self.engine) };
-        let operation = unsafe { transmute::<&'_ OperationRef, &'_ OperationRef>(&self.operation) };
-
-        let progress_counter1;
-
-        {
-            let mut o = operation.write();
-            o.set_waker(cx.waker().clone());
-            progress_counter1 = o.progress.counter();
-        }
-
-        //TODO: unwind panics
-        let p = match self.op_state {
-            OperationState::Init => match self.op_impl.as_mut().poll_init(cx, engine, operation) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => {
-                    self.op_state = OperationState::Progress;
-                    operation.write().wake();
-                    Poll::Pending
-                }
-            },
-            OperationState::Progress => match self.op_impl.as_mut().poll_progress(cx, engine, operation) {
-                Poll::Pending => {
-                    let mut o = operation.write();
-                    o.wake();
-                    Poll::Pending
-                },
-                Poll::Ready(u) => {
-                    let mut o = operation.write();
-                    o.progress.update(u);
-                    o.wake();
-                    if o.progress.is_done() {
-                        self.op_state = OperationState::Done;
-                    }
-                    Poll::Pending
-                }
-            },
-            OperationState::Done => match self.op_impl.as_mut().poll_done(cx, engine, operation) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => {
-                    engine.finish_operation(operation);
-                    Poll::Ready(())
-                }
-            },
-            OperationState::Cancel => match self.op_impl.as_mut().poll_cancel(cx, engine, operation) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => {
-                    engine.finish_operation(operation);
-                    Poll::Ready(())
-                }
-            },
-        };
-
-        let progress_counter2 = operation.read().progress.counter();
-
-        if progress_counter1 != progress_counter2 {
-            engine.notify_progress(operation);
-        }
-
-        p
-    }
-}
-
-
+#[async_trait]
 trait OperationImpl: Send {
-    fn poll_init(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
-        Poll::Ready(())
+    async fn init(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
+        ()
     }
 
-    fn poll_progress(self: Pin<&mut Self>, cx: &mut Context, engine: &EngineRef, operation: &OperationRef) -> Poll<ProgressUpdate>;
+    async fn next_progress(&mut self, engine: &EngineRef, operation: &OperationRef) -> ProgressUpdate;
 
-    fn poll_done(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
-        Poll::Ready(())
+    async fn done(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
+        ()
     }
 
-    fn poll_cancel(self: Pin<&mut Self>, _cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<()> {
-        Poll::Ready(())
+    async fn cancel(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
+        ()
     }
 }
 
@@ -396,22 +317,27 @@ impl TestOp {
     }
 }
 
+#[async_trait]
 impl OperationImpl for TestOp {
-    fn poll_progress(mut self: Pin<&mut Self>, cx: &mut Context, _engine: &EngineRef, _operation: &OperationRef) -> Poll<ProgressUpdate> {
+    async fn next_progress(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> ProgressUpdate {
         //println!("progress: {}", operation.read().name);
         if self.count > 0 {
-            let interval = Pin::new(&mut self.interval);
-            match interval.poll_next(cx) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => {
-                    self.count -= 1;
-                    Poll::Ready(ProgressUpdate::new((5.0 - self.count as f64) * 20.0))
-                }
-            }
+            self.count -= 1;
+            self.interval.tick().await;
+
+            ProgressUpdate::new((5.0 - self.count as f64) * 20.0)
         } else {
-            Poll::Ready(ProgressUpdate::done())
+            ProgressUpdate::done()
         }
     }
+
+    async fn done(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
+        let delay = tokio::time::delay_for(Duration::from_secs(2));
+        println!("Some long running cleanup code....");
+        delay.await;
+        println!("cleanup finished....");
+    }
+
 }
 
 fn print_progress(e: &EngineRef, first: bool) {
