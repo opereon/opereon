@@ -3,7 +3,11 @@
 #[macro_use]
 extern crate serde_derive;
 
-use async_trait::async_trait;
+#[macro_use]
+extern crate kg_diag_derive;
+#[macro_use]
+extern crate kg_display_derive;
+
 use futures::prelude::*;
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::*;
@@ -18,9 +22,13 @@ use tokio::prelude::*;
 use tokio::time::Interval;
 use uuid::Uuid;
 
-mod operation;
-mod progress;
+pub mod operation;
+pub mod progress;
 
+pub use operation::{OperationError, OperationErrorDetail, OperationImpl, OperationRef};
+pub use progress::ProgressUpdate;
+
+use kg_diag::BasicDiag;
 use operation::*;
 use progress::*;
 
@@ -101,6 +109,7 @@ impl<T: std::clone::Clone + 'static> EngineRef<T> {
         }
     }
 
+    /// This method is necessary if we want to create OperationImpl instances in context of tokio runtime
     pub fn run_with(&self, f: impl FnOnce(EngineRef<T>) -> ()) -> EngineResult {
         let mut runtime = tokio::runtime::Builder::new()
             .enable_all()
@@ -205,37 +214,22 @@ async fn get_operation_fut<T: std::clone::Clone + 'static>(
     operation: OperationRef<T>,
     mut op_impl: Box<dyn OperationImpl<T>>,
 ) {
-    // TODO ws errors
-    op_impl.init(&engine, &operation).await.unwrap();
+    let o = operation.clone();
+    let e = engine.clone();
+    let mut inner = async move || {
+        op_impl.init(&engine, &operation).await?;
 
-    while !operation.write().progress().is_done() {
-        // TODO ws errors
-        let u = op_impl.next_progress(&engine, &operation).await.unwrap();
-        operation.write().progress_mut().update(u);
-        engine.notify_progress(&operation);
-    }
-    // TODO ws errors
-    let res = op_impl.done(&engine, &operation).await.unwrap();
+        while !operation.write().progress().is_done() {
+            let u = op_impl.next_progress(&engine, &operation).await?;
+            operation.write().progress_mut().update(u);
+            engine.notify_progress(&operation);
+        }
+        op_impl.done(&engine, &operation).await
+    };
 
-    operation.write().set_outcome(res);
-
-    engine.finish_operation(&operation);
-}
-
-#[async_trait]
-pub trait OperationImpl<T: std::clone::Clone + 'static>: Send {
-    async fn init(&mut self, _engine: &EngineRef<T>, _operation: &OperationRef<T>) -> Result<(), ()> {
-        Ok(())
-    }
-
-    async fn next_progress(
-        &mut self,
-        engine: &EngineRef<T>,
-        operation: &OperationRef<T>,
-    ) -> Result<ProgressUpdate, ()>;
-
-    async fn done(&mut self, _engine: &EngineRef<T>, _operation: &OperationRef<T>) -> Result<T, ()>;
-
+    let out = inner().await;
+    o.write().set_outcome(out);
+    e.finish_operation(&o);
 }
 
 #[cfg(test)]
@@ -278,7 +272,11 @@ mod tests {
             }
         }
 
-        async fn done(&mut self, _engine: &EngineRef<OutputType>, _operation: &OperationRef<OutputType>) -> Result<OutputType, ()> {
+        async fn done(
+            &mut self,
+            _engine: &EngineRef<OutputType>,
+            _operation: &OperationRef<OutputType>,
+        ) -> Result<OutputType, ()> {
             let delay = tokio::time::delay_for(Duration::from_secs(2));
             println!("Some long running cleanup code....");
             delay.await;

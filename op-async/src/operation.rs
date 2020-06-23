@@ -1,9 +1,47 @@
-use crate::progress::Progress;
-use crate::{EngineRef, OperationImpl};
+use crate::progress::{Progress, ProgressUpdate};
+use crate::EngineRef;
 use kg_utils::sync::SyncRef;
 use std::ops::Deref;
 use std::task::Waker;
 use uuid::Uuid;
+
+use async_trait::async_trait;
+use kg_diag::BasicDiag;
+use kg_diag::Severity;
+
+pub type OperationError = BasicDiag;
+pub type OperationResult<T> = Result<T, OperationError>;
+
+#[derive(Debug, Display)]
+pub enum OperationErrorDetail {
+    #[display(fmt = "operation cancelled by user")]
+    Cancelled,
+}
+
+#[async_trait]
+pub trait OperationImpl<T: std::clone::Clone + 'static>: Send {
+    async fn init(
+        &mut self,
+        _engine: &EngineRef<T>,
+        _operation: &OperationRef<T>,
+    ) -> OperationResult<()> {
+        Ok::<_, OperationError>(())
+    }
+
+    async fn next_progress(
+        &mut self,
+        _engine: &EngineRef<T>,
+        _operation: &OperationRef<T>,
+    ) -> OperationResult<ProgressUpdate> {
+        Ok::<_, OperationError>(ProgressUpdate::done())
+    }
+
+    async fn done(
+        &mut self,
+        _engine: &EngineRef<T>,
+        _operation: &OperationRef<T>,
+    ) -> OperationResult<T>;
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum OperationState {
@@ -22,7 +60,7 @@ pub struct Operation<T> {
     waker: Option<Waker>,
     op_state: OperationState,
     op_impl: Option<Box<dyn OperationImpl<T>>>,
-    outcome: Option<T>
+    outcome: Option<OperationResult<T>>,
 }
 
 impl<T: std::clone::Clone + 'static> Operation<T> {
@@ -36,7 +74,7 @@ impl<T: std::clone::Clone + 'static> Operation<T> {
             waker: None,
             op_state: OperationState::Init,
             op_impl: Some(Box::new(op_impl)),
-            outcome: None
+            outcome: None,
         }
     }
 
@@ -70,7 +108,14 @@ impl<T: std::clone::Clone + 'static> Operation<T> {
         &mut self.progress
     }
 
-    pub fn set_outcome(&mut self, outcome: T) {
+    pub fn outcome(&self) -> Option<&OperationResult<T>> {
+        self.outcome.as_ref()
+    }
+    pub fn take_outcome(&mut self) -> Option<OperationResult<T>> {
+        self.outcome.take()
+    }
+
+    pub fn set_outcome(&mut self, outcome: OperationResult<T>) {
         self.outcome = Some(outcome)
     }
 }

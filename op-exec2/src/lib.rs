@@ -10,12 +10,14 @@ extern crate serde_derive;
 extern crate slog;
 #[macro_use]
 extern crate futures;
+extern crate async_trait;
 
 #[macro_use]
 extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
 extern crate kg_utils;
+extern crate op_async;
 
 #[macro_use]
 extern crate op_log;
@@ -36,5 +38,6 @@ mod command;
 mod outlog;
 mod rsync;
 mod utils;
+mod exec;
 
 pub use self::outlog::{EntryKind, OutputLog};
