@@ -13,7 +13,7 @@ pub enum OperationState {
     Cancel,
 }
 
-pub struct Operation {
+pub struct Operation<T> {
     id: Uuid,
     parent: Uuid,
     operations: Vec<Uuid>,
@@ -21,11 +21,12 @@ pub struct Operation {
     progress: Progress,
     waker: Option<Waker>,
     op_state: OperationState,
-    op_impl: Option<Box<dyn OperationImpl>>,
+    op_impl: Option<Box<dyn OperationImpl<T>>>,
+    outcome: Option<T>
 }
 
-impl Operation {
-    fn new<S: Into<String>, O: OperationImpl + 'static>(name: S, op_impl: O) -> Operation {
+impl<T: std::clone::Clone + 'static> Operation<T> {
+    fn new<S: Into<String>, O: OperationImpl<T> + 'static>(name: S, op_impl: O) -> Operation<T> {
         Operation {
             id: Uuid::new_v4(),
             parent: Uuid::nil(),
@@ -35,6 +36,7 @@ impl Operation {
             waker: None,
             op_state: OperationState::Init,
             op_impl: Some(Box::new(op_impl)),
+            outcome: None
         }
     }
 
@@ -67,13 +69,17 @@ impl Operation {
     pub fn progress_mut(&mut self) -> &mut Progress {
         &mut self.progress
     }
+
+    pub fn set_outcome(&mut self, outcome: T) {
+        self.outcome = Some(outcome)
+    }
 }
 
 #[derive(Clone)]
-pub struct OperationRef(SyncRef<Operation>);
+pub struct OperationRef<T>(SyncRef<Operation<T>>);
 
-impl Deref for OperationRef {
-    type Target = SyncRef<Operation>;
+impl<T> Deref for OperationRef<T> {
+    type Target = SyncRef<Operation<T>>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -81,8 +87,11 @@ impl Deref for OperationRef {
     }
 }
 
-impl OperationRef {
-    pub fn new<S: Into<String>, O: OperationImpl + 'static>(name: S, op_impl: O) -> OperationRef {
+impl<T: std::clone::Clone + 'static> OperationRef<T> {
+    pub fn new<S: Into<String>, O: OperationImpl<T> + 'static>(
+        name: S,
+        op_impl: O,
+    ) -> OperationRef<T> {
         OperationRef(SyncRef::new(Operation::new(name, op_impl)))
     }
 
@@ -94,7 +103,7 @@ impl OperationRef {
         self.write().set_waker(waker);
     }
 
-    pub(crate) fn take_op_impl(&mut self) -> Option<Box<dyn OperationImpl>> {
+    pub(crate) fn take_op_impl(&mut self) -> Option<Box<dyn OperationImpl<T>>> {
         self.0.write().op_impl.take()
     }
 }
