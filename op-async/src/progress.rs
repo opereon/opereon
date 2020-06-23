@@ -18,7 +18,6 @@ impl Unit {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Progress {
     counter: u32,
@@ -159,10 +158,16 @@ impl Default for Progress {
 impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let symbol = self.unit.symbol();
-        write!(f, "{}{} / {}{}", self.value, symbol, (self.max - self.min), symbol)
+        write!(
+            f,
+            "{}{} / {}{}",
+            self.value,
+            symbol,
+            (self.max - self.min),
+            symbol
+        )
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgressUpdate {

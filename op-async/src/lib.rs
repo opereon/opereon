@@ -4,92 +4,25 @@
 extern crate serde_derive;
 
 use async_trait::async_trait;
+use futures::prelude::*;
+use kg_utils::collections::LinkedHashMap;
+use kg_utils::sync::*;
 use std::collections::VecDeque;
 use std::future::Future;
-use std::task::{Context, Poll, Waker};
+use std::ops::Deref;
 use std::pin::Pin;
 use std::process::Termination;
-use std::ops::Deref;
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
-use futures::prelude::*;
 use tokio::prelude::*;
 use tokio::time::Interval;
 use uuid::Uuid;
-use kg_utils::collections::LinkedHashMap;
-use kg_utils::sync::*;
 
+mod operation;
 mod progress;
 
+use operation::*;
 use progress::*;
-
-
-struct Operation {
-    id: Uuid,
-    parent: Uuid,
-    operations: Vec<Uuid>,
-    name: String,
-    progress: Progress,
-    waker: Option<Waker>,
-    op_state: OperationState,
-}
-
-impl Operation {
-    fn new<S: Into<String>>(name: S) -> Operation {
-        Operation {
-            id: Uuid::new_v4(),
-            parent: Uuid::nil(),
-            operations: Vec::new(),
-            name: name.into(),
-            progress: Progress::default(),
-            waker: None,
-            op_state: OperationState::Init
-        }
-    }
-
-    fn wake(&mut self) {
-        if let Some(w) = self.waker.take() {
-            w.wake();
-        }
-    }
-
-    fn set_waker(&mut self, waker: Waker) {
-        self.waker = Some(waker);
-    }
-
-    fn parent(&self) -> Option<Uuid> {
-        if self.parent.is_nil() {
-            None
-        } else {
-            Some(self.parent)
-        }
-    }
-}
-
-#[derive(Clone)]
-struct OperationRef(SyncRef<Operation>);
-
-impl Deref for OperationRef {
-    type Target = SyncRef<Operation>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl OperationRef {
-    fn new<S: Into<String>>(name: S) -> OperationRef {
-        OperationRef(SyncRef::new(Operation::new(name)))
-    }
-
-    fn id(&self) -> Uuid {
-        self.0.read().id
-    }
-
-    fn set_waker(&self, waker: Waker) {
-        self.write().set_waker(waker);
-    }
-}
 
 struct Operations {
     operation_queue1: VecDeque<OperationRef>,
@@ -152,9 +85,8 @@ impl Services {
     }
 }
 
-
 #[derive(Clone)]
-struct EngineRef {
+pub struct EngineRef {
     operations: SyncRef<Operations>,
     core: SyncRef<Core>,
     services: SyncRef<Services>,
@@ -176,9 +108,7 @@ impl EngineRef {
             .thread_name("engine")
             .build()
             .unwrap();
-        runtime.block_on(async {
-            self.main_task().await
-        })
+        runtime.block_on(async { self.main_task().await })
     }
 
     pub fn operations(&self) -> SyncRefMapReadGuard<LinkedHashMap<Uuid, OperationRef>> {
@@ -203,7 +133,6 @@ impl EngineRef {
 
     fn finish_operation(&self, operation: &OperationRef) {
         if operation.read().parent().is_some() {
-
         } else {
             self.operations.write().remove_operation(operation);
         }
@@ -221,8 +150,7 @@ impl EngineRef {
     }
 }
 
-
-struct EngineResult {
+pub struct EngineResult {
     code: i32,
 }
 
@@ -231,7 +159,6 @@ impl Termination for EngineResult {
         self.code
     }
 }
-
 
 struct EngineMainTask {
     engine: EngineRef,
@@ -261,21 +188,16 @@ impl Future for EngineMainTask {
     }
 }
 
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum OperationState {
-    Init,
-    Progress,
-    Done,
-    Cancel,
-}
-
-async fn get_operation_fut(engine: EngineRef, operation: OperationRef, mut op_impl: Box<dyn OperationImpl>) {
+async fn get_operation_fut(
+    engine: EngineRef,
+    operation: OperationRef,
+    mut op_impl: Box<dyn OperationImpl>,
+) {
     op_impl.init(&engine, &operation).await;
 
-    while !operation.write().progress.is_done() {
+    while !operation.write().progress().is_done() {
         let u = op_impl.next_progress(&engine, &operation).await;
-        operation.write().progress.update(u);
+        operation.write().progress_mut().update(u);
         engine.notify_progress(&operation);
     }
 
@@ -290,7 +212,11 @@ trait OperationImpl: Send {
         ()
     }
 
-    async fn next_progress(&mut self, engine: &EngineRef, operation: &OperationRef) -> ProgressUpdate;
+    async fn next_progress(
+        &mut self,
+        engine: &EngineRef,
+        operation: &OperationRef,
+    ) -> ProgressUpdate;
 
     async fn done(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
         ()
@@ -301,79 +227,88 @@ trait OperationImpl: Send {
     }
 }
 
-struct TestOp {
-    interval: Interval,
-    count: usize,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl TestOp {
-    fn new() -> Box<Self> {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        Box::new(TestOp {
-            interval: tokio::time::interval(Duration::from_secs(rng.gen_range(1, 3))),
-            count: rng.gen_range(1, 5),
-        })
+    struct TestOp {
+        interval: Interval,
+        count: usize,
     }
-}
 
-#[async_trait]
-impl OperationImpl for TestOp {
-    async fn next_progress(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> ProgressUpdate {
-        //println!("progress: {}", operation.read().name);
-        if self.count > 0 {
-            self.count -= 1;
-            self.interval.tick().await;
-
-            ProgressUpdate::new((5.0 - self.count as f64) * 20.0)
-        } else {
-            ProgressUpdate::done()
+    impl TestOp {
+        fn new() -> Box<Self> {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            Box::new(TestOp {
+                interval: tokio::time::interval(Duration::from_secs(rng.gen_range(1, 3))),
+                count: rng.gen_range(1, 5),
+            })
         }
     }
 
-    async fn done(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
-        let delay = tokio::time::delay_for(Duration::from_secs(2));
-        println!("Some long running cleanup code....");
-        delay.await;
-        println!("cleanup finished....");
+    #[async_trait]
+    impl OperationImpl for TestOp {
+        async fn next_progress(
+            &mut self,
+            _engine: &EngineRef,
+            _operation: &OperationRef,
+        ) -> ProgressUpdate {
+            //println!("progress: {}", operation.read().name);
+            if self.count > 0 {
+                self.count -= 1;
+                self.interval.tick().await;
+
+                ProgressUpdate::new((5.0 - self.count as f64) * 20.0)
+            } else {
+                ProgressUpdate::done()
+            }
+        }
+
+        async fn done(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
+            let delay = tokio::time::delay_for(Duration::from_secs(2));
+            println!("Some long running cleanup code....");
+            delay.await;
+            println!("cleanup finished....");
+        }
     }
 
-}
+    fn print_progress(e: &EngineRef, first: bool) {
+        use std::fmt::Write;
 
-fn print_progress(e: &EngineRef, first: bool) {
-    use std::fmt::Write;
-
-    let mut s = String::new();
-    write!(s, "---\n").unwrap();
-    for o in e.operations().values() {
-        let o = o.read();
-        write!(s, "operation: {} -> {}\n", o.name, o.progress).unwrap();
+        let mut s = String::new();
+        write!(s, "---\n").unwrap();
+        for o in e.operations().values() {
+            let o = o.read();
+            write!(s, "operation: {} -> {}\n", o.name(), o.progress()).unwrap();
+        }
+        write!(s, "===\n").unwrap();
+        print_output(&s, first);
     }
-    write!(s, "===\n").unwrap();
-    print_output(&s, first);
-}
 
-fn print_output(output: &str, first: bool) {
-    if !first {
-        let lines = output.lines().count();
-        print!("\x1B[{}A", lines);
+    fn print_output(output: &str, first: bool) {
+        if !first {
+            let lines = output.lines().count();
+            print!("\x1B[{}A", lines);
+        }
+        print!("{}", output);
     }
-    print!("{}", output);
-}
 
-fn main() -> EngineResult {
-    let engine = EngineRef::new();
+    #[test]
+    fn main() -> EngineResult {
+        let engine = EngineRef::new();
 
-    engine.enqueue_operation(OperationRef::new("ddd1"));
-    engine.enqueue_operation(OperationRef::new("ddd2"));
-    engine.enqueue_operation(OperationRef::new("ddd3"));
-    engine.enqueue_operation(OperationRef::new("ddd4"));
+        engine.enqueue_operation(OperationRef::new("ddd1"));
+        engine.enqueue_operation(OperationRef::new("ddd2"));
+        engine.enqueue_operation(OperationRef::new("ddd3"));
+        engine.enqueue_operation(OperationRef::new("ddd4"));
 
-    engine.register_progress_cb(|e, o| {
-        print_progress(e, false);
-    });
+        engine.register_progress_cb(|e, o| {
+            print_progress(e, false);
+        });
 
-    print_progress(&engine, true);
+        print_progress(&engine, true);
 
-    engine.run()
+        engine.run()
+    }
 }
