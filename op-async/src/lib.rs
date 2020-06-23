@@ -32,13 +32,13 @@ use kg_diag::BasicDiag;
 use operation::*;
 use progress::*;
 
-struct Operations<T: std::clone::Clone + 'static> {
+struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
     operation_queue2: VecDeque<OperationRef<T>>,
     operations: LinkedHashMap<Uuid, OperationRef<T>>,
 }
 
-impl<T: std::clone::Clone + 'static> Operations<T> {
+impl<T: Clone + 'static> Operations<T> {
     fn new() -> Operations<T> {
         Operations {
             operation_queue1: VecDeque::new(),
@@ -61,12 +61,12 @@ impl<T: std::clone::Clone + 'static> Operations<T> {
     }
 }
 
-struct Core<T: std::clone::Clone + 'static> {
+struct Core<T: Clone + 'static> {
     waker: Option<Waker>,
     progress_callback: Option<Box<dyn FnMut(&EngineRef<T>, &OperationRef<T>)>>,
 }
 
-impl<T: std::clone::Clone + 'static> Core<T> {
+impl<T: Clone + 'static> Core<T> {
     fn new() -> Core<T> {
         Core {
             waker: None,
@@ -94,13 +94,13 @@ impl Services {
 }
 
 #[derive(Clone)]
-pub struct EngineRef<T: std::clone::Clone + 'static> {
+pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
     services: SyncRef<Services>,
 }
 
-impl<T: std::clone::Clone + 'static> EngineRef<T> {
+impl<T: Clone + 'static> EngineRef<T> {
     pub fn new() -> EngineRef<T> {
         EngineRef {
             operations: SyncRef::new(Operations::new()),
@@ -180,11 +180,11 @@ impl Termination for EngineResult {
     }
 }
 
-struct EngineMainTask<T: std::clone::Clone + 'static> {
+struct EngineMainTask<T: Clone + 'static> {
     engine: EngineRef<T>,
 }
 
-impl<T: std::clone::Clone + 'static> Future for EngineMainTask<T> {
+impl<T: Clone + 'static> Future for EngineMainTask<T> {
     type Output = EngineResult;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -209,7 +209,7 @@ impl<T: std::clone::Clone + 'static> Future for EngineMainTask<T> {
     }
 }
 
-async fn get_operation_fut<T: std::clone::Clone + 'static>(
+async fn get_operation_fut<T: Clone + 'static>(
     engine: EngineRef<T>,
     operation: OperationRef<T>,
     mut op_impl: Box<dyn OperationImpl<T>>,
@@ -285,7 +285,7 @@ mod tests {
         }
     }
 
-    fn print_progress<T: std::clone::Clone + 'static>(e: &EngineRef<T>, first: bool) {
+    fn print_progress<T: Clone + 'static>(e: &EngineRef<T>, first: bool) {
         use std::fmt::Write;
 
         let mut s = String::new();

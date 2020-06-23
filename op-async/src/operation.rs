@@ -19,7 +19,7 @@ pub enum OperationErrorDetail {
 }
 
 #[async_trait]
-pub trait OperationImpl<T: std::clone::Clone + 'static>: Send {
+pub trait OperationImpl<T: Clone + 'static>: Send {
     async fn init(
         &mut self,
         _engine: &EngineRef<T>,
@@ -63,7 +63,7 @@ pub struct Operation<T> {
     outcome: Option<OperationResult<T>>,
 }
 
-impl<T: std::clone::Clone + 'static> Operation<T> {
+impl<T: Clone + 'static> Operation<T> {
     fn new<S: Into<String>, O: OperationImpl<T> + 'static>(name: S, op_impl: O) -> Operation<T> {
         Operation {
             id: Uuid::new_v4(),
@@ -132,7 +132,7 @@ impl<T> Deref for OperationRef<T> {
     }
 }
 
-impl<T: std::clone::Clone + 'static> OperationRef<T> {
+impl<T: Clone + 'static> OperationRef<T> {
     pub fn new<S: Into<String>, O: OperationImpl<T> + 'static>(
         name: S,
         op_impl: O,
