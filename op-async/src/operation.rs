@@ -1,4 +1,5 @@
 use crate::progress::Progress;
+use crate::{EngineRef, OperationImpl};
 use kg_utils::sync::SyncRef;
 use std::ops::Deref;
 use std::task::Waker;
@@ -20,10 +21,11 @@ pub struct Operation {
     progress: Progress,
     waker: Option<Waker>,
     op_state: OperationState,
+    op_impl: Option<Box<dyn OperationImpl>>,
 }
 
 impl Operation {
-    fn new<S: Into<String>>(name: S) -> Operation {
+    fn new<S: Into<String>, O: OperationImpl + 'static>(name: S, op_impl: O) -> Operation {
         Operation {
             id: Uuid::new_v4(),
             parent: Uuid::nil(),
@@ -32,6 +34,7 @@ impl Operation {
             progress: Progress::default(),
             waker: None,
             op_state: OperationState::Init,
+            op_impl: Some(Box::new(op_impl)),
         }
     }
 
@@ -79,8 +82,8 @@ impl Deref for OperationRef {
 }
 
 impl OperationRef {
-    pub fn new<S: Into<String>>(name: S) -> OperationRef {
-        OperationRef(SyncRef::new(Operation::new(name)))
+    pub fn new<S: Into<String>, O: OperationImpl + 'static>(name: S, op_impl: O) -> OperationRef {
+        OperationRef(SyncRef::new(Operation::new(name, op_impl)))
     }
 
     pub fn id(&self) -> Uuid {
@@ -89,5 +92,9 @@ impl OperationRef {
 
     pub fn set_waker(&self, waker: Waker) {
         self.write().set_waker(waker);
+    }
+
+    pub(crate) fn take_op_impl(&mut self) -> Option<Box<dyn OperationImpl>> {
+        self.0.write().op_impl.take()
     }
 }

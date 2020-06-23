@@ -101,14 +101,22 @@ impl EngineRef {
         }
     }
 
-    pub fn run(&self) -> EngineResult {
+    pub fn run_with(&self, f: impl FnOnce(EngineRef) -> ()) -> EngineResult {
         let mut runtime = tokio::runtime::Builder::new()
             .enable_all()
             .threaded_scheduler()
             .thread_name("engine")
             .build()
             .unwrap();
-        runtime.block_on(async { self.main_task().await })
+        let e = self.clone();
+        runtime.block_on(async {
+            f(e);
+            self.main_task().await
+        })
+    }
+
+    pub fn run(&self) -> EngineResult {
+        self.run_with(|_| {})
     }
 
     pub fn operations(&self) -> SyncRefMapReadGuard<LinkedHashMap<Uuid, OperationRef>> {
@@ -174,8 +182,9 @@ impl Future for EngineMainTask {
 
         if !self.engine.operations.read().operation_queue1.is_empty() {
             let mut ops = self.engine.operations.write();
-            while let Some(op) = ops.operation_queue1.pop_front() {
-                tokio::spawn(get_operation_fut(self.engine.clone(), op, TestOp::new()));
+            while let Some(mut op) = ops.operation_queue1.pop_front() {
+                let op_impl = op.take_op_impl().unwrap();
+                tokio::spawn(get_operation_fut(self.engine.clone(), op, op_impl));
             }
             ops.swap_queues();
         }
@@ -207,7 +216,7 @@ async fn get_operation_fut(
 }
 
 #[async_trait]
-trait OperationImpl: Send {
+pub trait OperationImpl: Send {
     async fn init(&mut self, _engine: &EngineRef, _operation: &OperationRef) -> () {
         ()
     }
@@ -237,13 +246,13 @@ mod tests {
     }
 
     impl TestOp {
-        fn new() -> Box<Self> {
+        fn new() -> Self {
             use rand::Rng;
             let mut rng = rand::thread_rng();
-            Box::new(TestOp {
+            TestOp {
                 interval: tokio::time::interval(Duration::from_secs(rng.gen_range(1, 3))),
                 count: rng.gen_range(1, 5),
-            })
+            }
         }
     }
 
@@ -295,13 +304,8 @@ mod tests {
     }
 
     #[test]
-    fn main() -> EngineResult {
+    fn test_operation() {
         let engine = EngineRef::new();
-
-        engine.enqueue_operation(OperationRef::new("ddd1"));
-        engine.enqueue_operation(OperationRef::new("ddd2"));
-        engine.enqueue_operation(OperationRef::new("ddd3"));
-        engine.enqueue_operation(OperationRef::new("ddd4"));
 
         engine.register_progress_cb(|e, o| {
             print_progress(e, false);
@@ -309,6 +313,11 @@ mod tests {
 
         print_progress(&engine, true);
 
-        engine.run()
+        engine.run_with(|engine| {
+            engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new()));
+            engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new()));
+            engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new()));
+            engine.enqueue_operation(OperationRef::new("ddd4", TestOp::new()));
+        });
     }
 }
