@@ -10,6 +10,7 @@ use kg_diag::BasicDiag;
 use kg_diag::Severity;
 
 use tokio::sync::oneshot;
+use tokio::sync::mpsc;
 
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
@@ -62,7 +63,9 @@ pub struct Operation<T> {
     op_state: OperationState,
     op_impl: Option<Box<dyn OperationImpl<T>>>,
     outcome: Option<OperationResult<T>>,
-    done_sender: Option<oneshot::Sender<()>>
+    done_sender: Option<oneshot::Sender<()>>,
+    cancel_sender: Option<mpsc::Sender<()>>,
+    cancel_receiver: Option<mpsc::Receiver<()>>
 }
 
 impl<T: Clone + 'static> Operation<T> {
@@ -77,7 +80,9 @@ impl<T: Clone + 'static> Operation<T> {
             op_state: OperationState::Init,
             op_impl: Some(Box::new(op_impl)),
             outcome: None,
-            done_sender: None
+            done_sender: None,
+            cancel_sender: None,
+            cancel_receiver: None
         }
     }
 
