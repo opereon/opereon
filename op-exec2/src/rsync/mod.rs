@@ -4,11 +4,10 @@ use os_pipe::PipeWriter;
 use std::path::PathBuf;
 use tokio::process::Command;
 
-
 use super::*;
 
 pub use self::config::RsyncConfig;
-pub use self::rsync::compare::{DiffInfo, rsync_compare};
+pub use self::rsync::compare::{rsync_compare, DiffInfo};
 use std::process::ExitStatus;
 
 mod compare;

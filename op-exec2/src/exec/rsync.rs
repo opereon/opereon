@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
-use op_async::{OperationImpl, EngineRef, OperationRef, ProgressUpdate, OperationError};
+use crate::rsync::{rsync_compare, DiffInfo, RsyncConfig, RsyncParams};
+use crate::OutputLog;
 use kg_diag::BasicDiag;
 use op_async::operation::OperationResult;
-use crate::rsync::{RsyncConfig, RsyncParams, DiffInfo, rsync_compare};
-use crate::OutputLog;
+use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
 
 struct CompareOperation {
     config: RsyncConfig,
@@ -14,30 +14,44 @@ struct CompareOperation {
 }
 
 impl CompareOperation {
-    pub fn new(    config: &RsyncConfig,
-                   params: &RsyncParams,
-                   checksum: bool,
-                   log: &OutputLog,) -> Self {
+    pub fn new(
+        config: &RsyncConfig,
+        params: &RsyncParams,
+        checksum: bool,
+        log: &OutputLog,
+    ) -> Self {
         Self {
             config: config.clone(),
             params: params.clone(),
             checksum,
-            log: log.clone()
+            log: log.clone(),
         }
     }
 }
 type Outcome = Vec<DiffInfo>;
 #[async_trait]
 impl OperationImpl<Outcome> for CompareOperation {
-    async fn init(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<()> {
+    async fn init(
+        &mut self,
+        _engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<()> {
         Ok(())
     }
 
-    async fn next_progress(&mut self, engine: &EngineRef<Outcome>, operation: &OperationRef<Outcome>) -> OperationResult<ProgressUpdate> {
+    async fn next_progress(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        operation: &OperationRef<Outcome>,
+    ) -> OperationResult<ProgressUpdate> {
         Ok(ProgressUpdate::done())
     }
 
-    async fn done(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+    async fn done(
+        &mut self,
+        _engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
         let res = rsync_compare(&self.config, &self.params, self.checksum, &self.log).await?;
         Ok(res)
     }
@@ -54,7 +68,7 @@ mod tests {
 
         let mut rt = EngineRef::<()>::build_runtime();
 
-        rt.block_on(async move  {
+        rt.block_on(async move {
             let e = engine.clone();
             tokio::spawn(async move {
                 let cfg = RsyncConfig::default();
@@ -71,9 +85,6 @@ mod tests {
 
             e.start().await;
             println!("Engine stopped");
-
         })
-
-
     }
 }

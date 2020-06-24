@@ -87,9 +87,7 @@ async fn run_script(
         command.current_dir(cwd);
     }
 
-    command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     if let SourceRef::Source(src) = script {
         let (r_in, mut w_in) = pipe().unwrap();
@@ -116,7 +114,12 @@ async fn run_script(
     Ok(status)
 }
 
-fn prepare_builder(cmd: &str, env: Option<&LinkedHashMap<String, String>>, run_as: Option<&str>, config: &LocalConfig) -> CommandBuilder {
+fn prepare_builder(
+    cmd: &str,
+    env: Option<&LinkedHashMap<String, String>>,
+    run_as: Option<&str>,
+    config: &LocalConfig,
+) -> CommandBuilder {
     let mut builder = if let Some(user) = run_as {
         // TODO ws is this implementation ok? Will work only for `runas_cmd = sudo`
         let mut builder = CommandBuilder::new(config.runas_cmd());
@@ -165,8 +168,8 @@ mod tests {
                 &cfg,
                 &log,
             )
-                .await
-                .expect("Error");
+            .await
+            .expect("Error");
             eprintln!("status = {:?}", status);
             eprintln!("log = {}", log);
         });
@@ -218,8 +221,8 @@ mod tests {
                 &cfg,
                 &log,
             )
-                .await
-                .expect("Error");
+            .await
+            .expect("Error");
             eprintln!("status = {:?}", status);
             eprintln!("log = {}", log);
         });

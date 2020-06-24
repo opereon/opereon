@@ -427,7 +427,7 @@ mod tests {
                     Some(&env),
                     Some(&PathBuf::from("/home")),
                     None,
-                    &log
+                    &log,
                 )
                 .await
                 .expect("Error");
