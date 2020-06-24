@@ -31,6 +31,9 @@ pub use progress::ProgressUpdate;
 use kg_diag::BasicDiag;
 use operation::*;
 use progress::*;
+use tokio::sync::oneshot::Receiver;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::runtime::Runtime;
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -64,6 +67,7 @@ impl<T: Clone + 'static> Operations<T> {
 struct Core<T: Clone + 'static> {
     waker: Option<Waker>,
     progress_callback: Option<Box<dyn FnMut(&EngineRef<T>, &OperationRef<T>)>>,
+    stopped: bool
 }
 
 impl<T: Clone + 'static> Core<T> {
@@ -71,6 +75,7 @@ impl<T: Clone + 'static> Core<T> {
         Core {
             waker: None,
             progress_callback: None,
+            stopped: false,
         }
     }
 
@@ -82,6 +87,14 @@ impl<T: Clone + 'static> Core<T> {
 
     fn set_waker(&mut self, waker: Waker) {
         self.waker = Some(waker);
+    }
+
+    fn set_stopped(&mut self, stopped: bool) {
+        self.stopped = stopped
+    }
+
+    fn stopped(&self) -> bool {
+        self.stopped
     }
 }
 
@@ -109,23 +122,41 @@ impl<T: Clone + 'static> EngineRef<T> {
         }
     }
 
-    /// This method is necessary if we want to create OperationImpl instances in context of tokio runtime
-    pub fn run_with(&self, f: impl FnOnce(EngineRef<T>) -> ()) -> EngineResult {
-        let mut runtime = tokio::runtime::Builder::new()
+    pub fn build_runtime() -> Runtime {
+        let runtime = tokio::runtime::Builder::new()
             .enable_all()
             .threaded_scheduler()
             .thread_name("engine")
             .build()
             .unwrap();
-        let e = self.clone();
-        runtime.block_on(async {
-            f(e);
-            self.main_task().await
-        })
+        runtime
     }
 
-    pub fn run(&self) -> EngineResult {
-        self.run_with(|_| {})
+    // /// This method is necessary if we want to create OperationImpl instances in context of tokio runtime
+    // pub fn run_with(&self, f: impl FnOnce(EngineRef<T>) -> ()) -> EngineResult {
+    //     let mut runtime = Self::build_runtime();
+    //     let e = self.clone();
+    //     runtime.block_on(async {
+    //         f(e);
+    //         self.main_task().await
+    //     })
+    // }
+
+    // pub fn run(&self) -> EngineResult {
+    //     self.run_with(|_| {})
+    // }
+
+    pub async fn start(&self)  -> EngineResult {
+        self.main_task().await
+    }
+
+    pub fn stop(&self) {
+        self.core.write().set_stopped(true);
+        self.core.write().wake();
+    }
+
+    fn stopped(&self) -> bool {
+        self.core.read().stopped()
     }
 
     pub fn operations(&self) -> SyncRefMapReadGuard<LinkedHashMap<Uuid, OperationRef<T>>> {
@@ -143,13 +174,47 @@ impl<T: Clone + 'static> EngineRef<T> {
         self.core.write().set_waker(waker);
     }
 
-    pub fn enqueue_operation(&self, operation: OperationRef<T>) {
+    pub fn enqueue_operation(&self, operation: OperationRef<T>) -> Receiver<()>{
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        operation.write().set_done_sender(sender);
         self.operations.write().add_operation(operation.clone());
         self.core.write().wake();
+        receiver
     }
 
-    fn finish_operation(&self, operation: &OperationRef<T>) {
+    pub fn enqueue_with_res(&self, operation: OperationRef<T>) -> impl Future<Output=OperationResult<T>> {
+        let receiver = self.enqueue_operation(operation.clone());
+
+        async move {
+            match receiver.await {
+                Ok(_) => {
+                    // outcome is always set after operation completion
+                    operation.write().take_outcome().unwrap()
+                },
+                Err(_) => {
+                    // should never happen since only way to drop sender is:
+                    // - complete operation (notification sent before drop)
+                    // - drop entire operation (engine will never drop operation without completion)
+                    unreachable!()
+                },
+            }
+        }
+    }
+
+    fn finish_operation(&self, operation: &OperationRef<T>, res: OperationResult<T>) {
+        operation.write().set_outcome(res);
+        // this is safe since operations scheduled with `enqueue_operation` always have `done_sender`
+        let sender = operation.write().take_done_sender().unwrap();
+        match sender.send(()) {
+            Ok(_) => {
+            },
+            Err(_) => {
+                // nothing to do here. Its totally ok to have receiver deallocated (Fire and forget scenario)
+            },
+        };
+
         if operation.read().parent().is_some() {
+            // TODO ws what to do here?
         } else {
             self.operations.write().remove_operation(operation);
         }
@@ -192,19 +257,18 @@ impl<T: Clone + 'static> Future for EngineMainTask<T> {
 
         self.engine.set_waker(cx.waker().clone());
 
-        if !self.engine.operations.read().operation_queue1.is_empty() {
-            let mut ops = self.engine.operations.write();
-            while let Some(mut op) = ops.operation_queue1.pop_front() {
-                let op_impl = op.take_op_impl().unwrap();
-                tokio::spawn(get_operation_fut(self.engine.clone(), op, op_impl));
+        if !self.engine.stopped() {
+            if !self.engine.operations.read().operation_queue1.is_empty() {
+                let mut ops = self.engine.operations.write();
+                while let Some(mut op) = ops.operation_queue1.pop_front() {
+                    let op_impl = op.take_op_impl().unwrap();
+                    tokio::spawn(get_operation_fut(self.engine.clone(), op, op_impl));
+                }
+                ops.swap_queues();
             }
-            ops.swap_queues();
-        }
-
-        if self.engine.operations.read().operations.is_empty() {
-            Poll::Ready(EngineResult { code: 0 })
-        } else {
             Poll::Pending
+        } else {
+            Poll::Ready(EngineResult { code: 0 })
         }
     }
 }
@@ -228,8 +292,7 @@ async fn get_operation_fut<T: Clone + 'static>(
     };
 
     let out = inner().await;
-    o.write().set_outcome(out);
-    e.finish_operation(&o);
+    e.finish_operation(&o, out);
 }
 
 #[cfg(test)]

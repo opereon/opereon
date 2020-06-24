@@ -9,9 +9,10 @@ use async_trait::async_trait;
 use kg_diag::BasicDiag;
 use kg_diag::Severity;
 
+use tokio::sync::oneshot::Sender;
+
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
-
 #[derive(Debug, Display)]
 pub enum OperationErrorDetail {
     #[display(fmt = "operation cancelled by user")]
@@ -61,6 +62,7 @@ pub struct Operation<T> {
     op_state: OperationState,
     op_impl: Option<Box<dyn OperationImpl<T>>>,
     outcome: Option<OperationResult<T>>,
+    done_sender: Option<Sender<()>>
 }
 
 impl<T: Clone + 'static> Operation<T> {
@@ -75,6 +77,7 @@ impl<T: Clone + 'static> Operation<T> {
             op_state: OperationState::Init,
             op_impl: Some(Box::new(op_impl)),
             outcome: None,
+            done_sender: None
         }
     }
 
@@ -117,6 +120,14 @@ impl<T: Clone + 'static> Operation<T> {
 
     pub fn set_outcome(&mut self, outcome: OperationResult<T>) {
         self.outcome = Some(outcome)
+    }
+
+    pub (crate) fn set_done_sender(&mut self, sender: Sender<()>) {
+        self.done_sender = Some(sender)
+    }
+
+    pub (crate) fn take_done_sender(&mut self) -> Option<Sender<()>>{
+        self.done_sender.take()
     }
 }
 

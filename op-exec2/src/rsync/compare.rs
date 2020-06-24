@@ -167,7 +167,7 @@ impl FileType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DiffInfo {
     state: State,
     file_type: Option<FileType>,
