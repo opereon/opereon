@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use kg_diag::BasicDiag;
 use kg_diag::Severity;
 
-use tokio::sync::oneshot::Sender;
+use tokio::sync::oneshot;
 
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
@@ -62,7 +62,7 @@ pub struct Operation<T> {
     op_state: OperationState,
     op_impl: Option<Box<dyn OperationImpl<T>>>,
     outcome: Option<OperationResult<T>>,
-    done_sender: Option<Sender<()>>
+    done_sender: Option<oneshot::Sender<()>>
 }
 
 impl<T: Clone + 'static> Operation<T> {
@@ -122,11 +122,11 @@ impl<T: Clone + 'static> Operation<T> {
         self.outcome = Some(outcome)
     }
 
-    pub (crate) fn set_done_sender(&mut self, sender: Sender<()>) {
+    pub (crate) fn set_done_sender(&mut self, sender: oneshot::Sender<()>) {
         self.done_sender = Some(sender)
     }
 
-    pub (crate) fn take_done_sender(&mut self) -> Option<Sender<()>>{
+    pub (crate) fn take_done_sender(&mut self) -> Option<oneshot::Sender<()>>{
         self.done_sender.take()
     }
 }

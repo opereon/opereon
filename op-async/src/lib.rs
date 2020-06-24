@@ -298,6 +298,7 @@ async fn get_operation_fut<T: Clone + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::*;
 
     struct TestOp {
         interval: Interval,
@@ -323,7 +324,7 @@ mod tests {
             &mut self,
             _engine: &EngineRef<OutputType>,
             _operation: &OperationRef<OutputType>,
-        ) -> Result<ProgressUpdate, ()> {
+        ) -> OperationResult<ProgressUpdate> {
             //println!("progress: {}", operation.read().name);
             if self.count > 0 {
                 self.count -= 1;
@@ -339,7 +340,7 @@ mod tests {
             &mut self,
             _engine: &EngineRef<OutputType>,
             _operation: &OperationRef<OutputType>,
-        ) -> Result<OutputType, ()> {
+        ) -> OperationResult<OutputType> {
             let delay = tokio::time::delay_for(Duration::from_secs(2));
             println!("Some long running cleanup code....");
             delay.await;
@@ -379,11 +380,18 @@ mod tests {
 
         print_progress(&engine, true);
 
-        engine.run_with(|engine| {
-            engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new()));
-            engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new()));
-            engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new()));
-            engine.enqueue_operation(OperationRef::new("ddd4", TestOp::new()));
+        let mut rt = EngineRef::<()>::build_runtime();
+
+        rt.block_on(async move {
+            let e =engine.clone();
+            tokio::spawn(async move {
+                engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new()));
+                engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new()));
+                engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new()));
+                engine.enqueue_with_res(OperationRef::new("ddd4", TestOp::new())).await;
+                engine.stop()
+            });
+            e.start().await;
         });
     }
 }
