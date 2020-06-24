@@ -6,14 +6,14 @@ use kg_diag::BasicDiag;
 use op_async::operation::OperationResult;
 use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
 
-struct CompareOperation {
+struct FileCompareOperation {
     config: RsyncConfig,
     params: RsyncParams,
     checksum: bool,
     log: OutputLog,
 }
 
-impl CompareOperation {
+impl FileCompareOperation {
     pub fn new(
         config: &RsyncConfig,
         params: &RsyncParams,
@@ -30,7 +30,7 @@ impl CompareOperation {
 }
 type Outcome = Vec<DiffInfo>;
 #[async_trait]
-impl OperationImpl<Outcome> for CompareOperation {
+impl OperationImpl<Outcome> for FileCompareOperation {
     async fn init(
         &mut self,
         _engine: &EngineRef<Outcome>,
@@ -76,7 +76,7 @@ mod tests {
                     RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
                 let log = OutputLog::new();
 
-                let op_impl = CompareOperation::new(&cfg, &params, false, &log);
+                let op_impl = FileCompareOperation::new(&cfg, &params, false, &log);
                 let op = OperationRef::new("compare_operation", op_impl);
                 let res = engine.enqueue_with_res(op).await;
                 println!("operation completed {:#?}", res);
