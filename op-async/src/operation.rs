@@ -134,6 +134,22 @@ impl<T: Clone + 'static> Operation<T> {
     pub (crate) fn take_done_sender(&mut self) -> Option<oneshot::Sender<()>>{
         self.done_sender.take()
     }
+
+    pub (crate) fn set_cancel_sender(&mut self, sender: mpsc::Sender<()>) {
+        self.cancel_sender = Some(sender)
+    }
+
+    pub (crate) fn cancel_sender(&self) -> Option<&mpsc::Sender<()>> {
+        self.cancel_sender.as_ref()
+    }
+
+    pub (crate) fn set_cancel_receiver(&mut self, sender: mpsc::Receiver<()>) {
+        self.cancel_receiver = Some(sender)
+    }
+
+    pub (crate) fn take_cancel_receiver(&mut self) -> Option<mpsc::Receiver<()>>{
+        self.cancel_receiver.take()
+    }
 }
 
 #[derive(Clone)]

@@ -8,7 +8,7 @@ use std::task::{Waker, Context, Poll};
 use tokio::runtime::Runtime;
 use std::future::Future;
 use crate::operation::OperationResult;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, mpsc};
 use std::pin::Pin;
 
 struct Operations<T: Clone + 'static> {
@@ -151,11 +151,18 @@ impl<T: Clone + 'static> EngineRef<T> {
     }
 
     pub fn enqueue_operation(&self, operation: OperationRef<T>) -> oneshot::Receiver<()>{
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        operation.write().set_done_sender(sender);
+        let (done_tx, done_rx) = oneshot::channel();
+        let (cancel_tx, cancel_rx) = mpsc::channel(100);
+        {
+            let mut op = operation.write();
+            op.set_done_sender(done_tx);
+            op.set_cancel_sender(cancel_tx);
+            op.set_cancel_receiver(cancel_rx);
+        }
+
         self.operations.write().add_operation(operation.clone());
         self.core.write().wake();
-        receiver
+        done_rx
     }
 
     pub fn enqueue_with_res(&self, operation: OperationRef<T>) -> impl Future<Output=OperationResult<T>> {
