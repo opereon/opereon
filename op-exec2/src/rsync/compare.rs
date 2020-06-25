@@ -3,6 +3,7 @@ use std::process::{Output, Stdio};
 use regex::Regex;
 
 use super::*;
+use std::path::Display;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModFlags {
@@ -167,7 +168,7 @@ impl FileType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DiffInfo {
     state: State,
     file_type: Option<FileType>,

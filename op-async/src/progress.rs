@@ -1,3 +1,5 @@
+use kg_utils::collections::LinkedHashMap;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Unit {
@@ -158,14 +160,27 @@ impl Default for Progress {
 impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let symbol = self.unit.symbol();
-        write!(
-            f,
-            "{}{} / {}{}",
-            self.value,
-            symbol,
-            (self.max - self.min),
-            symbol
-        )
+
+        if let Some(ref label) = self.label {
+            write!(
+                f,
+                "{}{} / {}{} {}",
+                self.value,
+                symbol,
+                (self.max - self.min),
+                symbol,
+                label
+            )
+        }  else {
+            write!(
+                f,
+                "{}{} / {}{}",
+                self.value,
+                symbol,
+                (self.max - self.min),
+                symbol
+            )
+        }
     }
 }
 
@@ -201,5 +216,9 @@ impl ProgressUpdate {
     pub fn with_label<S: Into<String>>(mut self, label: S) -> ProgressUpdate {
         self.label = Some(label.into());
         self
+    }
+
+    pub fn set_label(&mut self, label: String) {
+        self.label = Some(label)
     }
 }

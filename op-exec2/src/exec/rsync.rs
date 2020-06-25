@@ -1,10 +1,19 @@
 use async_trait::async_trait;
 
-use crate::rsync::{rsync_compare, DiffInfo, RsyncConfig, RsyncParams};
+use crate::rsync::{rsync_compare, DiffInfo, RsyncConfig, RsyncParams, rsync_copy, RsyncResult};
 use crate::OutputLog;
 use kg_diag::BasicDiag;
 use op_async::operation::OperationResult;
 use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
+use crate::outcome::{Outcome, NodeSetRef};
+use kg_tree::NodeRef;
+use crate::outlog::EntryKind::Out;
+use op_async::progress::{Unit, Progress};
+use crate::rsync::compare::State;
+use crate::rsync::copy::ProgressInfo;
+
+use tokio::sync::{mpsc, oneshot};
+use std::process::ExitStatus;
 
 struct FileCompareOperation {
     config: RsyncConfig,
@@ -28,7 +37,6 @@ impl FileCompareOperation {
         }
     }
 }
-type Outcome = Vec<DiffInfo>;
 #[async_trait]
 impl OperationImpl<Outcome> for FileCompareOperation {
     async fn init(
@@ -41,8 +49,8 @@ impl OperationImpl<Outcome> for FileCompareOperation {
 
     async fn next_progress(
         &mut self,
-        engine: &EngineRef<Outcome>,
-        operation: &OperationRef<Outcome>,
+        _engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
     ) -> OperationResult<ProgressUpdate> {
         Ok(ProgressUpdate::done())
     }
@@ -53,7 +61,101 @@ impl OperationImpl<Outcome> for FileCompareOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let res = rsync_compare(&self.config, &self.params, self.checksum, &self.log).await?;
-        Ok(res)
+
+        Ok(Outcome::FileDiff(res))
+    }
+}
+
+struct FileCopyOperation {
+    config: RsyncConfig,
+    params: RsyncParams,
+    checksum: bool,
+    log: OutputLog,
+    progress_receiver: Option<mpsc::UnboundedReceiver<ProgressInfo>>,
+    done_receiver: Option<oneshot::Receiver<RsyncResult<ExitStatus>>>,
+    current_progress: f64
+}
+
+impl FileCopyOperation {
+    pub fn new(
+        config: &RsyncConfig,
+        params: &RsyncParams,
+        checksum: bool,
+        log: &OutputLog,
+    ) -> Self {
+        Self {
+            config: config.clone(),
+            params: params.clone(),
+            checksum,
+            log: log.clone(),
+            progress_receiver: None,
+            done_receiver: None,
+            current_progress: 0.
+        }
+    }
+}
+
+#[async_trait]
+impl OperationImpl<Outcome> for FileCopyOperation {
+    async fn init(&mut self, engine: &EngineRef<Outcome>, operation: &OperationRef<Outcome>) -> OperationResult<()> {
+        let op_impl = FileCompareOperation::new(&self.config, &self.params, false, &self.log);
+        let op = OperationRef::new("compare_operation", op_impl);
+        // TODO ws create specific error detail or just rethrow?
+        let out = engine.enqueue_with_res(op).await?;
+        let diffs = if let Outcome::FileDiff(diffs) = out {
+            diffs
+        } else {
+            unreachable!()
+        };
+
+        let mut total_size = 0.0;
+
+        for diff in diffs {
+            if let State::Missing | State::Modified(_) = diff.state() {
+                let file_max = diff.file_size() as f64;
+                total_size += file_max;
+            }
+        }
+        let progress = Progress::new(0.0, total_size, Unit::Bytes);
+
+        *operation.write().progress_mut() = progress;
+
+        let (progress_tx, progress_rx) = mpsc::unbounded_channel();
+        let (done_tx, done_rx) = oneshot::channel();
+        self.progress_receiver = Some(progress_rx);
+        self.done_receiver = Some(done_rx);
+
+        let config = self.config.clone();
+        let params = self.params.clone();
+        let log = self.log.clone();
+
+        tokio::spawn(async move {
+            let res = rsync_copy(&config, &params, progress_tx, &log).await;
+            done_tx.send(res).expect("Copy process cannot outlive parent operation!")
+        });
+
+        Ok(())
+    }
+
+    async fn next_progress(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<ProgressUpdate> {
+        let res = self.progress_receiver.as_mut()
+            .expect("progress_receiver not set!")
+            .recv().await;
+        if let Some(progress) = res {
+            self.current_progress += progress.loaded_bytes;
+            let mut update = ProgressUpdate::new(self.current_progress);
+            update.set_label(progress.file_name);
+            Ok(update)
+        } else {
+            Ok(ProgressUpdate::done())
+        }
+    }
+
+    async fn done(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+        let rx = self.done_receiver.take().expect("done_receiver not set!");
+        let result = rx.await.expect("Sender dropped before completion")?;
+        // TODO ws handle exit status
+        Ok(Outcome::Empty)
     }
 }
 
@@ -63,8 +165,38 @@ mod tests {
     use crate::rsync::DiffInfo;
 
     #[test]
+    fn file_copy_operation_test() {
+        let engine: EngineRef<Outcome> = EngineRef::new();
+
+        let mut rt = EngineRef::<()>::build_runtime();
+
+        rt.block_on(async move {
+            let e = engine.clone();
+            tokio::spawn(async move {
+                let cfg = RsyncConfig::default();
+                let mut params =
+                    RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+                let log = OutputLog::new();
+
+                engine.register_progress_cb(|e, o| {
+                    eprintln!("{}", o.read().progress())
+                });
+
+                let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
+                let op = OperationRef::new("copy_operation", op_impl);
+                let res = engine.enqueue_with_res(op).await.unwrap();
+                println!("operation completed {:?}", res);
+                engine.stop();
+            });
+
+            e.start().await;
+            println!("Engine stopped");
+        })
+    }
+
+    #[test]
     fn compare_operation_test() {
-        let engine: EngineRef<Vec<DiffInfo>> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::new();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -78,8 +210,8 @@ mod tests {
 
                 let op_impl = FileCompareOperation::new(&cfg, &params, false, &log);
                 let op = OperationRef::new("compare_operation", op_impl);
-                let res = engine.enqueue_with_res(op).await;
-                println!("operation completed {:#?}", res);
+                let res = engine.enqueue_with_res(op).await.unwrap();
+                println!("operation completed {:?}", res);
                 engine.stop();
             });
 

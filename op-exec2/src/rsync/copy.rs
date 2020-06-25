@@ -14,6 +14,7 @@ use os_pipe::pipe;
 use slog::Logger;
 use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::sync::mpsc;
 
 type Loaded = u64;
 
@@ -80,11 +81,24 @@ fn read_until<R: BufRead + ?Sized>(
     }
 }
 
-async fn parse_progress<R: AsyncRead + Unpin>(mut out: BufReader<R>) -> RsyncParseResult<()> {
+#[derive(Debug)]
+pub struct ProgressInfo {
+    pub file_name: String,
+    pub loaded_bytes: f64,
+    pub is_completed: bool,
+}
+
+impl ProgressInfo {
+    pub fn new(file_name: String, loaded_bytes: f64, is_completed: bool) -> Self {
+        ProgressInfo { file_name, loaded_bytes, is_completed }
+    }
+}
+
+async fn parse_progress<R: AsyncRead + Unpin>(out: BufReader<R>, progress_sender: mpsc::UnboundedSender<ProgressInfo>) -> RsyncParseResult<()> {
     let mut lines = lines(out);
     let mut file_name: String = String::new();
     let mut file_completed = true;
-    let mut file_idx = 0;
+    let mut file_idx :i32 = 0;
 
     let file_reg = Regex::new(r"[\[\]]").unwrap();
     let progress_reg = Regex::new(r"[ ]").unwrap();
@@ -120,10 +134,12 @@ async fn parse_progress<R: AsyncRead + Unpin>(mut out: BufReader<R>) -> RsyncPar
             //     .write()
             //     .update_progress_step_value(file_idx, loaded_bytes);
 
-            eprintln!("File: {} : {}", file_name, loaded_bytes);
+            let _ = progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, false));
+            // eprintln!("File: {} : {}", file_name, loaded_bytes);
 
             if progress_info.len() == 6 {
-                eprintln!("File completed: {:?}", file_name);
+                let _ = progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, true));
+                // eprintln!("File completed: {:?}", file_name);
                 // operation.write().update_progress_step_value_done(file_idx);
                 file_idx += 1;
                 file_completed = true;
@@ -161,6 +177,7 @@ async fn parse_progress<R: AsyncRead + Unpin>(mut out: BufReader<R>) -> RsyncPar
 pub async fn rsync_copy(
     config: &RsyncConfig,
     params: &RsyncParams,
+    progress_sender: mpsc::UnboundedSender<ProgressInfo>,
     log: &OutputLog,
 ) -> RsyncResult<ExitStatus> {
     let mut child = {
@@ -184,8 +201,8 @@ pub async fn rsync_copy(
     let stderr = BufReader::new(child.stderr.take().unwrap());
     drop(child.stdin.take());
 
-    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> RsyncResult<()> {
-        parse_progress(s).await?;
+    async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>, progress_sender: mpsc::UnboundedSender<ProgressInfo>) -> RsyncResult<()> {
+        parse_progress(s, progress_sender).await?;
         Ok(())
     }
 
@@ -198,7 +215,7 @@ pub async fn rsync_copy(
         Ok(())
     }
 
-    try_join(stdout_read(stdout), stderr_read(stderr)).await?;
+    try_join(stdout_read(stdout, progress_sender), stderr_read(stderr)).await?;
 
     let status = child.await.map_err_to_diag()?;
     log.log_status(status.code())?;
@@ -396,7 +413,14 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
 
         rt.block_on(async move {
-            rsync_copy(&cfg, &params, &log).await.expect("error");
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            tokio::spawn(async move {
+               while let Some(progress) = rx.recv().await {
+                   eprintln!("progress = {:?}", progress);
+               }
+            });
+
+            rsync_copy(&cfg, &params, tx, &log).await.expect("error");
             println!("{}", log)
         });
     }

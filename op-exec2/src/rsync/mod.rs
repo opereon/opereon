@@ -8,11 +8,12 @@ use super::*;
 
 pub use self::config::RsyncConfig;
 pub use self::rsync::compare::{rsync_compare, DiffInfo};
+pub use self::rsync::copy::{rsync_copy};
 use std::process::ExitStatus;
 
-mod compare;
-mod config;
-mod copy;
+pub mod compare;
+pub mod config;
+pub mod copy;
 
 type FileSize = u64;
 
