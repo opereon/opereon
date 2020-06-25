@@ -95,6 +95,19 @@ impl FileCopyOperation {
     }
 }
 
+fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
+    let mut total_size = 0.0;
+
+    for diff in diffs {
+        if let State::Missing | State::Modified(_) = diff.state() {
+            let file_max = diff.file_size() as f64;
+            total_size += file_max;
+        }
+    }
+    let progress = Progress::new(0.0, total_size, Unit::Bytes);
+    progress
+}
+
 #[async_trait]
 impl OperationImpl<Outcome> for FileCopyOperation {
     async fn init(&mut self, engine: &EngineRef<Outcome>, operation: &OperationRef<Outcome>) -> OperationResult<()> {
@@ -108,17 +121,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             unreachable!()
         };
 
-        let mut total_size = 0.0;
-
-        for diff in diffs {
-            if let State::Missing | State::Modified(_) = diff.state() {
-                let file_max = diff.file_size() as f64;
-                total_size += file_max;
-            }
-        }
-        let progress = Progress::new(0.0, total_size, Unit::Bytes);
-
-        *operation.write().progress_mut() = progress;
+        *operation.write().progress_mut() = build_progress(diffs);
 
         let (progress_tx, progress_rx) = mpsc::unbounded_channel();
         let (done_tx, done_rx) = oneshot::channel();
@@ -179,7 +182,7 @@ mod tests {
                 let log = OutputLog::new();
 
                 engine.register_progress_cb(|e, o| {
-                    eprintln!("{}", o.read().progress())
+                    eprintln!("progress: {}", o.read().progress())
                 });
 
                 let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
