@@ -157,13 +157,13 @@ async fn parse_progress<R: AsyncRead + Unpin>(
             if progress_info.len() == 6 {
                 let _ =
                     progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, true));
-                // eprintln!("File completed: {:?}", file_name);
+                eprintln!("File completed: {:?}", file_name);
                 // operation.write().update_progress_step_value_done(file_idx);
                 file_idx += 1;
                 file_completed = true;
             } else {
+                eprintln!("File: {} : {}", file_name, loaded_bytes);
                 let _ = progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, false));
-                // eprintln!("File: {} : {}", file_name, loaded_bytes);
             }
             continue;
         }

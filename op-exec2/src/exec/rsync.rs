@@ -98,14 +98,17 @@ impl FileCopyOperation {
 fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
     let mut total_size = 0.0;
 
+    let mut parts = vec![];
+
     for diff in diffs {
         if let State::Missing | State::Modified(_) = diff.state() {
+            parts.push(Progress::new_partial(&diff.file_path().to_string_lossy(), 0., diff.file_size() as f64, Unit::Bytes));
             let file_max = diff.file_size() as f64;
             total_size += file_max;
         }
     }
-    let progress = Progress::new(0.0, total_size, Unit::Bytes);
-    eprintln!("calculated progress = {:?}", progress);
+    let progress = Progress::from_parts(parts);
+    eprintln!("calculated progress = {:#?}", progress);
     progress
 }
 
@@ -160,8 +163,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             .await;
         if let Some(progress) = res {
             self.current_progress += progress.loaded_bytes;
-            let mut update = ProgressUpdate::new(self.current_progress);
-            update.set_label(progress.file_name);
+            let mut update = ProgressUpdate::new_partial(self.current_progress, progress.file_name);
             Ok(update)
         } else {
             Ok(ProgressUpdate::done())
