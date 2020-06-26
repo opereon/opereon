@@ -152,13 +152,7 @@ impl<T: Clone + 'static> EngineRef<T> {
 
     pub fn enqueue_operation(&self, operation: OperationRef<T>) -> oneshot::Receiver<()>{
         let (done_tx, done_rx) = oneshot::channel();
-        let (cancel_tx, cancel_rx) = mpsc::channel(100);
-        {
-            let mut op = operation.write();
-            op.set_done_sender(done_tx);
-            op.set_cancel_sender(cancel_tx);
-            op.set_cancel_receiver(cancel_rx);
-        }
+        operation.write().set_done_sender(done_tx);
 
         self.operations.write().add_operation(operation.clone());
         self.core.write().wake();

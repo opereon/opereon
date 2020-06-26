@@ -1,12 +1,12 @@
-use std::sync::{Arc, Mutex, MutexGuard};
 use kg_tree::diff::NodeDiff;
-use std::path::PathBuf;
 use kg_tree::opath::NodeSet;
 use kg_tree::NodeRef;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::rsync::DiffInfo;
 use serde::{de, ser};
 use std::ops::Deref;
-use crate::rsync::DiffInfo;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type", content = "arg")]

@@ -64,12 +64,13 @@ pub struct Operation<T> {
     op_impl: Option<Box<dyn OperationImpl<T>>>,
     outcome: Option<OperationResult<T>>,
     done_sender: Option<oneshot::Sender<()>>,
-    cancel_sender: Option<mpsc::Sender<()>>,
+    cancel_sender: mpsc::Sender<()>,
     cancel_receiver: Option<mpsc::Receiver<()>>
 }
 
 impl<T: Clone + 'static> Operation<T> {
     fn new<S: Into<String>, O: OperationImpl<T> + 'static>(name: S, op_impl: O) -> Operation<T> {
+        let (cancel_tx, cancel_rx) = mpsc::channel(100);
         Operation {
             id: Uuid::new_v4(),
             parent: Uuid::nil(),
@@ -81,8 +82,8 @@ impl<T: Clone + 'static> Operation<T> {
             op_impl: Some(Box::new(op_impl)),
             outcome: None,
             done_sender: None,
-            cancel_sender: None,
-            cancel_receiver: None
+            cancel_sender: cancel_tx,
+            cancel_receiver: Some(cancel_rx)
         }
     }
 
@@ -135,20 +136,12 @@ impl<T: Clone + 'static> Operation<T> {
         self.done_sender.take()
     }
 
-    pub (crate) fn set_cancel_sender(&mut self, sender: mpsc::Sender<()>) {
-        self.cancel_sender = Some(sender)
-    }
-
-    pub (crate) fn cancel_sender(&self) -> Option<&mpsc::Sender<()>> {
-        self.cancel_sender.as_ref()
-    }
-
-    pub (crate) fn set_cancel_receiver(&mut self, sender: mpsc::Receiver<()>) {
-        self.cancel_receiver = Some(sender)
-    }
-
-    pub (crate) fn take_cancel_receiver(&mut self) -> Option<mpsc::Receiver<()>>{
+    pub fn take_cancel_receiver(&mut self) -> Option<mpsc::Receiver<()>>{
         self.cancel_receiver.take()
+    }
+
+    pub (crate) fn cancel_sender_mut(&mut self) -> &mut mpsc::Sender<()> {
+        &mut self.cancel_sender
     }
 }
 
@@ -176,11 +169,15 @@ impl<T: Clone + 'static> OperationRef<T> {
         self.0.read().id
     }
 
-    pub fn set_waker(&self, waker: Waker) {
+    pub (crate) fn set_waker(&self, waker: Waker) {
         self.write().set_waker(waker);
     }
 
     pub(crate) fn take_op_impl(&mut self) -> Option<Box<dyn OperationImpl<T>>> {
         self.0.write().op_impl.take()
+    }
+
+    pub fn cancel(&self) {
+        let _ = self.0.write().cancel_sender_mut().send(());
     }
 }

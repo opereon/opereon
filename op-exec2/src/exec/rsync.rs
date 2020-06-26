@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 
-use crate::rsync::{rsync_compare, DiffInfo, RsyncConfig, RsyncParams, rsync_copy, RsyncResult};
-use crate::OutputLog;
-use kg_diag::BasicDiag;
-use op_async::operation::OperationResult;
-use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
-use crate::outcome::{Outcome, NodeSetRef};
-use kg_tree::NodeRef;
+use crate::outcome::{NodeSetRef, Outcome};
 use crate::outlog::EntryKind::Out;
-use op_async::progress::{Unit, Progress};
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
+use crate::rsync::{rsync_compare, rsync_copy, DiffInfo, RsyncConfig, RsyncParams, RsyncResult};
+use crate::OutputLog;
+use kg_diag::BasicDiag;
+use kg_tree::NodeRef;
+use op_async::operation::OperationResult;
+use op_async::progress::{Progress, Unit};
+use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
 
-use tokio::sync::{mpsc, oneshot};
 use std::process::ExitStatus;
+use tokio::sync::{mpsc, oneshot};
 
 struct FileCompareOperation {
     config: RsyncConfig,
@@ -73,7 +73,7 @@ struct FileCopyOperation {
     log: OutputLog,
     progress_receiver: Option<mpsc::UnboundedReceiver<ProgressInfo>>,
     done_receiver: Option<oneshot::Receiver<RsyncResult<ExitStatus>>>,
-    current_progress: f64
+    current_progress: f64,
 }
 
 impl FileCopyOperation {
@@ -90,7 +90,7 @@ impl FileCopyOperation {
             log: log.clone(),
             progress_receiver: None,
             done_receiver: None,
-            current_progress: 0.
+            current_progress: 0.,
         }
     }
 }
@@ -105,12 +105,17 @@ fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
         }
     }
     let progress = Progress::new(0.0, total_size, Unit::Bytes);
+    eprintln!("calculated progress = {:?}", progress);
     progress
 }
 
 #[async_trait]
 impl OperationImpl<Outcome> for FileCopyOperation {
-    async fn init(&mut self, engine: &EngineRef<Outcome>, operation: &OperationRef<Outcome>) -> OperationResult<()> {
+    async fn init(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        operation: &OperationRef<Outcome>,
+    ) -> OperationResult<()> {
         let op_impl = FileCompareOperation::new(&self.config, &self.params, false, &self.log);
         let op = OperationRef::new("compare_operation", op_impl);
         // TODO ws create specific error detail or just rethrow?
@@ -134,16 +139,25 @@ impl OperationImpl<Outcome> for FileCopyOperation {
 
         tokio::spawn(async move {
             let res = rsync_copy(&config, &params, progress_tx, &log).await;
-            done_tx.send(res).expect("Copy process cannot outlive parent operation!")
+            done_tx
+                .send(res)
+                .expect("Copy process cannot outlive parent operation!")
         });
 
         Ok(())
     }
 
-    async fn next_progress(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<ProgressUpdate> {
-        let res = self.progress_receiver.as_mut()
+    async fn next_progress(
+        &mut self,
+        _engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<ProgressUpdate> {
+        let res = self
+            .progress_receiver
+            .as_mut()
             .expect("progress_receiver not set!")
-            .recv().await;
+            .recv()
+            .await;
         if let Some(progress) = res {
             self.current_progress += progress.loaded_bytes;
             let mut update = ProgressUpdate::new(self.current_progress);
@@ -154,7 +168,11 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         }
     }
 
-    async fn done(&mut self, _engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+    async fn done(
+        &mut self,
+        _engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
         let rx = self.done_receiver.take().expect("done_receiver not set!");
         let result = rx.await.expect("Sender dropped before completion")?;
         // TODO ws handle exit status
@@ -166,27 +184,63 @@ impl OperationImpl<Outcome> for FileCopyOperation {
 mod tests {
     use super::*;
     use crate::rsync::DiffInfo;
+    use tokio::time::Duration;
+
+    #[test]
+    fn cancel_file_copy_operation_test() {
+        let engine: EngineRef<Outcome> = EngineRef::new();
+
+        let mut rt = EngineRef::<()>::build_runtime();
+
+        let cfg = RsyncConfig::default();
+        let mut params =
+            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let log = OutputLog::new();
+
+        let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
+        let op = OperationRef::new("copy_operation", op_impl);
+
+        rt.block_on(async move {
+            let e = engine.clone();
+            tokio::spawn(async move {
+                let o = op.clone();
+
+                tokio::spawn(async move {
+                    tokio::time::delay_for(Duration::from_secs(2)).await;
+                    println!("Stopping operation");
+                    o.cancel()
+                });
+
+                engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
+
+                let res = engine.enqueue_with_res(op).await.unwrap();
+                println!("operation completed {:?}", res);
+                engine.stop();
+            });
+
+            e.start().await;
+            println!("Engine stopped");
+        })
+    }
 
     #[test]
     fn file_copy_operation_test() {
         let engine: EngineRef<Outcome> = EngineRef::new();
 
         let mut rt = EngineRef::<()>::build_runtime();
+        let cfg = RsyncConfig::default();
+        let mut params =
+            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let log = OutputLog::new();
+
+        let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
+        let op = OperationRef::new("copy_operation", op_impl);
 
         rt.block_on(async move {
             let e = engine.clone();
             tokio::spawn(async move {
-                let cfg = RsyncConfig::default();
-                let mut params =
-                    RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
-                let log = OutputLog::new();
+                engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
 
-                engine.register_progress_cb(|e, o| {
-                    eprintln!("progress: {}", o.read().progress())
-                });
-
-                let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
-                let op = OperationRef::new("copy_operation", op_impl);
                 let res = engine.enqueue_with_res(op).await.unwrap();
                 println!("operation completed {:?}", res);
                 engine.stop();
