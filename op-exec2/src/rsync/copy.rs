@@ -15,6 +15,7 @@ use futures::future::try_join;
 
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::sync::mpsc;
+use shared_child::SharedChild;
 
 type Loaded = u64;
 
@@ -114,7 +115,7 @@ async fn parse_progress<R: AsyncRead + Unpin>(
     lines.next_line().await.map_err_to_diag()?;
 
     while let Some(line) = lines.next_line().await.map_err_to_diag()? {
-        // eprintln!("line = {:?}", line);
+        eprintln!("line = {:?}", line);
         // skip parsing when line is empty
         if line == "\n" || line == "\r" || line.is_empty() {
             continue;
@@ -186,6 +187,7 @@ pub async fn rsync_copy(
 ) -> RsyncResult<ExitStatus> {
     let mut child = {
         let mut rsync_cmd = params.to_cmd(config);
+        let mut rsync_cmd = tokio::process::Command::from(rsync_cmd);
         rsync_cmd
             .arg("--progress")
             .arg("--super") // fail on permission denied
@@ -197,7 +199,6 @@ pub async fn rsync_copy(
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-
         log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
         rsync_cmd.spawn().map_err(RsyncErrorDetail::spawn_err)?
     };

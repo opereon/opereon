@@ -2,7 +2,7 @@ use kg_diag::io::ResultExt;
 
 
 use std::path::PathBuf;
-use tokio::process::Command;
+use std::process::Command;
 
 use super::*;
 

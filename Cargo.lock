@@ -1122,6 +1122,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "shared_child",
  "slog",
  "tempfile 3.1.0",
  "time 0.2.16",
@@ -1689,6 +1690,16 @@ name = "sha1"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2579985fda508104f7587689507983eadd6a6e84dd35d6d115361f530916fa0d"
+
+[[package]]
+name = "shared_child"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cebcf3a403e4deafaf34dc882c4a1b6a648b43e5670aa2e4bb985914eaeb2d2"
+dependencies = [
+ "libc",
+ "winapi 0.3.8",
+]
 
 [[package]]
 name = "signal-hook-registry"
