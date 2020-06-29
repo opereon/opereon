@@ -36,7 +36,7 @@ async fn run_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    log.log_in(format!("{:?}", command).as_bytes());
+    log.log_in(format!("{:?}", command).as_bytes())?;
     let mut child = command.spawn().map_err(CommandErrorDetail::spawn_err)?;
 
     let stdout = BufReader::new(child.stdout.take().unwrap());
@@ -97,7 +97,7 @@ async fn run_script(
         command.stdin(Stdio::null());
     }
 
-    log.log_in(format!("{:?}", command).as_bytes());
+    log.log_in(format!("{:?}", command).as_bytes())?;
     let mut child = command.spawn().map_err(CommandErrorDetail::spawn_err)?;
 
     let stdout = BufReader::new(child.stdout.take().unwrap());
@@ -120,7 +120,7 @@ fn prepare_builder(
     run_as: Option<&str>,
     config: &LocalConfig,
 ) -> CommandBuilder {
-    let mut builder = if let Some(user) = run_as {
+    let builder = if let Some(user) = run_as {
         // TODO ws is this implementation ok? Will work only for `runas_cmd = sudo`
         let mut builder = CommandBuilder::new(config.runas_cmd());
         builder.arg("-u").arg(user);
@@ -142,6 +142,7 @@ fn prepare_builder(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn run_command_test() {

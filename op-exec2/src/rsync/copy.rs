@@ -1,18 +1,18 @@
 use std::io::BufRead;
 use std::process::Stdio;
-use std::thread::JoinHandle;
-use std::time::Duration;
+
+
 
 use regex::Regex;
 
-use super::compare::State;
+
 use super::*;
 use crate::rsync::RsyncParseErrorDetail::Custom;
 use crate::utils::lines;
 use futures::future::try_join;
-use os_pipe::pipe;
-use slog::Logger;
-use std::sync::{Arc, Mutex, MutexGuard};
+
+
+
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::sync::mpsc;
 

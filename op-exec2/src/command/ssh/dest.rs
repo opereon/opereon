@@ -73,7 +73,7 @@ impl SshDest {
                 .to_str()
                 .unwrap()
                 .to_string(),
-            u @ _ => u.to_string(),
+            u => u.to_string(),
         };
         let port = url.port().unwrap_or(22);
 

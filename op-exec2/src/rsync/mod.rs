@@ -1,6 +1,6 @@
 use kg_diag::io::ResultExt;
 
-use os_pipe::PipeWriter;
+
 use std::path::PathBuf;
 use tokio::process::Command;
 

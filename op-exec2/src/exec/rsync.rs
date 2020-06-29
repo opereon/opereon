@@ -1,16 +1,16 @@
 use async_trait::async_trait;
 
-use crate::outcome::{NodeSetRef, Outcome};
-use crate::outlog::EntryKind::Out;
+use crate::outcome::{Outcome};
+
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
 use crate::rsync::{rsync_compare, rsync_copy, DiffInfo, RsyncConfig, RsyncParams, RsyncResult};
 use crate::OutputLog;
-use kg_diag::BasicDiag;
-use kg_tree::NodeRef;
+
+
 use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
-use op_async::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
+use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
 use std::process::ExitStatus;
 use tokio::sync::{mpsc, oneshot};
@@ -99,7 +99,6 @@ fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
     for diff in diffs {
         if let State::Missing | State::Modified(_) = diff.state() {
             parts.push(Progress::new_partial(&diff.file_path().to_string_lossy(), 0., diff.file_size() as f64, Unit::Bytes));
-            let file_max = diff.file_size() as f64;
         }
     }
     let progress = Progress::from_parts(parts);
@@ -156,7 +155,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             .recv()
             .await;
         if let Some(progress) = res {
-            let mut update = ProgressUpdate::new_partial(progress.loaded_bytes, progress.file_name);
+            let update = ProgressUpdate::new_partial(progress.loaded_bytes, progress.file_name);
             Ok(update)
         } else {
             Ok(ProgressUpdate::done())

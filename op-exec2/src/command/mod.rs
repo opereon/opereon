@@ -2,9 +2,9 @@ use super::*;
 
 use futures::future::try_join;
 use kg_diag::io::ResultExt;
-use std::pin::Pin;
+
 use std::process::Stdio;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
 
 use utils::lines;
@@ -241,7 +241,7 @@ impl std::fmt::Display for CommandBuilder {
     }
 }
 
-async fn execute(mut command: Command, log: &OutputLog) -> CommandResult<()> {
+async fn execute(mut command: Command, _log: &OutputLog) -> CommandResult<()> {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     command.stdin(Stdio::null());
@@ -264,7 +264,7 @@ async fn execute(mut command: Command, log: &OutputLog) -> CommandResult<()> {
 
 async fn execute_pty(
     command: std::process::Command,
-    log: &OutputLog,
+    _log: &OutputLog,
 ) -> Result<(), std::io::Error> {
     let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
     while let Ok(line) = session.read_line() {

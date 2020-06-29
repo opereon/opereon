@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use os_pipe::pipe;
