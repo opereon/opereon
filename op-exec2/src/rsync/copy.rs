@@ -98,17 +98,6 @@ impl ProgressInfo {
     }
 }
 
-struct RsyncProgressParser {
-
-}
-
-impl RsyncProgressParser {
-    pub fn new() -> Self {
-        RsyncProgressParser {}
-    }
-}
-
-
 async fn parse_progress<R: AsyncRead + Unpin>(
     out: BufReader<R>,
     progress_sender: mpsc::UnboundedSender<ProgressInfo>,
@@ -149,20 +138,14 @@ async fn parse_progress<R: AsyncRead + Unpin>(
             }
             let loaded_bytes = loaded_bytes.unwrap() as f64;
 
-            // operation
-            //     .write()
-            //     .update_progress_step_value(file_idx, loaded_bytes);
-
-
             if progress_info.len() == 6 {
                 let _ =
                     progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, true));
-                eprintln!("File completed: {:?}", file_name);
-                // operation.write().update_progress_step_value_done(file_idx);
+                // eprintln!("File completed: {:?}", file_name);
                 file_idx += 1;
                 file_completed = true;
             } else {
-                eprintln!("File: {} : {}", file_name, loaded_bytes);
+                // eprintln!("File: {} : {}", file_name, loaded_bytes);
                 let _ = progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, false));
             }
             continue;

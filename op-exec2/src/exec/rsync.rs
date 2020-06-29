@@ -73,7 +73,6 @@ struct FileCopyOperation {
     log: OutputLog,
     progress_receiver: Option<mpsc::UnboundedReceiver<ProgressInfo>>,
     done_receiver: Option<oneshot::Receiver<RsyncResult<ExitStatus>>>,
-    current_progress: f64,
 }
 
 impl FileCopyOperation {
@@ -90,25 +89,20 @@ impl FileCopyOperation {
             log: log.clone(),
             progress_receiver: None,
             done_receiver: None,
-            current_progress: 0.,
         }
     }
 }
 
 fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
-    let mut total_size = 0.0;
-
     let mut parts = vec![];
 
     for diff in diffs {
         if let State::Missing | State::Modified(_) = diff.state() {
             parts.push(Progress::new_partial(&diff.file_path().to_string_lossy(), 0., diff.file_size() as f64, Unit::Bytes));
             let file_max = diff.file_size() as f64;
-            total_size += file_max;
         }
     }
     let progress = Progress::from_parts(parts);
-    eprintln!("calculated progress = {:#?}", progress);
     progress
 }
 
@@ -162,8 +156,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             .recv()
             .await;
         if let Some(progress) = res {
-            self.current_progress += progress.loaded_bytes;
-            let mut update = ProgressUpdate::new_partial(self.current_progress, progress.file_name);
+            let mut update = ProgressUpdate::new_partial(progress.loaded_bytes, progress.file_name);
             Ok(update)
         } else {
             Ok(ProgressUpdate::done())
