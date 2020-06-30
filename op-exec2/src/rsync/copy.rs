@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::thread;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tokio::sync::{mpsc, oneshot};
+use futures::io::Error;
 
 type Loaded = u64;
 
@@ -254,26 +255,23 @@ impl RsyncCopy {
             Arc::new(child)
         };
 
+        let l = log.clone();
         thread::spawn(move || {
             let mut parser = ProgressParser::new(out_reader, progress_sender);
 
             if let Err(err) = parser.parse_progress() {
                 // TODO ws log error
+                eprintln!("Error parsing rsync progress = {:?}", err);
 
-                let mut stdout = parser.into_inner();
-
-                let mut buf = String::new();
                 // in case of parsing error drain stdout to prevent main process hang/failure
-                // FIXME ws error
-                stdout.read_to_string(&mut buf).unwrap();
+                let mut stdout = parser.into_inner();
+                l.consume_stdout(stdout).expect("Error logging stdout");
             };
         });
 
+        let l = log.clone();
         thread::spawn(move || {
-            let mut stderr = String::new();
-            // FIXME ws error
-            err_reader.read_to_string(&mut stderr);
-            // let _ = err_tx.send(stderr);
+            l.consume_stderr(err_reader).expect("Error logging stderr")
         });
 
         let c = child.clone();

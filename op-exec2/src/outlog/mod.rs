@@ -4,6 +4,7 @@ use parking_lot::Mutex;
 
 use std::sync::Arc;
 use std::time::Instant;
+use std::io::{Read, BufReader, BufRead};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
@@ -75,6 +76,33 @@ impl OutputLog {
             Some(value) => self.log_entry_disp(EntryKind::Status, Instant::now(), value),
             None => self.log_entry_disp(EntryKind::Status, Instant::now(), '?'),
         }
+    }
+
+    pub fn consume_stderr<R: Read>(&self, stderr: R)-> IoResult<()> {
+        self.consume_input(stderr, EntryKind::Err)
+    }
+
+    pub fn consume_stdout<R: Read>(&self, stderr: R)-> IoResult<()> {
+        self.consume_input(stderr, EntryKind::Out)
+    }
+
+    fn consume_input<R:Read>(&self, reader: R, kind: EntryKind) -> IoResult<()>{
+        let mut r = BufReader::new(reader);
+        let mut lines = r.lines();
+
+        while let Some(res) = lines.next() {
+            match res {
+                Ok(line) => {
+                    self.log_entry_now(kind, line.as_bytes())?;
+                },
+                Err(err) => {
+                    // TODO ws what to do with error?
+                    eprintln!("Error reading stderr = {:?}", err);
+                    // keep draining reader to prevent main process hang/failure
+                },
+            }
+        }
+        Ok(())
     }
 }
 
