@@ -1,19 +1,20 @@
-use std::io::BufRead;
+use std::io::{BufRead, BufReader, Read};
 use std::process::Stdio;
 
-
 use regex::Regex;
-
 
 use super::*;
 use crate::rsync::RsyncParseErrorDetail::Custom;
 use crate::utils::lines;
 use futures::future::try_join;
 
-
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use tokio::sync::mpsc;
+use os_pipe::pipe;
 use shared_child::SharedChild;
+use std::borrow::Cow;
+use std::sync::Arc;
+use std::thread;
+use tokio::io::{AsyncBufReadExt, AsyncRead};
+use tokio::sync::{mpsc, oneshot};
 
 type Loaded = u64;
 
@@ -97,102 +98,214 @@ impl ProgressInfo {
     }
 }
 
-async fn parse_progress<R: AsyncRead + Unpin>(
-    out: BufReader<R>,
+pub struct ProgressParser<R: Read> {
+    reader: BufReader<R>,
+    buf: Vec<u8>,
     progress_sender: mpsc::UnboundedSender<ProgressInfo>,
-) -> RsyncParseResult<()> {
-    let mut lines = lines(out);
-    let mut file_name: String = String::new();
-    let mut file_completed = true;
-    let mut file_idx: i32 = 0;
+}
 
-    let file_reg = Regex::new(r"[\[\]]").unwrap();
-    let progress_reg = Regex::new(r"[ ]").unwrap();
+fn newline_delimiter(b: u8) -> bool {
+    b == b'\n' || b == b'\r'
+}
 
-    // skip first line: "sending incremental file list"
-    lines.next_line().await.map_err_to_diag()?;
-
-    while let Some(line) = lines.next_line().await.map_err_to_diag()? {
-        eprintln!("line = {:?}", line);
-        // skip parsing when line is empty
-        if line == "\n" || line == "\r" || line.is_empty() {
-            continue;
+impl<R: Read> ProgressParser<R> {
+    pub fn new(
+        reader: R,
+        progress_sender: mpsc::UnboundedSender<ProgressInfo>,
+    ) -> ProgressParser<R> {
+        ProgressParser {
+            reader: BufReader::new(reader),
+            buf: Vec::new(),
+            progress_sender,
         }
-        // skip \n or \r at the end of line
-        let line = &line[..line.len() - 1];
+    }
 
-        if !file_completed && !line.starts_with('[') {
-            let progress_info = progress_reg
+    pub fn next_line(&mut self) -> RsyncParseResult<Option<Cow<str>>> {
+        self.buf.clear();
+        let read = read_until(&mut self.reader, newline_delimiter, &mut self.buf)?;
+        if read == 0 {
+            Ok(None)
+        } else {
+            let line = String::from_utf8_lossy(self.buf.as_slice());
+            Ok(Some(line))
+        }
+    }
+
+    pub fn parse_progress(&mut self) -> RsyncParseResult<()> {
+        let mut file_name: String = String::new();
+        let mut file_completed = true;
+        let mut file_idx: i32 = 0;
+
+        let file_reg = Regex::new(r"[\[\]]").unwrap();
+        let progress_reg = Regex::new(r"[ ]").unwrap();
+
+        // skip first line: "sending incremental file list"
+        self.next_line()?;
+
+        while let Some(line) = self.next_line()? {
+            // eprintln!("line = {:?}", line);
+            // skip parsing when line is empty
+            if line == "\n" || line == "\r" || line.is_empty() {
+                continue;
+            }
+            // skip \n or \r at the end of line
+            let line = &line[..line.len() - 1];
+
+            if !file_completed && !line.starts_with('[') {
+                let progress_info = progress_reg
+                    .split(&line)
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<&str>>();
+
+                check_progress_info(&progress_info)?;
+
+                let loaded_bytes = progress_info[0].replace(",", "");
+                let loaded_bytes = loaded_bytes.parse::<Loaded>();
+
+                if loaded_bytes.is_err() {
+                    return RsyncParseErrorDetail::custom_line(line!());
+                }
+                let loaded_bytes = loaded_bytes.unwrap() as f64;
+
+                if progress_info.len() == 6 {
+                    let _ = self.progress_sender.send(ProgressInfo::new(
+                        file_name.clone(),
+                        loaded_bytes,
+                        true,
+                    ));
+                    // eprintln!("File completed: {:?}", file_name);
+                    file_idx += 1;
+                    file_completed = true;
+                } else {
+                    // eprintln!("File: {} : {}", file_name, loaded_bytes);
+                    let _ = self.progress_sender.send(ProgressInfo::new(
+                        file_name.clone(),
+                        loaded_bytes,
+                        false,
+                    ));
+                }
+                continue;
+            }
+
+            let file_info = file_reg
                 .split(&line)
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<&str>>();
 
-            check_progress_info(&progress_info)?;
+            check_file_info(&file_info)?;
 
-            let loaded_bytes = progress_info[0].replace(",", "");
-            let loaded_bytes = loaded_bytes.parse::<Loaded>();
-
-            if loaded_bytes.is_err() {
+            let res = file_info[1].parse::<FileSize>();
+            if res.is_err() {
                 return RsyncParseErrorDetail::custom_line(line!());
             }
-            let loaded_bytes = loaded_bytes.unwrap() as f64;
 
-            if progress_info.len() == 6 {
-                let _ =
-                    progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, true));
-                // eprintln!("File completed: {:?}", file_name);
-                file_idx += 1;
+            file_name = file_info[0].to_string();
+
+            if file_name.ends_with('/') || file_name.ends_with("/.") {
+                // directory - no progress value
+                // operation.write().update_progress_step_value_done(file_idx);
+
                 file_completed = true;
-            } else {
-                // eprintln!("File: {} : {}", file_name, loaded_bytes);
-                let _ = progress_sender.send(ProgressInfo::new(file_name.clone(), loaded_bytes, false));
+                file_idx += 1;
+                continue;
             }
-            continue;
+            file_completed = false;
         }
-
-        let file_info = file_reg
-            .split(&line)
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<&str>>();
-
-        check_file_info(&file_info)?;
-
-        let res = file_info[1].parse::<FileSize>();
-        if res.is_err() {
-            return RsyncParseErrorDetail::custom_line(line!());
-        }
-
-        file_name = file_info[0].to_string();
-
-        if file_name.ends_with('/') || file_name.ends_with("/.") {
-            // directory - no progress value
-            // operation.write().update_progress_step_value_done(file_idx);
-
-            file_completed = true;
-            file_idx += 1;
-            continue;
-        }
-        file_completed = false;
+        Ok(())
     }
-    Ok(())
+
+    pub fn into_inner(self) -> R {
+        self.reader.into_inner()
+    }
 }
 
-pub struct RsyncCopy {}
+pub struct RsyncCopy {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<Result<ExitStatus, std::io::Error>>,
+    log: OutputLog,
+}
 
 impl RsyncCopy {
-    pub fn spawn(config: &RsyncConfig,
-                 params: &RsyncParams,
-                 progress_sender: mpsc::UnboundedSender<ProgressInfo>,
-                 log: &OutputLog, ) -> RsyncCopy {
+    pub fn spawn(
+        config: &RsyncConfig,
+        params: &RsyncParams,
+        progress_sender: mpsc::UnboundedSender<ProgressInfo>,
+        log: &OutputLog,
+    ) -> RsyncResult<RsyncCopy> {
+        let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
+        let (mut out_reader, out_writer) = pipe().unwrap();
+        let (mut err_reader, err_writer) = pipe().unwrap();
 
+        let child = {
+            let mut rsync_cmd = params.to_cmd(config);
+            rsync_cmd
+                .arg("--progress")
+                .arg("--super") // fail on permission denied
+                .arg("--recursive")
+                .arg("--links") // copy symlinks as symlinks
+                .arg("--times") // preserve modification times
+                .arg("--out-format=[%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
+                .env("TERM", "xterm-256color")
+                .stdin(Stdio::null())
+                .stdout(out_writer)
+                .stderr(err_writer);
+            log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
+            let child = SharedChild::spawn(&mut rsync_cmd).map_err(RsyncErrorDetail::spawn_err)?;
+            Arc::new(child)
+        };
 
-        RsyncCopy {
+        thread::spawn(move || {
+            let mut parser = ProgressParser::new(out_reader, progress_sender);
 
-        }
+            if let Err(err) = parser.parse_progress() {
+                // TODO ws log error
 
+                let mut stdout = parser.into_inner();
+
+                let mut buf = String::new();
+                // in case of parsing error drain stdout to prevent main process hang/failure
+                // FIXME ws error
+                stdout.read_to_string(&mut buf).unwrap();
+            };
+        });
+
+        thread::spawn(move || {
+            let mut stderr = String::new();
+            // FIXME ws error
+            err_reader.read_to_string(&mut stderr);
+            // let _ = err_tx.send(stderr);
+        });
+
+        let c = child.clone();
+        thread::spawn(move || {
+            let res = c.wait();
+            // no receiver means main future was dropped - we can safely skip result
+            let _ = done_tx.send(res);
+        });
+
+        Ok(RsyncCopy {
+            done_rx,
+            child,
+            log: log.clone(),
+        })
+    }
+
+    pub async fn wait(self) -> RsyncResult<ExitStatus> {
+        let status = self
+            .done_rx
+            .await
+            .unwrap()
+            .map_err(RsyncErrorDetail::spawn_err)?;
+
+        Ok(status)
+    }
+
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
     }
 }
 
+/*
 pub async fn rsync_copy(
     config: &RsyncConfig,
     params: &RsyncParams,
@@ -244,7 +357,7 @@ pub async fn rsync_copy(
 
     Ok(status)
 }
-
+*/
 /**
 impl FileCopyOperation {
     pub fn new(
@@ -442,7 +555,9 @@ mod tests {
                 }
             });
 
-            rsync_copy(&cfg, &params, tx, &log).await.expect("error");
+            let copy = RsyncCopy::spawn(&cfg, &params, tx, &log).expect("error");
+
+            let res = copy.wait().await.expect("Error");
             println!("{}", log)
         });
     }

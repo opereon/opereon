@@ -26,8 +26,7 @@ extern crate op_log;
 #[macro_use]
 extern crate pretty_assertions;
 
-use std::path::{Path};
-
+use std::path::Path;
 
 use kg_diag::io::fs;
 use kg_diag::*;

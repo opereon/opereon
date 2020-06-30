@@ -1,14 +1,13 @@
 use kg_diag::io::ResultExt;
 
-
 use std::path::PathBuf;
 use std::process::Command;
 
 use super::*;
 
 pub use self::config::RsyncConfig;
-pub use self::rsync::compare::{RsyncCompare, DiffInfo};
-pub use self::rsync::copy::rsync_copy;
+pub use self::rsync::compare::{DiffInfo, RsyncCompare};
+pub use self::rsync::copy::RsyncCopy;
 use std::process::ExitStatus;
 
 pub mod compare;

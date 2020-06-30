@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 
-use crate::outcome::{Outcome};
+use crate::outcome::Outcome;
 
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
-use crate::rsync::{RsyncCompare, rsync_copy, DiffInfo, RsyncConfig, RsyncParams, RsyncResult};
+use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
 use crate::OutputLog;
-
 
 use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
@@ -100,7 +99,12 @@ fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
 
     for diff in diffs {
         if let State::Missing | State::Modified(_) = diff.state() {
-            parts.push(Progress::new_partial(&diff.file_path().to_string_lossy(), 0., diff.file_size() as f64, Unit::Bytes));
+            parts.push(Progress::new_partial(
+                &diff.file_path().to_string_lossy(),
+                0.,
+                diff.file_size() as f64,
+                Unit::Bytes,
+            ));
         }
     }
     let progress = Progress::from_parts(parts);
@@ -136,7 +140,9 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         let log = self.log.clone();
 
         tokio::spawn(async move {
-            let res = rsync_copy(&config, &params, progress_tx, &log).await;
+            // TODO ws error
+            let copy = RsyncCopy::spawn(&config, &params, progress_tx, &log).unwrap();
+            let res = copy.wait().await;
             done_tx
                 .send(res)
                 .expect("Copy process cannot outlive parent operation!")
