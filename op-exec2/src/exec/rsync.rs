@@ -4,7 +4,7 @@ use crate::outcome::{Outcome};
 
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
-use crate::rsync::{rsync_compare, rsync_copy, DiffInfo, RsyncConfig, RsyncParams, RsyncResult};
+use crate::rsync::{RsyncCompare, rsync_copy, DiffInfo, RsyncConfig, RsyncParams, RsyncResult};
 use crate::OutputLog;
 
 
@@ -60,7 +60,9 @@ impl OperationImpl<Outcome> for FileCompareOperation {
         _engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        let res = rsync_compare(&self.config, &self.params, self.checksum, &self.log).await?;
+        let cmp = RsyncCompare::spawn(&self.config, &self.params, self.checksum, &self.log)?;
+
+        let res = cmp.output().await?;
 
         Ok(Outcome::FileDiff(res))
     }

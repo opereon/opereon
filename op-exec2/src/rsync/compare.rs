@@ -9,6 +9,8 @@ use std::thread;
 use shared_child::SharedChild;
 use std::io::Read;
 use futures::TryFutureExt;
+use shared_child::unix::SharedChildExt;
+use std::sync::Arc;
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -247,8 +249,8 @@ fn build_compare_cmd(
         .arg("-ii") // output unchanged files
         .arg("--out-format=###%i [%f][%l]") // log format described in https://download.samba.org/pub/rsync/rsyncd.conf.html
         .stdin(Stdio::null());
-        // .stdout(Stdio::piped())
-        // .stderr(Stdio::piped());
+    // .stdout(Stdio::piped())
+    // .stderr(Stdio::piped());
 
     if checksum {
         rsync_cmd.arg("--checksum"); // skip based on checksum, not mod-time & size.
@@ -256,76 +258,91 @@ fn build_compare_cmd(
     rsync_cmd
 }
 
-pub async fn rsync_compare(
-    config: &RsyncConfig,
-    params: &RsyncParams,
-    checksum: bool,
-    log: &OutputLog,
-) -> RsyncResult<Vec<DiffInfo>> {
-    let mut rsync_cmd = build_compare_cmd(config, params, checksum);
-    let (mut out_reader, out_writer) = pipe().unwrap();
-    let (mut err_reader, err_writer) = pipe().unwrap();
+pub struct RsyncCompare {
+    done_rx: oneshot::Receiver<Result<ExitStatus, std::io::Error>>,
+    err_rx: oneshot::Receiver<String>,
+    out_rx: oneshot::Receiver<String>,
+    child: Arc<SharedChild>,
+    log: OutputLog,
+}
 
-    log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
+impl RsyncCompare {
+    pub fn spawn(config: &RsyncConfig,
+                 params: &RsyncParams,
+                 checksum: bool,
+                 log: &OutputLog) -> RsyncResult<RsyncCompare> {
+        let mut rsync_cmd = build_compare_cmd(config, params, checksum);
+        let (mut out_reader, out_writer) = pipe().unwrap();
+        let (mut err_reader, err_writer) = pipe().unwrap();
 
-    rsync_cmd.stdout(out_writer);
-    rsync_cmd.stderr(err_writer);
+        log.log_in(format!("{:?}", rsync_cmd).as_bytes())?;
 
-    let child = SharedChild::spawn(&mut rsync_cmd).map_err(RsyncErrorDetail::spawn_err)?;
-    drop(rsync_cmd);
+        rsync_cmd.stdout(out_writer);
+        rsync_cmd.stderr(err_writer);
 
-    let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
-    let (out_tx, out_rx) = oneshot::channel();
-    let (err_tx, err_rx) = oneshot::channel();
+        let child = Arc::new(SharedChild::spawn(&mut rsync_cmd).map_err(RsyncErrorDetail::spawn_err)?);
+        drop(rsync_cmd);
 
-    thread::spawn(move || {
-        let res = child.wait();
-        // no receiver means main future was dropped - we can safely skip result
-        let _ = done_tx.send(res);
-    });
+        let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
+        let (out_tx, out_rx) = oneshot::channel();
+        let (err_tx, err_rx) = oneshot::channel();
 
-    thread::spawn(move || {
-        let mut  stdout = String::new();
-        out_reader.read_to_string(&mut stdout);
-        let _ = out_tx.send(stdout);
-    });
+        let c = child.clone();
+        thread::spawn(move || {
+            let res = c.wait();
+            // no receiver means main future was dropped - we can safely skip result
+            let _ = done_tx.send(res);
+        });
 
-    thread::spawn(move || {
-        let mut stderr = String::new();
-        err_reader.read_to_string(&mut stderr);
-        let _ = err_tx.send( stderr);
-    });
+        thread::spawn(move || {
+            let mut stdout = String::new();
+            out_reader.read_to_string(&mut stdout);
+            let _ = out_tx.send(stdout);
+        });
 
-    let status = done_rx
-        .await
-        .unwrap()
-        .map_err(RsyncErrorDetail::spawn_err)?;
+        thread::spawn(move || {
+            let mut stderr = String::new();
+            err_reader.read_to_string(&mut stderr);
+            let _ = err_tx.send(stderr);
+        });
 
-    let (stdout, stderr) = futures::join!(out_rx, err_rx);
-    // threads collecting stdout/stderr should never return without sending result
-    let (stdout, stderr) = (stdout.unwrap(), stderr.unwrap());
+        Ok(RsyncCompare {
+            done_rx,
+            out_rx,
+            err_rx,
+            child,
+            log: log.clone(),
+        })
+    }
 
-    log.log_out(stdout.as_bytes());
-    log.log_err(stderr.as_bytes());
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
+    }
 
-    // let mut  stdout = String::new();
-    // let mut stderr = String::new();
-    // out_reader.read_to_string(&mut stdout);
-    // err_reader.read_to_string(&mut stderr);
+    pub async fn output(self) -> RsyncResult<Vec<DiffInfo>> {
+        let status = self.done_rx
+            .await
+            .unwrap()
+            .map_err(RsyncErrorDetail::spawn_err)?;
 
-    // log.log_out(stdout.as_bytes())?;
-    // log.log_err(stderr.as_bytes())?;
+        let (stdout, stderr) = futures::join!(self.out_rx, self.err_rx);
+        // threads collecting stdout/stderr should never return without sending result
+        let (stdout, stderr) = (stdout.unwrap(), stderr.unwrap());
 
-    log.log_status(status.code())?;
-    match status.code() {
-        None => Err(RsyncErrorDetail::RsyncTerminated.into()),
-        Some(0) => {
-            let output = stdout;
-            parse_output(&output)
-        }
-        Some(_c) => {
-            let output = stderr;
-            RsyncErrorDetail::process_exit(output.to_string())
+        self.log.log_out(stdout.as_bytes());
+        self.log.log_err(stderr.as_bytes());
+
+        self.log.log_status(status.code())?;
+        match status.code() {
+            None => Err(RsyncErrorDetail::RsyncTerminated.into()),
+            Some(0) => {
+                let output = stdout;
+                parse_output(&output)
+            }
+            Some(_c) => {
+                let output = stderr;
+                RsyncErrorDetail::process_exit(output.to_string())
+            }
         }
     }
 }
@@ -400,7 +417,9 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
 
         rt.block_on(async move {
-            let diffs = rsync_compare(&cfg, &params, false, &log)
+            let cmp = RsyncCompare::spawn(&cfg, &params, false, &log).unwrap();
+
+            let diffs = cmp.output()
                 .await
                 .expect("error");
             eprintln!("diffs = {:#?}", diffs);

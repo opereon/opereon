@@ -2,7 +2,6 @@ use std::io::BufRead;
 use std::process::Stdio;
 
 
-
 use regex::Regex;
 
 
@@ -10,7 +9,6 @@ use super::*;
 use crate::rsync::RsyncParseErrorDetail::Custom;
 use crate::utils::lines;
 use futures::future::try_join;
-
 
 
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
@@ -177,6 +175,22 @@ async fn parse_progress<R: AsyncRead + Unpin>(
         file_completed = false;
     }
     Ok(())
+}
+
+pub struct RsyncCopy {}
+
+impl RsyncCopy {
+    pub fn spawn(config: &RsyncConfig,
+                 params: &RsyncParams,
+                 progress_sender: mpsc::UnboundedSender<ProgressInfo>,
+                 log: &OutputLog, ) -> RsyncCopy {
+
+
+        RsyncCopy {
+
+        }
+
+    }
 }
 
 pub async fn rsync_copy(
