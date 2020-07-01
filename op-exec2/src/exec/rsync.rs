@@ -15,6 +15,8 @@ use kg_diag::{BasicDiag, IntoDiagRes, Severity};
 use std::process::ExitStatus;
 use tokio::sync::{mpsc, oneshot};
 use crate::utils::SharedChildExt;
+use std::sync::Arc;
+use shared_child::SharedChild;
 
 struct FileCompareOperation {
     config: RsyncConfig,
@@ -48,19 +50,21 @@ impl OperationImpl<Outcome> for FileCompareOperation {
     ) -> OperationResult<Outcome> {
         let cmp = RsyncCompare::spawn(&self.config, &self.params, self.checksum, &self.log)?;
 
-        let child = cmp.child().clone();
-        let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();
-
-        tokio::spawn(async move {
-            if let Some(_) = cancel_rx.recv().await {
-                child.send_sigterm();
-            }
-        });
+        let cancel_rx = operation.write().take_cancel_receiver().unwrap();
+        handle_cancel(cancel_rx, cmp.child().clone());
 
         let res = cmp.output().await?;
 
         Ok(Outcome::FileDiff(res))
     }
+}
+
+fn handle_cancel(mut cancel_rx: mpsc::Receiver<()>, child: Arc<SharedChild>) {
+    tokio::spawn(async move {
+        if let Some(_) = cancel_rx.recv().await {
+            child.send_sigterm();
+        }
+    });
 }
 
 struct FileCopyOperation {
@@ -146,9 +150,12 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         let params = self.params.clone();
         let log = self.log.clone();
 
+        let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();
+
         tokio::spawn(async move {
             match RsyncCopy::spawn(&config, &params, progress_tx, &log) {
                 Ok(copy) => {
+                    handle_cancel(cancel_rx, copy.child().clone());
                     let res = copy.wait().await;
                     let _ = done_tx.send(res);
                 }
@@ -173,7 +180,11 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             .recv()
             .await;
         if let Some(progress) = res {
-            let update = ProgressUpdate::new_partial(progress.loaded_bytes, progress.file_name);
+            let update = if progress.is_completed {
+                ProgressUpdate::partial_done(progress.file_name)
+            } else {
+                ProgressUpdate::new_partial(progress.loaded_bytes, progress.file_name)
+            };
             Ok(update)
         } else {
             Ok(ProgressUpdate::done())
@@ -219,7 +230,7 @@ mod tests {
                 let o = op.clone();
 
                 tokio::spawn(async move {
-                    tokio::time::delay_for(Duration::from_secs(2)).await;
+                    tokio::time::delay_for(Duration::from_secs(3)).await;
                     println!("Stopping operation");
                     o.cancel().await
                 });
@@ -232,6 +243,7 @@ mod tests {
             });
 
             e.start().await;
+            eprintln!("log = {}", log);
             println!("Engine stopped");
         })
     }
@@ -260,6 +272,7 @@ mod tests {
             });
 
             e.start().await;
+            // eprintln!("log = {}", log);
             println!("Engine stopped");
         })
     }
