@@ -39,6 +39,10 @@ impl RsyncErrorDetail {
         Err(RsyncErrorDetail::RsyncProcess { stderr }.into())
     }
 
+    pub fn process_status<T>(status: ExitStatus) -> RsyncResult<T> {
+        Err(RsyncErrorDetail::RsyncProcessStatus { status }.into())
+    }
+
     pub fn spawn_err(err: std::io::Error) -> RsyncError {
         let err = IoErrorDetail::from(err);
         RsyncErrorDetail::RsyncSpawn.with_cause(BasicDiag::from(err))
@@ -68,18 +72,6 @@ impl RsyncParseErrorDetail {
     pub fn custom_output<T>(line: u32, output: String) -> RsyncParseResult<T> {
         Err(RsyncParseErrorDetail::Custom { line, output }).into_diag_res()
     }
-}
-
-pub type FileCopyError = BasicDiag;
-pub type FileCopyResult<T> = Result<T, FileCopyError>;
-
-#[derive(Debug, Display, Detail)]
-pub enum FileCopyErrorDetail {
-    #[display(fmt = "Cannot get file list, operation interrupted")]
-    CompareCanceled,
-
-    #[display(fmt = "Cannot get file list, process exited with code {code}")]
-    CompareFailed { code: i32 },
 }
 
 #[derive(Debug, Clone)]
@@ -218,32 +210,5 @@ impl RsyncParams {
         }
 
         cmd
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CompareResult {
-    diffs: Vec<DiffInfo>,
-    status: Option<i32>,
-}
-
-impl CompareResult {
-    pub fn new(diffs: Vec<DiffInfo>, status: Option<i32>) -> Self {
-        Self { diffs, status }
-    }
-    pub fn is_success(&self) -> bool {
-        if let Some(status) = self.status {
-            status == 0
-        } else {
-            false
-        }
-    }
-
-    pub fn diffs(&self) -> &Vec<DiffInfo> {
-        &self.diffs
-    }
-
-    pub fn status(&self) -> Option<i32> {
-        self.status
     }
 }

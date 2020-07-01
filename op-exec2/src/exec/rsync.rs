@@ -4,7 +4,7 @@ use crate::outcome::Outcome;
 
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
-use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult, FileCopyErrorDetail};
+use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
 use crate::OutputLog;
 
 use op_async::operation::OperationResult;
@@ -73,7 +73,7 @@ struct FileCopyOperation {
     checksum: bool,
     log: OutputLog,
     progress_receiver: Option<mpsc::UnboundedReceiver<ProgressInfo>>,
-    done_receiver: Option<oneshot::Receiver<RsyncResult<ExitStatus>>>,
+    done_receiver: Option<oneshot::Receiver<RsyncResult<()>>>,
 }
 
 impl FileCopyOperation {
@@ -123,23 +123,12 @@ impl OperationImpl<Outcome> for FileCopyOperation {
 
         let out = engine.enqueue_with_res(op).await?;
         let diffs = if let Outcome::FileDiff(res) = out {
-            match res.status() {
-                Some(code) => {
-                    if code == 0 {
-                        res
-                    } else {
-                        return Err(FileCopyErrorDetail::CompareFailed { code }).into_diag_res();
-                    }
-                }
-                None => {
-                    return Err(FileCopyErrorDetail::CompareCanceled).into_diag_res();
-                }
-            }
+            res
         } else {
             unreachable!()
         };
 
-        *operation.write().progress_mut() = build_progress(diffs.diffs());
+        *operation.write().progress_mut() = build_progress(&diffs);
 
         let (progress_tx, progress_rx) = mpsc::unbounded_channel();
         let (done_tx, done_rx) = oneshot::channel();
@@ -197,10 +186,8 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let rx = self.done_receiver.take().expect("done_receiver not set!");
-        let result = rx.await.expect("Sender dropped before completion")?;
-        Ok(Outcome::FileCopy {
-            status: result.code()
-        })
+        rx.await.expect("Sender dropped before completion")?;
+        Ok(Outcome::Empty)
     }
 }
 
@@ -237,13 +224,13 @@ mod tests {
 
                 engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
 
-                let res = engine.enqueue_with_res(op).await.unwrap();
-                println!("operation completed {:?}", res);
+                let res = engine.enqueue_with_res(op).await.unwrap_err();
+                println!("operation completed with error {}", res);
                 engine.stop();
             });
 
             e.start().await;
-            eprintln!("log = {}", log);
+            // eprintln!("log = {}", log);
             println!("Engine stopped");
         })
     }

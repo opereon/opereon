@@ -332,7 +332,7 @@ impl RsyncCompare {
         &self.child
     }
 
-    pub async fn output(self) -> RsyncResult<CompareResult> {
+    pub async fn output(self) -> RsyncResult<Vec<DiffInfo>> {
         let status = self
             .done_rx
             .await
@@ -351,7 +351,7 @@ impl RsyncCompare {
             None => Err(RsyncErrorDetail::RsyncTerminated.into()),
             Some(0) => {
                 let diffs = parse_output(&stdout)?;
-                Ok(CompareResult::new(diffs, status.code()))
+                Ok(diffs)
             }
             Some(_c) => RsyncErrorDetail::process_exit(stderr.to_string()),
         }
