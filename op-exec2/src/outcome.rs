@@ -4,7 +4,7 @@ use kg_tree::NodeRef;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::rsync::DiffInfo;
+use crate::rsync::{DiffInfo, CompareResult};
 use serde::{de, ser};
 use std::ops::Deref;
 
@@ -14,7 +14,7 @@ pub enum Outcome {
     Empty,
     NodeSet(NodeSetRef),
     Diff(NodeDiff),
-    FileDiff(Vec<DiffInfo>),
+    FileDiff(CompareResult),
     File(PathBuf),
     Many(Vec<Outcome>),
 }

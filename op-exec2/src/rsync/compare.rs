@@ -11,6 +11,7 @@ use std::io::Read;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::oneshot;
+use futures::io::Error;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModFlags {
@@ -287,14 +288,28 @@ impl RsyncCompare {
 
         thread::spawn(move || {
             let mut stdout = String::new();
-            out_reader.read_to_string(&mut stdout);
-            let _ = out_tx.send(stdout);
+            match out_reader.read_to_string(&mut stdout) {
+                Ok(_) => {
+                    let _ = out_tx.send(stdout);
+                },
+                Err(err) => {
+                    // TODO ws log error
+                    eprintln!("Error reading stdout = {}", err);
+                },
+            };
         });
 
         thread::spawn(move || {
             let mut stderr = String::new();
-            err_reader.read_to_string(&mut stderr);
-            let _ = err_tx.send(stderr);
+            match err_reader.read_to_string(&mut stderr) {
+                Ok(_) => {
+                    let _ = err_tx.send(stderr);
+                },
+                Err(err) => {
+                    // TODO ws log error
+                    eprintln!("Error reading stderr = {}", err);
+                },
+            };
         });
 
         let c = child.clone();
@@ -317,7 +332,7 @@ impl RsyncCompare {
         &self.child
     }
 
-    pub async fn output(self) -> RsyncResult<Vec<DiffInfo>> {
+    pub async fn output(self) -> RsyncResult<CompareResult> {
         let status = self
             .done_rx
             .await
@@ -328,19 +343,18 @@ impl RsyncCompare {
         // threads collecting stdout/stderr should never return without sending result
         let (stdout, stderr) = (stdout.unwrap(), stderr.unwrap());
 
-        self.log.log_out(stdout.as_bytes());
-        self.log.log_err(stderr.as_bytes());
-
+        self.log.log_out(stdout.as_bytes())?;
+        self.log.log_err(stderr.as_bytes())?;
         self.log.log_status(status.code())?;
+
         match status.code() {
             None => Err(RsyncErrorDetail::RsyncTerminated.into()),
             Some(0) => {
-                let output = stdout;
-                parse_output(&output)
+                let diffs = parse_output(&stdout)?;
+                Ok(CompareResult::new(diffs, status.code()))
             }
             Some(_c) => {
-                let output = stderr;
-                RsyncErrorDetail::process_exit(output.to_string())
+                RsyncErrorDetail::process_exit(stderr.to_string())
             }
         }
     }

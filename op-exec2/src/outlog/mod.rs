@@ -2,9 +2,9 @@ use super::*;
 
 use parking_lot::Mutex;
 
+use std::io::{BufRead, BufReader, Read};
 use std::sync::Arc;
 use std::time::Instant;
-use std::io::{Read, BufReader, BufRead};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
@@ -78,15 +78,15 @@ impl OutputLog {
         }
     }
 
-    pub fn consume_stderr<R: Read>(&self, stderr: R)-> IoResult<()> {
+    pub fn consume_stderr<R: Read>(&self, stderr: R) -> IoResult<()> {
         self.consume_input(stderr, EntryKind::Err)
     }
 
-    pub fn consume_stdout<R: Read>(&self, stderr: R)-> IoResult<()> {
+    pub fn consume_stdout<R: Read>(&self, stderr: R) -> IoResult<()> {
         self.consume_input(stderr, EntryKind::Out)
     }
 
-    fn consume_input<R:Read>(&self, reader: R, kind: EntryKind) -> IoResult<()>{
+    fn consume_input<R: Read>(&self, reader: R, kind: EntryKind) -> IoResult<()> {
         let mut r = BufReader::new(reader);
         let mut lines = r.lines();
 
@@ -94,12 +94,12 @@ impl OutputLog {
             match res {
                 Ok(line) => {
                     self.log_entry_now(kind, line.as_bytes())?;
-                },
+                }
                 Err(err) => {
                     // TODO ws what to do with error?
-                    eprintln!("Error reading stderr = {:?}", err);
+                    eprintln!("Error reading output = {:?}", err);
                     // keep draining reader to prevent main process hang/failure
-                },
+                }
             }
         }
         Ok(())

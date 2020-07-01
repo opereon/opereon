@@ -209,19 +209,17 @@ impl RsyncParams {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompareResult {
     diffs: Vec<DiffInfo>,
     status: Option<i32>,
-    signal: Option<i32>,
 }
 
 impl CompareResult {
-    pub fn new(diffs: Vec<DiffInfo>, status: Option<i32>, signal: Option<i32>) -> Self {
+    pub fn new(diffs: Vec<DiffInfo>, status: Option<i32>) -> Self {
         Self {
             diffs,
             status,
-            signal,
         }
     }
     pub fn is_success(&self) -> bool {
@@ -239,12 +237,4 @@ impl CompareResult {
     pub fn status(&self) -> Option<i32> {
         self.status
     }
-
-    pub fn signal(&self) -> Option<i32> {
-        self.signal
-    }
-
-    // pub fn into_task_result(self) -> TaskResult {
-    //     TaskResult::new(Outcome::Empty, self.status, self.signal)
-    // }
 }

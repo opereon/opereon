@@ -8,6 +8,7 @@ use crate::rsync::RsyncParseErrorDetail::Custom;
 use crate::utils::lines;
 use futures::future::try_join;
 
+use futures::io::Error;
 use os_pipe::pipe;
 use shared_child::SharedChild;
 use std::borrow::Cow;
@@ -15,7 +16,6 @@ use std::sync::Arc;
 use std::thread;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tokio::sync::{mpsc, oneshot};
-use futures::io::Error;
 
 type Loaded = u64;
 
@@ -261,7 +261,7 @@ impl RsyncCopy {
 
             if let Err(err) = parser.parse_progress() {
                 // TODO ws log error
-                eprintln!("Error parsing rsync progress = {:?}", err);
+                eprintln!("Error parsing rsync progress = {}", err);
 
                 // in case of parsing error drain stdout to prevent main process hang/failure
                 let mut stdout = parser.into_inner();
@@ -271,6 +271,7 @@ impl RsyncCopy {
 
         let l = log.clone();
         thread::spawn(move || {
+            //drain stderr to prevent main process hang/failure
             l.consume_stderr(err_reader).expect("Error logging stderr")
         });
 

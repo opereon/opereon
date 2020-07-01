@@ -11,6 +11,7 @@ use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
 use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
+use kg_diag::BasicDiag;
 use std::process::ExitStatus;
 use tokio::sync::{mpsc, oneshot};
 
@@ -36,6 +37,7 @@ impl FileCompareOperation {
         }
     }
 }
+
 #[async_trait]
 impl OperationImpl<Outcome> for FileCompareOperation {
     async fn init(
@@ -94,7 +96,7 @@ impl FileCopyOperation {
     }
 }
 
-fn build_progress(diffs: Vec<DiffInfo>) -> Progress {
+fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
     let mut parts = vec![];
 
     for diff in diffs {
@@ -128,7 +130,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
             unreachable!()
         };
 
-        *operation.write().progress_mut() = build_progress(diffs);
+        *operation.write().progress_mut() = build_progress(diffs.diffs());
 
         let (progress_tx, progress_rx) = mpsc::unbounded_channel();
         let (done_tx, done_rx) = oneshot::channel();
@@ -140,12 +142,15 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         let log = self.log.clone();
 
         tokio::spawn(async move {
-            // TODO ws error
-            let copy = RsyncCopy::spawn(&config, &params, progress_tx, &log).unwrap();
-            let res = copy.wait().await;
-            done_tx
-                .send(res)
-                .expect("Copy process cannot outlive parent operation!")
+            match RsyncCopy::spawn(&config, &params, progress_tx, &log) {
+                Ok(copy) => {
+                    let res = copy.wait().await;
+                    let _ = done_tx.send(res);
+                }
+                Err(err) => {
+                    let _ = done_tx.send(Err(err));
+                }
+            };
         });
 
         Ok(())
