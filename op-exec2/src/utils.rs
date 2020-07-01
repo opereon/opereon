@@ -2,6 +2,9 @@ use futures::task::{Context, Poll};
 use std::pin::Pin;
 use tokio::future::poll_fn;
 use tokio::io::AsyncBufRead;
+use shared_child::SharedChild;
+use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
+use futures::io::Error;
 
 #[pin_project]
 #[must_use = "streams do nothing unless polled"]
@@ -126,6 +129,18 @@ fn read_until_internal<R: AsyncBufRead + ?Sized>(
         *read += used;
         if done || used == 0 {
             return Poll::Ready(Ok(std::mem::replace(read, 0)));
+        }
+    }
+}
+
+pub trait SharedChildExt {
+    fn send_sigterm(&self);
+}
+
+impl SharedChildExt for SharedChild {
+    fn send_sigterm(&self)  {
+        if let Err(err) = self.send_signal(libc::SIGTERM) {
+            eprintln!("error sending sigterm signal = {:?}", err);
         }
     }
 }

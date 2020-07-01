@@ -401,6 +401,7 @@ fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
 mod tests {
     use super::*;
     use op_test_helpers::UnwrapDisplay;
+    use tokio::time::Duration;
 
     #[test]
     fn compare_cmd() {
@@ -432,6 +433,31 @@ mod tests {
 
             let diffs = cmp.output().await.expect("error");
             eprintln!("diffs = {:#?}", diffs);
+            println!("{}", log)
+        });
+    }
+
+    #[test]
+    fn cancel_rsync_compare_test() {
+        let cfg = RsyncConfig::default();
+        let mut params =
+            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let log = OutputLog::new();
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        rt.block_on(async move {
+            let cmp = RsyncCompare::spawn(&cfg, &params, true, &log).unwrap();
+            let child = cmp.child().clone();
+
+            tokio::spawn(async move {
+                tokio::time::delay_for(Duration::from_secs(1)).await;
+                eprintln!("killing operation...");
+                child.kill()
+            });
+
+            let err = cmp.output().await.unwrap_err();
+            eprintln!("err = {}", err);
             println!("{}", log)
         });
     }

@@ -177,7 +177,8 @@ impl<T: Clone + 'static> OperationRef<T> {
         self.0.write().op_impl.take()
     }
 
-    pub fn cancel(&self) {
-        let _ = self.0.write().cancel_sender_mut().send(());
+    pub async fn cancel(&self) {
+        let mut sender = self.0.write().cancel_sender_mut().clone();
+        let _ = sender.send(()).await;
     }
 }

@@ -70,6 +70,18 @@ impl RsyncParseErrorDetail {
     }
 }
 
+pub type FileCopyError = BasicDiag;
+pub type FileCopyResult<T> = Result<T, FileCopyError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum FileCopyErrorDetail {
+    #[display(fmt = "Cannot get file list, operation interrupted")]
+    CompareCanceled,
+
+    #[display(fmt = "Cannot get file list, process exited with code {code}")]
+    CompareFailed { code: i32 },
+}
+
 #[derive(Debug, Clone)]
 pub struct RsyncParams {
     current_dir: PathBuf,

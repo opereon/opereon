@@ -4,7 +4,7 @@ use crate::outcome::Outcome;
 
 use crate::rsync::compare::State;
 use crate::rsync::copy::ProgressInfo;
-use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
+use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult, FileCopyErrorDetail};
 use crate::OutputLog;
 
 use op_async::operation::OperationResult;
@@ -14,6 +14,7 @@ use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 use kg_diag::{BasicDiag, IntoDiagRes, Severity};
 use std::process::ExitStatus;
 use tokio::sync::{mpsc, oneshot};
+use crate::utils::SharedChildExt;
 
 struct FileCompareOperation {
     config: RsyncConfig,
@@ -40,28 +41,21 @@ impl FileCompareOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for FileCompareOperation {
-    async fn init(
-        &mut self,
-        _engine: &EngineRef<Outcome>,
-        _operation: &OperationRef<Outcome>,
-    ) -> OperationResult<()> {
-        Ok(())
-    }
-
-    async fn next_progress(
-        &mut self,
-        _engine: &EngineRef<Outcome>,
-        _operation: &OperationRef<Outcome>,
-    ) -> OperationResult<ProgressUpdate> {
-        Ok(ProgressUpdate::done())
-    }
-
     async fn done(
         &mut self,
         _engine: &EngineRef<Outcome>,
-        _operation: &OperationRef<Outcome>,
+        operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let cmp = RsyncCompare::spawn(&self.config, &self.params, self.checksum, &self.log)?;
+
+        let child = cmp.child().clone();
+        let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();
+
+        tokio::spawn(async move {
+            if let Some(_) = cancel_rx.recv().await {
+                child.send_sigterm();
+            }
+        });
 
         let res = cmp.output().await?;
 
@@ -113,18 +107,6 @@ fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
     progress
 }
 
-pub type FileCopyError = BasicDiag;
-pub type FileCopyResult<T> = Result<T, FileCopyError>;
-
-#[derive(Debug, Display, Detail)]
-pub enum FileCopyErrorDetail {
-    #[display(fmt = "Cannot get file list, operation interrupted")]
-    CompareCanceled,
-
-    #[display(fmt = "Cannot get file list, process exited with code {code}")]
-    CompareFailed { code: i32 },
-}
-
 #[async_trait]
 impl OperationImpl<Outcome> for FileCopyOperation {
     async fn init(
@@ -132,7 +114,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         engine: &EngineRef<Outcome>,
         operation: &OperationRef<Outcome>,
     ) -> OperationResult<()> {
-        let op_impl = FileCompareOperation::new(&self.config, &self.params, false, &self.log);
+        let op_impl = FileCompareOperation::new(&self.config, &self.params, self.checksum, &self.log);
         let op = OperationRef::new("compare_operation", op_impl);
 
         let out = engine.enqueue_with_res(op).await?;
@@ -239,7 +221,7 @@ mod tests {
                 tokio::spawn(async move {
                     tokio::time::delay_for(Duration::from_secs(2)).await;
                     println!("Stopping operation");
-                    o.cancel()
+                    o.cancel().await
                 });
 
                 engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
@@ -307,4 +289,39 @@ mod tests {
             println!("Engine stopped");
         })
     }
+
+    #[test]
+    fn cancel_compare_operation_test() {
+        let engine: EngineRef<Outcome> = EngineRef::new();
+
+        let mut rt = EngineRef::<()>::build_runtime();
+
+        rt.block_on(async move {
+            let e = engine.clone();
+            tokio::spawn(async move {
+                let cfg = RsyncConfig::default();
+                let mut params =
+                    RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+                let log = OutputLog::new();
+
+                let op_impl = FileCompareOperation::new(&cfg, &params, true, &log);
+                let op = OperationRef::new("compare_operation", op_impl);
+
+                let o = op.clone();
+                tokio::spawn(async move {
+                    tokio::time::delay_for(Duration::from_secs(2)).await;
+                    println!("Stopping compare operation...");
+                    o.cancel().await
+                });
+
+                let err = engine.enqueue_with_res(op).await.unwrap_err();
+                println!("operation completed with error {}", err);
+                engine.stop();
+            });
+
+            e.start().await;
+            println!("Engine stopped");
+        })
+    }
+
 }
