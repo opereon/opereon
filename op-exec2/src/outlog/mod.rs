@@ -87,10 +87,10 @@ impl OutputLog {
     }
 
     fn consume_input<R: Read>(&self, reader: R, kind: EntryKind) -> IoResult<()> {
-        let mut r = BufReader::new(reader);
-        let mut lines = r.lines();
+        let r = BufReader::new(reader);
+        let lines = r.lines();
 
-        while let Some(res) = lines.next() {
+        for res in lines {
             match res {
                 Ok(line) => {
                     self.log_entry_now(kind, line.as_bytes())?;

@@ -11,8 +11,8 @@ use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
 use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
-use kg_diag::{BasicDiag, IntoDiagRes, Severity};
-use std::process::ExitStatus;
+
+
 use tokio::sync::{mpsc, oneshot};
 use crate::utils::SharedChildExt;
 use std::sync::Arc;
@@ -61,7 +61,7 @@ impl OperationImpl<Outcome> for FileCompareOperation {
 
 fn handle_cancel(mut cancel_rx: mpsc::Receiver<()>, child: Arc<SharedChild>) {
     tokio::spawn(async move {
-        if let Some(_) = cancel_rx.recv().await {
+        if cancel_rx.recv().await.is_some() {
             child.send_sigterm();
         }
     });
@@ -139,7 +139,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         let params = self.params.clone();
         let log = self.log.clone();
 
-        let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();
+        let cancel_rx = operation.write().take_cancel_receiver().unwrap();
 
         tokio::spawn(async move {
             match RsyncCopy::spawn(&config, &params, progress_tx, &log) {
@@ -194,7 +194,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rsync::DiffInfo;
+    
     use tokio::time::Duration;
 
     #[test]
@@ -204,7 +204,7 @@ mod tests {
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = RsyncConfig::default();
-        let mut params =
+        let params =
             RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
@@ -222,7 +222,7 @@ mod tests {
                     o.cancel().await
                 });
 
-                engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
+                engine.register_progress_cb(|_e, o| eprintln!("progress: {}", o.read().progress()));
 
                 let res = engine.enqueue_with_res(op).await.unwrap_err();
                 println!("operation completed with error {}", res);
@@ -241,7 +241,7 @@ mod tests {
 
         let mut rt = EngineRef::<()>::build_runtime();
         let cfg = RsyncConfig::default();
-        let mut params =
+        let params =
             RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
@@ -251,7 +251,7 @@ mod tests {
         rt.block_on(async move {
             let e = engine.clone();
             tokio::spawn(async move {
-                engine.register_progress_cb(|e, o| eprintln!("progress: {}", o.read().progress()));
+                engine.register_progress_cb(|_e, o| eprintln!("progress: {}", o.read().progress()));
 
                 let res = engine.enqueue_with_res(op).await.unwrap();
                 println!("operation completed {:?}", res);
@@ -274,7 +274,7 @@ mod tests {
             let e = engine.clone();
             tokio::spawn(async move {
                 let cfg = RsyncConfig::default();
-                let mut params =
+                let params =
                     RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
                 let log = OutputLog::new();
 
@@ -300,7 +300,7 @@ mod tests {
             let e = engine.clone();
             tokio::spawn(async move {
                 let cfg = RsyncConfig::default();
-                let mut params =
+                let params =
                     RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
                 let log = OutputLog::new();
 

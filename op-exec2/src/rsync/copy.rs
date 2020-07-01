@@ -5,16 +5,16 @@ use regex::Regex;
 
 use super::*;
 use crate::rsync::RsyncParseErrorDetail::Custom;
-use crate::utils::lines;
-use futures::future::try_join;
 
-use futures::io::Error;
+
+
+
 use os_pipe::pipe;
 use shared_child::SharedChild;
 use std::borrow::Cow;
 use std::sync::Arc;
 use std::thread;
-use tokio::io::{AsyncBufReadExt, AsyncRead};
+use tokio::io::{AsyncBufReadExt};
 use tokio::sync::{mpsc, oneshot};
 
 type Loaded = u64;
@@ -234,8 +234,8 @@ impl RsyncCopy {
         log: &OutputLog,
     ) -> RsyncResult<RsyncCopy> {
         let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
-        let (mut out_reader, out_writer) = pipe().unwrap();
-        let (mut err_reader, err_writer) = pipe().unwrap();
+        let (out_reader, out_writer) = pipe().unwrap();
+        let (err_reader, err_writer) = pipe().unwrap();
 
         let child = {
             let mut rsync_cmd = params.to_cmd(config);
@@ -264,7 +264,7 @@ impl RsyncCopy {
                 eprintln!("Error parsing rsync progress = {}", err);
 
                 // in case of parsing error drain stdout to prevent main process hang/failure
-                let mut stdout = parser.into_inner();
+                let stdout = parser.into_inner();
                 l.consume_stdout(stdout).expect("Error logging stdout");
             };
         });
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn rsync_copy_test() {
         let cfg = RsyncConfig::default();
-        let mut params =
+        let params =
             RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
@@ -333,7 +333,7 @@ mod tests {
 
             let copy = RsyncCopy::spawn(&cfg, &params, tx, &log).expect("error");
 
-            let res = copy.wait().await.expect("Error");
+            let _res = copy.wait().await.expect("Error");
             println!("{}", log)
         });
     }

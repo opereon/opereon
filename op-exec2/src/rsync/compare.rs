@@ -1,12 +1,12 @@
-use std::process::{Output, Stdio};
+use std::process::{Stdio};
 
 use regex::Regex;
 
 use super::*;
-use futures::io::Error;
+
 use futures::TryFutureExt;
 use os_pipe::pipe;
-use shared_child::unix::SharedChildExt;
+
 use shared_child::SharedChild;
 use std::io::Read;
 use std::sync::Arc;
@@ -353,7 +353,7 @@ impl RsyncCompare {
                 let diffs = parse_output(&stdout)?;
                 Ok(diffs)
             }
-            Some(_c) => RsyncErrorDetail::process_exit(stderr.to_string()),
+            Some(_c) => RsyncErrorDetail::process_exit(stderr),
         }
     }
 }
@@ -400,7 +400,7 @@ fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use op_test_helpers::UnwrapDisplay;
+    
     use tokio::time::Duration;
 
     #[test]
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn rsync_compare_test() {
         let cfg = RsyncConfig::default();
-        let mut params =
+        let params =
             RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn cancel_rsync_compare_test() {
         let cfg = RsyncConfig::default();
-        let mut params =
+        let params =
             RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 

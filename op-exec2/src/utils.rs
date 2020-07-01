@@ -4,7 +4,7 @@ use tokio::future::poll_fn;
 use tokio::io::AsyncBufRead;
 use shared_child::SharedChild;
 use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
-use futures::io::Error;
+
 
 #[pin_project]
 #[must_use = "streams do nothing unless polled"]

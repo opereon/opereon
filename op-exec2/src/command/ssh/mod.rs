@@ -333,8 +333,8 @@ impl SshSessionRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::ssh::SshErrorDetail::SshClosed;
-    use kg_tree::opath::Env;
+    
+    
 
     #[test]
     fn remote_shell_cmd() {
