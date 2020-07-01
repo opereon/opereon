@@ -11,7 +11,7 @@ use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
 use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
-use kg_diag::BasicDiag;
+use kg_diag::{BasicDiag, IntoDiagRes, Severity};
 use std::process::ExitStatus;
 use tokio::sync::{mpsc, oneshot};
 
@@ -113,6 +113,18 @@ fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
     progress
 }
 
+pub type FileCopyError = BasicDiag;
+pub type FileCopyResult<T> = Result<T, FileCopyError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum FileCopyErrorDetail {
+    #[display(fmt = "Cannot get file list, operation interrupted")]
+    CompareCanceled,
+
+    #[display(fmt = "Cannot get file list, process exited with code {code}")]
+    CompareFailed { code: i32 },
+}
+
 #[async_trait]
 impl OperationImpl<Outcome> for FileCopyOperation {
     async fn init(
@@ -122,10 +134,21 @@ impl OperationImpl<Outcome> for FileCopyOperation {
     ) -> OperationResult<()> {
         let op_impl = FileCompareOperation::new(&self.config, &self.params, false, &self.log);
         let op = OperationRef::new("compare_operation", op_impl);
-        // TODO ws create specific error detail or just rethrow?
+
         let out = engine.enqueue_with_res(op).await?;
-        let diffs = if let Outcome::FileDiff(diffs) = out {
-            diffs
+        let diffs = if let Outcome::FileDiff(res) = out {
+            match res.status() {
+                Some(code) => {
+                    if code == 0 {
+                        res
+                    } else {
+                        return Err(FileCopyErrorDetail::CompareFailed { code }).into_diag_res();
+                    }
+                }
+                None => {
+                    return Err(FileCopyErrorDetail::CompareCanceled).into_diag_res();
+                }
+            }
         } else {
             unreachable!()
         };
@@ -182,8 +205,9 @@ impl OperationImpl<Outcome> for FileCopyOperation {
     ) -> OperationResult<Outcome> {
         let rx = self.done_receiver.take().expect("done_receiver not set!");
         let result = rx.await.expect("Sender dropped before completion")?;
-        // TODO ws handle exit status
-        Ok(Outcome::Empty)
+        Ok(Outcome::FileCopy {
+            status: result.code()
+        })
     }
 }
 

@@ -3,6 +3,7 @@ use std::process::{Output, Stdio};
 use regex::Regex;
 
 use super::*;
+use futures::io::Error;
 use futures::TryFutureExt;
 use os_pipe::pipe;
 use shared_child::unix::SharedChildExt;
@@ -11,7 +12,6 @@ use std::io::Read;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::oneshot;
-use futures::io::Error;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModFlags {
@@ -291,11 +291,11 @@ impl RsyncCompare {
             match out_reader.read_to_string(&mut stdout) {
                 Ok(_) => {
                     let _ = out_tx.send(stdout);
-                },
+                }
                 Err(err) => {
                     // TODO ws log error
                     eprintln!("Error reading stdout = {}", err);
-                },
+                }
             };
         });
 
@@ -304,11 +304,11 @@ impl RsyncCompare {
             match err_reader.read_to_string(&mut stderr) {
                 Ok(_) => {
                     let _ = err_tx.send(stderr);
-                },
+                }
                 Err(err) => {
                     // TODO ws log error
                     eprintln!("Error reading stderr = {}", err);
-                },
+                }
             };
         });
 
@@ -353,9 +353,7 @@ impl RsyncCompare {
                 let diffs = parse_output(&stdout)?;
                 Ok(CompareResult::new(diffs, status.code()))
             }
-            Some(_c) => {
-                RsyncErrorDetail::process_exit(stderr.to_string())
-            }
+            Some(_c) => RsyncErrorDetail::process_exit(stderr.to_string()),
         }
     }
 }

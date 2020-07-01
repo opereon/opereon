@@ -217,10 +217,7 @@ pub struct CompareResult {
 
 impl CompareResult {
     pub fn new(diffs: Vec<DiffInfo>, status: Option<i32>) -> Self {
-        Self {
-            diffs,
-            status,
-        }
+        Self { diffs, status }
     }
     pub fn is_success(&self) -> bool {
         if let Some(status) = self.status {
