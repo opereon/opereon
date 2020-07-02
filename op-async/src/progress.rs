@@ -66,7 +66,7 @@ impl Progress {
                 counter: 0,
                 label: None,
                 speed: None,
-                parts: parts.into_iter().map(|mut p| (p.label.as_ref().cloned().take().unwrap(), p)).collect()
+                parts: parts.into_iter().map(|p| (p.label.as_ref().cloned().take().unwrap(), p)).collect()
             }
         } else {
             Progress {
@@ -122,7 +122,7 @@ impl Progress {
     }
 
     pub fn label(&self) -> Option<&str> {
-        self.label.as_ref().map(String::as_str)
+        self.label.as_deref()
     }
 
     pub fn set_label<S: Into<String>>(&mut self, label: S) {
@@ -138,7 +138,7 @@ impl Progress {
     }
 
     pub fn update(&mut self, u: ProgressUpdate) {
-        return match u {
+        match u {
             ProgressUpdate::Main { value, speed, label } => {
                 if value.is_finite() {
                     self.set_value(value);
@@ -173,7 +173,7 @@ impl Progress {
                 self.label = Some(label);
                 self.update_from_parts()
             }
-        };
+        }
     }
 
     pub(super) fn counter(&self) -> u32 {
@@ -284,7 +284,7 @@ impl ProgressUpdate {
         ProgressUpdate::Partial {
             value: std::f64::NAN,
             speed: None,
-            label: label,
+            label,
         }
     }
 

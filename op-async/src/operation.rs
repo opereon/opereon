@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use async_trait::async_trait;
 use kg_diag::BasicDiag;
-use kg_diag::Severity;
+
 
 use tokio::sync::oneshot;
 use tokio::sync::mpsc;

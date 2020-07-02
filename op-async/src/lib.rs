@@ -98,7 +98,7 @@ mod tests {
     fn test_operation() {
         let engine: EngineRef<String> = EngineRef::new();
 
-        engine.register_progress_cb(|e, o| {
+        engine.register_progress_cb(|e, _o| {
             print_progress(e, false);
         });
 

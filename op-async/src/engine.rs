@@ -8,7 +8,7 @@ use std::task::{Waker, Context, Poll};
 use tokio::runtime::Runtime;
 use std::future::Future;
 use crate::operation::OperationResult;
-use tokio::sync::{oneshot, mpsc};
+use tokio::sync::{oneshot};
 use std::pin::Pin;
 
 struct Operations<T: Clone + 'static> {
@@ -154,7 +154,7 @@ impl<T: Clone + 'static> EngineRef<T> {
         let (done_tx, done_rx) = oneshot::channel();
         operation.write().set_done_sender(done_tx);
 
-        self.operations.write().add_operation(operation.clone());
+        self.operations.write().add_operation(operation);
         self.core.write().wake();
         done_rx
     }
@@ -251,7 +251,7 @@ async fn get_operation_fut<T: Clone + 'static>(
 ) {
     let o = operation.clone();
     let e = engine.clone();
-    let mut inner = async move || {
+    let inner = async move || {
         op_impl.init(&engine, &operation).await?;
 
         while !operation.write().progress().is_done() {
