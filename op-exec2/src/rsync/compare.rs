@@ -1,4 +1,4 @@
-use std::process::{Stdio};
+use std::process::Stdio;
 
 use regex::Regex;
 
@@ -7,6 +7,7 @@ use super::*;
 use futures::TryFutureExt;
 use os_pipe::pipe;
 
+use crate::utils::spawn_blocking;
 use shared_child::SharedChild;
 use std::io::Read;
 use std::sync::Arc;
@@ -282,42 +283,26 @@ impl RsyncCompare {
             Arc::new(SharedChild::spawn(&mut rsync_cmd).map_err(RsyncErrorDetail::spawn_err)?);
         drop(rsync_cmd);
 
-        let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
-        let (out_tx, out_rx) = oneshot::channel();
-        let (err_tx, err_rx) = oneshot::channel();
-
-        thread::spawn(move || {
+        let out_rx = spawn_blocking(move || {
             let mut stdout = String::new();
-            match out_reader.read_to_string(&mut stdout) {
-                Ok(_) => {
-                    let _ = out_tx.send(stdout);
-                }
-                Err(err) => {
-                    // TODO ws log error
-                    eprintln!("Error reading stdout = {}", err);
-                }
+            if let Err(err) = out_reader.read_to_string(&mut stdout) {
+                // TODO ws log error
+                eprintln!("Error reading stdout = {}", err);
             };
+            stdout
         });
 
-        thread::spawn(move || {
+        let err_rx = spawn_blocking(move || {
             let mut stderr = String::new();
-            match err_reader.read_to_string(&mut stderr) {
-                Ok(_) => {
-                    let _ = err_tx.send(stderr);
-                }
-                Err(err) => {
-                    // TODO ws log error
-                    eprintln!("Error reading stderr = {}", err);
-                }
+            if let Err(err) = err_reader.read_to_string(&mut stderr) {
+                // TODO ws log error
+                eprintln!("Error reading stderr = {}", err);
             };
+            stderr
         });
 
         let c = child.clone();
-        thread::spawn(move || {
-            let res = c.wait();
-            // no receiver means main future was dropped - we can safely skip result
-            let _ = done_tx.send(res);
-        });
+        let done_rx = spawn_blocking(move || c.wait());
 
         Ok(RsyncCompare {
             done_rx,
@@ -400,7 +385,7 @@ fn parse_output(output: &str) -> RsyncParseResult<Vec<DiffInfo>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use tokio::time::Duration;
 
     #[test]
@@ -422,8 +407,7 @@ mod tests {
     #[test]
     fn rsync_compare_test() {
         let cfg = RsyncConfig::default();
-        let params =
-            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");
@@ -440,8 +424,7 @@ mod tests {
     #[test]
     fn cancel_rsync_compare_test() {
         let cfg = RsyncConfig::default();
-        let params =
-            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");

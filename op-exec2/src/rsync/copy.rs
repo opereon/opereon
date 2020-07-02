@@ -6,15 +6,13 @@ use regex::Regex;
 use super::*;
 use crate::rsync::RsyncParseErrorDetail::Custom;
 
-
-
-
+use crate::utils::spawn_blocking;
 use os_pipe::pipe;
 use shared_child::SharedChild;
 use std::borrow::Cow;
 use std::sync::Arc;
 use std::thread;
-use tokio::io::{AsyncBufReadExt};
+use tokio::io::AsyncBufReadExt;
 use tokio::sync::{mpsc, oneshot};
 
 type Loaded = u64;
@@ -233,7 +231,6 @@ impl RsyncCopy {
         progress_sender: mpsc::UnboundedSender<ProgressInfo>,
         log: &OutputLog,
     ) -> RsyncResult<RsyncCopy> {
-        let (done_tx, done_rx) = oneshot::channel::<Result<ExitStatus, std::io::Error>>();
         let (out_reader, out_writer) = pipe().unwrap();
         let (err_reader, err_writer) = pipe().unwrap();
 
@@ -276,11 +273,7 @@ impl RsyncCopy {
         });
 
         let c = child.clone();
-        thread::spawn(move || {
-            let res = c.wait();
-            // no receiver means main future was dropped - we can safely skip result
-            let _ = done_tx.send(res);
-        });
+        let done_rx = spawn_blocking(move || c.wait());
 
         Ok(RsyncCopy {
             done_rx,
@@ -298,9 +291,7 @@ impl RsyncCopy {
 
         match status.code() {
             None => Err(RsyncErrorDetail::RsyncTerminated.into()),
-            Some(0) => {
-                Ok(())
-            }
+            Some(0) => Ok(()),
             Some(_c) => RsyncErrorDetail::process_status(status),
         }
     }
@@ -317,8 +308,7 @@ mod tests {
     #[test]
     fn rsync_copy_test() {
         let cfg = RsyncConfig::default();
-        let params =
-            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let mut rt = tokio::runtime::Runtime::new().expect("runtime");

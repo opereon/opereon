@@ -333,8 +333,6 @@ impl SshSessionRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
 
     #[test]
     fn remote_shell_cmd() {

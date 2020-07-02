@@ -11,12 +11,10 @@ use op_async::operation::OperationResult;
 use op_async::progress::{Progress, Unit};
 use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
-
-
-use tokio::sync::{mpsc, oneshot};
 use crate::utils::SharedChildExt;
-use std::sync::Arc;
 use shared_child::SharedChild;
+use std::sync::Arc;
+use tokio::sync::{mpsc, oneshot};
 
 struct FileCompareOperation {
     config: RsyncConfig,
@@ -118,7 +116,8 @@ impl OperationImpl<Outcome> for FileCopyOperation {
         engine: &EngineRef<Outcome>,
         operation: &OperationRef<Outcome>,
     ) -> OperationResult<()> {
-        let op_impl = FileCompareOperation::new(&self.config, &self.params, self.checksum, &self.log);
+        let op_impl =
+            FileCompareOperation::new(&self.config, &self.params, self.checksum, &self.log);
         let op = OperationRef::new("compare_operation", op_impl);
 
         let out = engine.enqueue_with_res(op).await?;
@@ -194,7 +193,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use tokio::time::Duration;
 
     #[test]
@@ -204,8 +203,7 @@ mod tests {
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = RsyncConfig::default();
-        let params =
-            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
@@ -241,8 +239,7 @@ mod tests {
 
         let mut rt = EngineRef::<()>::build_runtime();
         let cfg = RsyncConfig::default();
-        let params =
-            RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
+        let params = RsyncParams::new("./", "./../target/debug/incremental", "./../target/debug2");
         let log = OutputLog::new();
 
         let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
@@ -323,5 +320,4 @@ mod tests {
             println!("Engine stopped");
         })
     }
-
 }

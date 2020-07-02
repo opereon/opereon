@@ -1,10 +1,11 @@
 use futures::task::{Context, Poll};
+use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
+use shared_child::SharedChild;
 use std::pin::Pin;
+use std::thread;
 use tokio::future::poll_fn;
 use tokio::io::AsyncBufRead;
-use shared_child::SharedChild;
-use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
-
+use tokio::sync::oneshot;
 
 #[pin_project]
 #[must_use = "streams do nothing unless polled"]
@@ -138,9 +139,26 @@ pub trait SharedChildExt {
 }
 
 impl SharedChildExt for SharedChild {
-    fn send_sigterm(&self)  {
+    fn send_sigterm(&self) {
         if let Err(err) = self.send_signal(libc::SIGTERM) {
             eprintln!("error sending sigterm signal = {:?}", err);
         }
     }
+}
+
+pub fn spawn_blocking<T, F>(f: F) -> oneshot::Receiver<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let (result_tx, result_rx) = oneshot::channel();
+
+    // TODO ws use threadpool? see https://docs.rs/tokio/0.2.21/tokio/runtime/struct.Handle.html#method.spawn_blocking
+
+    thread::spawn(|| {
+        let res = f();
+        let _ = result_tx.send(res);
+    });
+
+    result_rx
 }
