@@ -1,3 +1,4 @@
+#![deny(unused_extern_crates)]
 #![feature(box_syntax, specialization, integer_atomics)]
 
 #[macro_use]
@@ -10,14 +11,11 @@ extern crate serde_derive;
 extern crate slog;
 #[macro_use]
 extern crate futures;
-extern crate async_trait;
 
 #[macro_use]
 extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
-extern crate kg_utils;
-extern crate op_engine;
 
 #[macro_use]
 extern crate op_log;

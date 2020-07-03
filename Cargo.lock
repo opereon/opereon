@@ -1107,7 +1107,6 @@ dependencies = [
 name = "op-exec2"
 version = "0.1.1"
 dependencies = [
- "async-trait",
  "bytes 0.5.4",
  "chrono 0.4.11",
  "futures 0.3.5",
@@ -1122,7 +1121,6 @@ dependencies = [
  "kg-utils",
  "lazy_static",
  "libc",
- "op-engine",
  "op-log",
  "op-model",
  "op-rev",
