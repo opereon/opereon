@@ -134,18 +134,6 @@ fn read_until_internal<R: AsyncBufRead + ?Sized>(
     }
 }
 
-pub trait SharedChildExt {
-    fn send_sigterm(&self);
-}
-
-impl SharedChildExt for SharedChild {
-    fn send_sigterm(&self) {
-        if let Err(err) = self.send_signal(libc::SIGTERM) {
-            eprintln!("error sending sigterm signal = {:?}", err);
-        }
-    }
-}
-
 pub fn spawn_blocking<T, F>(f: F) -> oneshot::Receiver<T>
 where
     F: FnOnce() -> T + Send + 'static,

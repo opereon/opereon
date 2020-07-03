@@ -1027,6 +1027,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "op-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures 0.3.5",
+ "kg-tree",
+ "lazy_static",
+ "libc",
+ "op-engine",
+ "op-exec2",
+ "serde",
+ "serde_derive",
+ "shared_child",
+ "tokio",
+]
+
+[[package]]
 name = "op-engine"
 version = "0.1.1"
 dependencies = [

@@ -33,11 +33,9 @@ use kg_diag::*;
 
 use kg_utils::collections::{LinkedHashMap, LruCache};
 
-mod command;
-mod exec;
-mod outcome;
-mod outlog;
-mod rsync;
+pub mod command;
+pub mod outlog;
+pub mod rsync;
 mod utils;
 
 pub use self::outlog::{EntryKind, OutputLog};

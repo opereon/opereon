@@ -4,7 +4,7 @@ use kg_tree::NodeRef;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::rsync::DiffInfo;
+use op_exec2::rsync::DiffInfo;
 use serde::{de, ser};
 use std::ops::Deref;
 
