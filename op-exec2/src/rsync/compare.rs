@@ -4,7 +4,6 @@ use regex::Regex;
 
 use super::*;
 
-use futures::TryFutureExt;
 use os_pipe::pipe;
 
 use crate::utils::spawn_blocking;

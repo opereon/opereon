@@ -4,13 +4,13 @@ use futures::future::try_join;
 use kg_diag::io::ResultExt;
 
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::io::{AsyncRead, BufReader};
 use tokio::process::{Child, Command};
 
 use utils::lines;
 
-mod local;
-mod ssh;
+pub mod local;
+pub mod ssh;
 
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;
@@ -165,7 +165,6 @@ impl CommandBuilder {
 
     #[cfg(unix)]
     fn handle_setsid(&self, c: &mut Command) {
-        use std::os::unix::process::CommandExt;
 
         if self.setsid {
             unsafe {

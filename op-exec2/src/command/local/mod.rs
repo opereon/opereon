@@ -1,7 +1,7 @@
 use super::*;
 use std::process::ExitStatus;
 
-mod config;
+pub mod config;
 
 use config::LocalConfig;
 use os_pipe::pipe;

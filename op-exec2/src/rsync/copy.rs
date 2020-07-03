@@ -12,7 +12,6 @@ use shared_child::SharedChild;
 use std::borrow::Cow;
 use std::sync::Arc;
 use std::thread;
-use tokio::io::AsyncBufReadExt;
 use tokio::sync::{mpsc, oneshot};
 
 type Loaded = u64;
@@ -133,7 +132,7 @@ impl<R: Read> ProgressParser<R> {
     pub fn parse_progress(&mut self) -> RsyncParseResult<()> {
         let mut file_name: String = String::new();
         let mut file_completed = true;
-        let mut file_idx: i32 = 0;
+        // let mut file_idx: i32 = 0;
 
         let file_reg = Regex::new(r"[\[\]]").unwrap();
         let progress_reg = Regex::new(r"[ ]").unwrap();
@@ -173,7 +172,7 @@ impl<R: Read> ProgressParser<R> {
                         true,
                     ));
                     // eprintln!("File completed: {:?}", file_name);
-                    file_idx += 1;
+                    // file_idx += 1;
                     file_completed = true;
                 } else {
                     // eprintln!("File: {} : {}", file_name, loaded_bytes);
@@ -205,7 +204,7 @@ impl<R: Read> ProgressParser<R> {
                 // operation.write().update_progress_step_value_done(file_idx);
 
                 file_completed = true;
-                file_idx += 1;
+                // file_idx += 1;
                 continue;
             }
             file_completed = false;
