@@ -7,9 +7,9 @@ use crate::rsync::copy::ProgressInfo;
 use crate::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
 use crate::OutputLog;
 
-use op_async::operation::OperationResult;
-use op_async::progress::{Progress, Unit};
-use op_async::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
+use op_engine::operation::OperationResult;
+use op_engine::progress::{Progress, Unit};
+use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
 use crate::utils::SharedChildExt;
 use shared_child::SharedChild;

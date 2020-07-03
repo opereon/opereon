@@ -1,5 +1,5 @@
 [package]
-name = "op-async"
+name = "op-engine"
 version = "0.1.1"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl", "Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
 workspace = ".."

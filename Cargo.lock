@@ -1000,23 +1000,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
 
 [[package]]
-name = "op-async"
-version = "0.1.1"
-dependencies = [
- "async-trait",
- "futures 0.3.5",
- "kg-diag",
- "kg-diag-derive",
- "kg-display-derive",
- "kg-utils",
- "rand 0.7.3",
- "serde",
- "serde_derive",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "op-cli"
 version = "0.1.1"
 dependencies = [
@@ -1040,6 +1023,23 @@ dependencies = [
  "tokio",
  "toml",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "op-engine"
+version = "0.1.1"
+dependencies = [
+ "async-trait",
+ "futures 0.3.5",
+ "kg-diag",
+ "kg-diag-derive",
+ "kg-display-derive",
+ "kg-utils",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "tokio",
  "uuid",
 ]
 
@@ -1105,7 +1105,7 @@ dependencies = [
  "kg-utils",
  "lazy_static",
  "libc",
- "op-async",
+ "op-engine",
  "op-log",
  "op-model",
  "op-rev",

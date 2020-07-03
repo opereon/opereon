@@ -17,7 +17,7 @@ extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
 extern crate kg_utils;
-extern crate op_async;
+extern crate op_engine;
 
 #[macro_use]
 extern crate op_log;
