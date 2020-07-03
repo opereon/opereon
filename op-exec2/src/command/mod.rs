@@ -5,8 +5,7 @@ use kg_diag::io::ResultExt;
 
 use std::process::Stdio;
 use tokio::io::{AsyncRead, BufReader};
-use tokio::process::{Child, Command};
-
+use std::process::{Command};
 use utils::lines;
 
 pub mod local;
@@ -28,6 +27,19 @@ impl CommandErrorDetail {
     pub fn spawn_err(err: std::io::Error) -> CommandError {
         let err = IoErrorDetail::from(err);
         CommandErrorDetail::CommandSpawn.with_cause(BasicDiag::from(err))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandOutput {
+    code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+impl CommandOutput {
+    pub fn new(code: Option<i32>, stdout: String, stderr: String) -> Self {
+        CommandOutput { code, stdout, stderr }
     }
 }
 
@@ -165,6 +177,7 @@ impl CommandBuilder {
 
     #[cfg(unix)]
     fn handle_setsid(&self, c: &mut Command) {
+        use std::os::unix::process::CommandExt;
 
         if self.setsid {
             unsafe {
@@ -239,6 +252,7 @@ impl std::fmt::Display for CommandBuilder {
         Ok(())
     }
 }
+/*
 
 async fn execute(mut command: Command, _log: &OutputLog) -> CommandResult<()> {
     command.stdout(Stdio::piped());
@@ -298,7 +312,6 @@ async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(
         .map_err_to_diag()?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,3 +350,4 @@ mod tests {
         });
     }
 }
+*/

@@ -6,112 +6,193 @@ pub mod config;
 use config::LocalConfig;
 use os_pipe::pipe;
 use std::io::Write;
+use shared_child::SharedChild;
+use std::sync::Arc;
+use std::thread;
+use crate::utils::spawn_blocking;
+use tokio::sync::{oneshot, mpsc};
 
-async fn run_command(
-    cmd: &str,
-    args: &[String],
-    env: Option<&EnvVars>,
-    cwd: Option<&Path>,
-    run_as: Option<&str>,
-    config: &LocalConfig,
-    log: &OutputLog,
-) -> CommandResult<ExitStatus> {
-    let mut builder = prepare_builder(cmd, env, run_as, config);
-
-    builder.args(args.iter().map(String::as_str));
-
-    if let Some(envs) = env {
-        for (k, v) in envs {
-            builder.env(k, v);
-        }
-    }
-
-    let mut command = builder.build();
-
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
-    }
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    log.log_in(format!("{:?}", command).as_bytes())?;
-    let mut child = command.spawn().map_err(CommandErrorDetail::spawn_err)?;
-
-    let stdout = BufReader::new(child.stdout.take().unwrap());
-    let stderr = BufReader::new(child.stderr.take().unwrap());
-    drop(child.stdin.take());
-
-    // TODO ws handle stdout and stderr
-    handle_out(stdout, stderr).await?;
-
-    let status = child.await.map_err_to_diag()?;
-
-    log.log_status(status.code())?;
-
-    Ok(status)
+pub struct LocalCommand {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
+    out_rx: oneshot::Receiver<String>,
+    err_rx: oneshot::Receiver<String>,
 }
 
-async fn run_script(
-    script: SourceRef<'_>,
-    args: &[String],
-    env: Option<&EnvVars>,
-    cwd: Option<&Path>,
-    run_as: Option<&str>,
-    config: &LocalConfig,
-    log: &OutputLog,
-) -> CommandResult<ExitStatus> {
-    let mut builder = prepare_builder(config.shell_cmd(), env, run_as, config);
+impl LocalCommand {
+    pub fn spawn(cmd: &str,
+                 args: &[String],
+                 env: Option<&EnvVars>,
+                 cwd: Option<&Path>,
+                 run_as: Option<&str>,
+                 config: &LocalConfig,
+                 log: &OutputLog, ) -> CommandResult<Self> {
+        let mut builder = prepare_builder(cmd, env, run_as, config);
 
-    match script {
-        SourceRef::Path(path) => {
-            builder.arg(path.to_string_lossy());
+        builder.args(args.iter().map(String::as_str));
+
+        if let Some(envs) = env {
+            for (k, v) in envs {
+                builder.env(k, v);
+            }
         }
-        SourceRef::Source(_) => {
-            builder.arg("/dev/stdin");
+
+        let mut command = builder.build();
+
+        if let Some(cwd) = cwd {
+            command.current_dir(cwd);
         }
+        let (out_reader, out_writer) = pipe().unwrap();
+        let (err_reader, err_writer) = pipe().unwrap();
+        command
+            .stdin(Stdio::null())
+            .stdout(out_writer)
+            .stderr(err_writer);
+
+        log.log_in(format!("{:?}", command).as_bytes())?;
+        let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
+        drop(command);
+        let child = Arc::new(child);
+
+        let l = log.clone();
+        let out_rx = spawn_blocking(move || {
+            // FIXME ws
+            let stdout = String::new();
+            l.consume_stderr(out_reader).expect("Error logging stdout");
+            stdout
+        });
+
+        let l = log.clone();
+        let err_rx = spawn_blocking(move || {
+            // FIXME ws
+            let stderr = String::new();
+            l.consume_stderr(err_reader).expect("Error logging stderr");
+            stderr
+        });
+
+        let c = child.clone();
+        let done_rx = spawn_blocking(move || {
+            c.wait().map_err(CommandErrorDetail::spawn_err)
+        });
+
+        Ok(LocalCommand {
+            child,
+            done_rx,
+            out_rx,
+            err_rx,
+        })
     }
 
-    builder.args(args.iter().map(String::as_str));
+    pub async fn wait(self) -> CommandResult<CommandOutput> {
+        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
+        let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
 
-    if let Some(envs) = env {
-        for (k, v) in envs {
-            builder.env(k, v);
+        Ok(CommandOutput::new(status.code(), out, err))
+    }
+
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
+    }
+}
+
+pub struct LocalScript {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
+    out_rx: oneshot::Receiver<String>,
+    err_rx: oneshot::Receiver<String>
+}
+
+impl LocalScript {
+    pub fn spawn(script: SourceRef<'_>,
+                 args: &[String],
+                 env: Option<&EnvVars>,
+                 cwd: Option<&Path>,
+                 run_as: Option<&str>,
+                 config: &LocalConfig,
+                 log: &OutputLog, ) -> CommandResult<Self> {
+
+        let mut builder = prepare_builder(config.shell_cmd(), env, run_as, config);
+
+        match script {
+            SourceRef::Path(path) => {
+                builder.arg(path.to_string_lossy());
+            }
+            SourceRef::Source(_) => {
+                builder.arg("/dev/stdin");
+            }
         }
+
+        builder.args(args.iter().map(String::as_str));
+
+        if let Some(envs) = env {
+            for (k, v) in envs {
+                builder.env(k, v);
+            }
+        }
+
+        let mut command = builder.build();
+
+        if let Some(cwd) = cwd {
+            command.current_dir(cwd);
+        }
+        let (out_reader, out_writer) = pipe().unwrap();
+        let (err_reader, err_writer) = pipe().unwrap();
+        command
+            .stdout(out_writer)
+            .stderr(err_writer);
+
+        if let SourceRef::Source(src) = script {
+            let (r_in, mut w_in) = pipe().unwrap();
+            command.stdin(Stdio::from(r_in));
+            w_in.write_all(src.as_bytes()).map_err_to_diag()?;
+        } else {
+            command.stdin(Stdio::null());
+        }
+
+        log.log_in(format!("{:?}", command).as_bytes())?;
+
+        let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
+        drop(command);
+        let child = Arc::new(child);
+        let l = log.clone();
+        let out_rx = spawn_blocking(move || {
+            // FIXME ws
+            let stdout = String::new();
+            l.consume_stderr(out_reader).expect("Error logging stdout");
+            stdout
+        });
+
+        let l = log.clone();
+        let err_rx = spawn_blocking(move || {
+            // FIXME ws
+            let stderr = String::new();
+            l.consume_stderr(err_reader).expect("Error logging stderr");
+            stderr
+        });
+
+        let c = child.clone();
+        let done_rx = spawn_blocking(move || {
+            c.wait().map_err(CommandErrorDetail::spawn_err)
+        });
+
+        Ok(LocalScript {
+            child,
+            done_rx,
+            out_rx,
+            err_rx,
+        })
     }
 
-    let mut command = builder.build();
+    pub async fn wait(self) -> CommandResult<CommandOutput> {
+        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
+        let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
 
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
+        Ok(CommandOutput::new(status.code(), out, err))
     }
 
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
-
-    if let SourceRef::Source(src) = script {
-        let (r_in, mut w_in) = pipe().unwrap();
-        command.stdin(Stdio::from(r_in));
-        w_in.write_all(src.as_bytes()).map_err_to_diag()?;
-    } else {
-        command.stdin(Stdio::null());
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
     }
-
-    log.log_in(format!("{:?}", command).as_bytes())?;
-    let mut child = command.spawn().map_err(CommandErrorDetail::spawn_err)?;
-
-    let stdout = BufReader::new(child.stdout.take().unwrap());
-    let stderr = BufReader::new(child.stderr.take().unwrap());
-    drop(child.stdin.take());
-
-    // TODO ws handle stdout and stderr
-    handle_out(stdout, stderr).await?;
-
-    let status = child.await.map_err_to_diag()?;
-
-    log.log_status(status.code())?;
-
-    Ok(status)
 }
 
 fn prepare_builder(
@@ -143,6 +224,53 @@ fn prepare_builder(
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use tokio::time::Duration;
+
+
+    #[test]
+    fn cancel_command_test() {
+        let cfg = LocalConfig::default();
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        let mut env = EnvVars::new();
+
+        env.insert(
+            "TEST_ENV_VAR".into(),
+            "This is environment variable content ".into(),
+        );
+
+        rt.block_on(async move {
+            let log = OutputLog::new();
+
+            let lc = LocalCommand::spawn(
+                "yes",
+                &[],
+                Some(&env),
+                Some(&PathBuf::from("/home")),
+                None,
+                &cfg,
+                &log,
+            ).unwrap();
+
+            let child = lc.child().clone();
+
+            tokio::spawn(async move {
+                tokio::time::delay_for(Duration::from_secs(2)).await;
+                println!("killing command...");
+                child.kill().unwrap();
+                println!("signal sent");
+
+            });
+
+            let res = lc.wait().await.unwrap();
+            eprintln!("status = {:?}", res);
+            assert_eq!(res.code, None);
+
+            // eprintln!("log = {}", log);
+        });
+    }
+
 
     #[test]
     fn run_command_test() {
@@ -160,7 +288,7 @@ mod tests {
         rt.block_on(async move {
             let log = OutputLog::new();
 
-            let status = run_command(
+            let lc = LocalCommand::spawn(
                 "ls",
                 &["-a".into(), "-l".into()],
                 Some(&env),
@@ -168,10 +296,11 @@ mod tests {
                 Some("wiktor"),
                 &cfg,
                 &log,
-            )
-            .await
-            .expect("Error");
-            eprintln!("status = {:?}", status);
+            ).expect("Error");
+
+            let res = lc.wait().await.unwrap();
+
+            eprintln!("status = {:?}", res);
             eprintln!("log = {}", log);
         });
     }
@@ -213,7 +342,7 @@ mod tests {
         rt.block_on(async move {
             let log = OutputLog::new();
 
-            let status = run_script(
+            let ls = LocalScript::spawn(
                 script,
                 &["-a1".into(), "-l2".into()],
                 Some(&env),
@@ -221,10 +350,10 @@ mod tests {
                 Some("wiktor"),
                 &cfg,
                 &log,
-            )
-            .await
-            .expect("Error");
-            eprintln!("status = {:?}", status);
+            ).unwrap();
+
+            let out = ls.wait().await.unwrap();
+            eprintln!("output = {:?}", out);
             eprintln!("log = {}", log);
         });
     }

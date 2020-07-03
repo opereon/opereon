@@ -12,6 +12,7 @@ use std::io::{Seek, SeekFrom, Write};
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
 use kg_diag::io::ResultExt;
+use crate::utils::spawn_blocking;
 
 mod config;
 mod dest;
@@ -147,7 +148,11 @@ impl SshSession {
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
 
-        let output = cmd.output().await.map_err(SshErrorDetail::spawn_err)?;
+        let done_rx = spawn_blocking(move || {
+            let output = cmd.output().map_err(SshErrorDetail::spawn_err);
+            output
+        });
+        let output = done_rx.await.unwrap()?;
         if output.status.success() {
             self.opened.set(true);
             Ok(())
@@ -172,7 +177,11 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-        let s = cmd.status().await.map_err(SshErrorDetail::spawn_err)?;
+        let done_rx = spawn_blocking(move || {
+            cmd.status().map_err(SshErrorDetail::spawn_err)
+        });
+
+        let s = done_rx.await.unwrap()?;
         Ok(s.success())
     }
 
@@ -198,7 +207,7 @@ impl SshSession {
             SshErrorDetail::process_exit(String::from_utf8_lossy(&output.stderr).to_string())
         }
     }
-
+    /*
     async fn run_command(
         &mut self,
         cmd: &str,
@@ -240,14 +249,13 @@ impl SshSession {
         drop(child.stdin.take());
 
         // TODO ws handle stdout and stderr
-        handle_out(stdout, stderr).await?;
+        // handle_out(stdout, stderr).await?;
 
         let status = child.await.map_err_to_diag()?;
         log.log_status(status.code())?;
 
         Ok(status)
     }
-
     async fn run_script(
         &mut self,
         script: SourceRef<'_>,
@@ -301,11 +309,12 @@ impl SshSession {
         let stdout = BufReader::new(child.stdout.take().unwrap());
         let stderr = BufReader::new(child.stderr.take().unwrap());
 
-        handle_out(stdout, stderr).await?;
+        // handle_out(stdout, stderr).await?;
 
         let status = child.await.map_err_to_diag()?;
         Ok(status)
     }
+    */
 }
 
 impl Drop for SshSession {
@@ -352,85 +361,85 @@ mod tests {
         eprintln!("cmd = {}", cmd);
     }
 
-    #[test]
-    fn run_command_test() {
-        let auth = SshAuth::PublicKey {
-            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
-        };
-        let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
-
-        let mut sess = SshSession::new(dest, cfg);
-
-        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
-
-        rt.block_on(async move {
-            sess.open().await.expect("Cannot open session");
-            let log = OutputLog::new();
-
-            let status = sess
-                .run_command("ls", &["-al".into()], &log)
-                .await
-                .expect("Error");
-            eprintln!("status = {:?}", status);
-            eprintln!("log = {}", log);
-        });
-    }
-
-    #[test]
-    fn run_script_test() {
-        let auth = SshAuth::PublicKey {
-            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
-        };
-        let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
-
-        let mut sess = SshSession::new(dest, cfg);
-
-        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
-
-        let script = SourceRef::Source(
-            r#"
-        echo 'printing cwd'
-        pwd
-
-        echo 'printing arguments...'
-        echo $@
-
-        echo "listing files..."
-        ls -al
-
-        echo 'Printing $TEST_ENV_VAR ...'
-        echo $TEST_ENV_VAR
-        exit 2
-
-        "#,
-        );
-
-        let mut env = EnvVars::new();
-
-        env.insert(
-            "TEST_ENV_VAR".into(),
-            "This is environment variable content ".into(),
-        );
-
-        rt.block_on(async move {
-            sess.open().await.expect("Error opening session");
-            let log = OutputLog::new();
-
-            let status = sess
-                .run_script(
-                    script,
-                    &["-some_argument".into()],
-                    Some(&env),
-                    Some(&PathBuf::from("/home")),
-                    None,
-                    &log,
-                )
-                .await
-                .expect("Error");
-            eprintln!("status = {:?}", status);
-            eprintln!("log = {}", log);
-        });
-    }
+    // #[test]
+    // fn run_command_test() {
+    //     let auth = SshAuth::PublicKey {
+    //         identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+    //     };
+    //     let dest = SshDest::new("localhost", 22, "wiktor", auth);
+    //     let cfg = SshConfig::default();
+    //
+    //     let mut sess = SshSession::new(dest, cfg);
+    //
+    //     let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+    //
+    //     rt.block_on(async move {
+    //         sess.open().await.expect("Cannot open session");
+    //         let log = OutputLog::new();
+    //
+    //         let status = sess
+    //             .run_command("ls", &["-al".into()], &log)
+    //             .await
+    //             .expect("Error");
+    //         eprintln!("status = {:?}", status);
+    //         eprintln!("log = {}", log);
+    //     });
+    // }
+    //
+    // #[test]
+    // fn run_script_test() {
+    //     let auth = SshAuth::PublicKey {
+    //         identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+    //     };
+    //     let dest = SshDest::new("localhost", 22, "wiktor", auth);
+    //     let cfg = SshConfig::default();
+    //
+    //     let mut sess = SshSession::new(dest, cfg);
+    //
+    //     let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+    //
+    //     let script = SourceRef::Source(
+    //         r#"
+    //     echo 'printing cwd'
+    //     pwd
+    //
+    //     echo 'printing arguments...'
+    //     echo $@
+    //
+    //     echo "listing files..."
+    //     ls -al
+    //
+    //     echo 'Printing $TEST_ENV_VAR ...'
+    //     echo $TEST_ENV_VAR
+    //     exit 2
+    //
+    //     "#,
+    //     );
+    //
+    //     let mut env = EnvVars::new();
+    //
+    //     env.insert(
+    //         "TEST_ENV_VAR".into(),
+    //         "This is environment variable content ".into(),
+    //     );
+    //
+    //     rt.block_on(async move {
+    //         sess.open().await.expect("Error opening session");
+    //         let log = OutputLog::new();
+    //
+    //         let status = sess
+    //             .run_script(
+    //                 script,
+    //                 &["-some_argument".into()],
+    //                 Some(&env),
+    //                 Some(&PathBuf::from("/home")),
+    //                 None,
+    //                 &log,
+    //             )
+    //             .await
+    //             .expect("Error");
+    //         eprintln!("status = {:?}", status);
+    //         eprintln!("log = {}", log);
+    //     });
+    // }
 }
