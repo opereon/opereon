@@ -3,9 +3,10 @@ use super::*;
 use futures::future::try_join;
 use kg_diag::io::ResultExt;
 
+use std::io::{BufRead, BufReader, Read};
+use std::process::Command;
 use std::process::Stdio;
-use tokio::io::{AsyncRead, BufReader};
-use std::process::{Command};
+use tokio::io::AsyncRead;
 use utils::lines;
 
 pub mod local;
@@ -39,7 +40,11 @@ pub struct CommandOutput {
 
 impl CommandOutput {
     pub fn new(code: Option<i32>, stdout: String, stderr: String) -> Self {
-        CommandOutput { code, stdout, stderr }
+        CommandOutput {
+            code,
+            stdout,
+            stderr,
+        }
     }
 }
 
@@ -252,6 +257,26 @@ impl std::fmt::Display for CommandBuilder {
         Ok(())
     }
 }
+
+fn collect_out<R: Read, F: FnMut(&str) -> CommandResult<()>>(
+    reader: R,
+    mut line_cb: F,
+) -> CommandResult<String> {
+    let mut out = String::new();
+    let r = BufReader::new(reader);
+    let lines = r.lines();
+
+    use std::fmt::Write;
+
+    for res in lines {
+        let line = res.map_err_to_diag()?;
+        line_cb(&line)?;
+        writeln!(&mut out, "{}", &line).unwrap();
+    }
+
+    Ok(out)
+}
+
 /*
 
 async fn execute(mut command: Command, _log: &OutputLog) -> CommandResult<()> {

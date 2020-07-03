@@ -257,6 +257,7 @@ impl RsyncCopy {
 
             if let Err(err) = parser.parse_progress() {
                 // TODO ws log error
+                // TODO ws each line should be logged to OutputLog
                 eprintln!("Error parsing rsync progress = {}", err);
 
                 // in case of parsing error drain stdout to prevent main process hang/failure

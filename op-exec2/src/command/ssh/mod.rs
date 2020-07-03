@@ -11,8 +11,8 @@ use std::io::{Seek, SeekFrom, Write};
 
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
-use kg_diag::io::ResultExt;
 use crate::utils::spawn_blocking;
+use kg_diag::io::ResultExt;
 
 mod config;
 mod dest;
@@ -177,9 +177,7 @@ impl SshSession {
 
         cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-        let done_rx = spawn_blocking(move || {
-            cmd.status().map_err(SshErrorDetail::spawn_err)
-        });
+        let done_rx = spawn_blocking(move || cmd.status().map_err(SshErrorDetail::spawn_err));
 
         let s = done_rx.await.unwrap()?;
         Ok(s.success())

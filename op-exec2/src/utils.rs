@@ -1,6 +1,5 @@
 use futures::task::{Context, Poll};
 
-
 use std::pin::Pin;
 use std::thread;
 use tokio::future::poll_fn;

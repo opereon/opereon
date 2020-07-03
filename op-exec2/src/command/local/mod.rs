@@ -3,31 +3,33 @@ use std::process::ExitStatus;
 
 pub mod config;
 
+use crate::utils::spawn_blocking;
 use config::LocalConfig;
 use os_pipe::pipe;
-use std::io::Write;
 use shared_child::SharedChild;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::sync::Arc;
 use std::thread;
-use crate::utils::spawn_blocking;
-use tokio::sync::{oneshot, mpsc};
+use tokio::sync::{mpsc, oneshot};
 
 pub struct LocalCommand {
     child: Arc<SharedChild>,
     done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
-    out_rx: oneshot::Receiver<String>,
-    err_rx: oneshot::Receiver<String>,
+    out_rx: oneshot::Receiver<CommandResult<String>>,
+    err_rx: oneshot::Receiver<CommandResult<String>>,
     log: OutputLog,
 }
 
 impl LocalCommand {
-    pub fn spawn(cmd: &str,
-                 args: &[String],
-                 env: Option<&EnvVars>,
-                 cwd: Option<&Path>,
-                 run_as: Option<&str>,
-                 config: &LocalConfig,
-                 log: &OutputLog, ) -> CommandResult<Self> {
+    pub fn spawn(
+        cmd: &str,
+        args: &[String],
+        env: Option<&EnvVars>,
+        cwd: Option<&Path>,
+        run_as: Option<&str>,
+        config: &LocalConfig,
+        log: &OutputLog,
+    ) -> CommandResult<Self> {
         let mut builder = prepare_builder(cmd, env, run_as, config);
 
         builder.args(args.iter().map(String::as_str));
@@ -57,37 +59,35 @@ impl LocalCommand {
 
         let l = log.clone();
         let out_rx = spawn_blocking(move || {
-            // FIXME ws
-            let mut stdout = String::new();
-            l.consume_stderr(out_reader).expect("Error logging stdout");
-            stdout
+            collect_out(out_reader, |line| {
+                l.log_out(line.as_bytes())?;
+                Ok(())
+            })
         });
 
         let l = log.clone();
         let err_rx = spawn_blocking(move || {
-            // FIXME ws
-            let stderr = String::new();
-            l.consume_stderr(err_reader).expect("Error logging stderr");
-            stderr
+            collect_out(err_reader, |line| {
+                l.log_err(line.as_bytes())?;
+                Ok(())
+            })
         });
 
         let c = child.clone();
-        let done_rx = spawn_blocking(move || {
-            c.wait().map_err(CommandErrorDetail::spawn_err)
-        });
+        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
 
         Ok(LocalCommand {
             child,
             done_rx,
             out_rx,
             err_rx,
-            log: log.clone()
+            log: log.clone(),
         })
     }
 
     pub async fn wait(self) -> CommandResult<CommandOutput> {
         let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
-        let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
+        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
 
         self.log.log_status(status.code())?;
 
@@ -102,20 +102,21 @@ impl LocalCommand {
 pub struct LocalScript {
     child: Arc<SharedChild>,
     done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
-    out_rx: oneshot::Receiver<String>,
-    err_rx: oneshot::Receiver<String>,
-    log: OutputLog
+    out_rx: oneshot::Receiver<CommandResult<String>>,
+    err_rx: oneshot::Receiver<CommandResult<String>>,
+    log: OutputLog,
 }
 
 impl LocalScript {
-    pub fn spawn(script: SourceRef<'_>,
-                 args: &[String],
-                 env: Option<&EnvVars>,
-                 cwd: Option<&Path>,
-                 run_as: Option<&str>,
-                 config: &LocalConfig,
-                 log: &OutputLog, ) -> CommandResult<Self> {
-
+    pub fn spawn(
+        script: SourceRef<'_>,
+        args: &[String],
+        env: Option<&EnvVars>,
+        cwd: Option<&Path>,
+        run_as: Option<&str>,
+        config: &LocalConfig,
+        log: &OutputLog,
+    ) -> CommandResult<Self> {
         let mut builder = prepare_builder(config.shell_cmd(), env, run_as, config);
 
         match script {
@@ -142,9 +143,7 @@ impl LocalScript {
         }
         let (out_reader, out_writer) = pipe().unwrap();
         let (err_reader, err_writer) = pipe().unwrap();
-        command
-            .stdout(out_writer)
-            .stderr(err_writer);
+        command.stdout(out_writer).stderr(err_writer);
 
         if let SourceRef::Source(src) = script {
             let (r_in, mut w_in) = pipe().unwrap();
@@ -161,24 +160,22 @@ impl LocalScript {
         let child = Arc::new(child);
         let l = log.clone();
         let out_rx = spawn_blocking(move || {
-            // FIXME ws
-            let stdout = String::new();
-            l.consume_stderr(out_reader).expect("Error logging stdout");
-            stdout
+            collect_out(out_reader, |line| {
+                l.log_out(line.as_bytes())?;
+                Ok(())
+            })
         });
 
         let l = log.clone();
         let err_rx = spawn_blocking(move || {
-            // FIXME ws
-            let stderr = String::new();
-            l.consume_stderr(err_reader).expect("Error logging stderr");
-            stderr
+            collect_out(err_reader, |line| {
+                l.log_err(line.as_bytes())?;
+                Ok(())
+            })
         });
 
         let c = child.clone();
-        let done_rx = spawn_blocking(move || {
-            c.wait().map_err(CommandErrorDetail::spawn_err)
-        });
+        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
 
         Ok(LocalScript {
             child,
@@ -191,7 +188,7 @@ impl LocalScript {
 
     pub async fn wait(self) -> CommandResult<CommandOutput> {
         let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
-        let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
+        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
 
         self.log.log_status(status.code())?;
 
@@ -234,7 +231,6 @@ mod tests {
     use std::path::PathBuf;
     use tokio::time::Duration;
 
-
     #[test]
     fn cancel_command_test() {
         let cfg = LocalConfig::default();
@@ -259,7 +255,8 @@ mod tests {
                 None,
                 &cfg,
                 &log,
-            ).unwrap();
+            )
+            .unwrap();
 
             let child = lc.child().clone();
 
@@ -268,7 +265,6 @@ mod tests {
                 println!("killing command...");
                 child.kill().unwrap();
                 println!("signal sent");
-
             });
 
             let res = lc.wait().await.unwrap();
@@ -278,7 +274,6 @@ mod tests {
             // eprintln!("log = {}", log);
         });
     }
-
 
     #[test]
     fn run_command_test() {
@@ -304,7 +299,8 @@ mod tests {
                 Some("wiktor"),
                 &cfg,
                 &log,
-            ).expect("Error");
+            )
+            .expect("Error");
 
             let res = lc.wait().await.unwrap();
 
@@ -333,6 +329,9 @@ mod tests {
         echo 'printing cwd'
         pwd
 
+        echo 'Printing to stderr...'
+        echo 'This should go to stderr' >&2
+
         echo 'printing arguments...'
         echo $@
         echo $1
@@ -358,7 +357,8 @@ mod tests {
                 Some("wiktor"),
                 &cfg,
                 &log,
-            ).unwrap();
+            )
+            .unwrap();
 
             let out = ls.wait().await.unwrap();
             eprintln!("output = {:?}", out);
