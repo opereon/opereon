@@ -11,7 +11,7 @@ use crate::utils::spawn_blocking;
 use shared_child::SharedChild;
 use std::io::Read;
 use std::sync::Arc;
-use std::thread;
+
 use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

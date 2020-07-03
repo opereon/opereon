@@ -1,6 +1,6 @@
 use futures::task::{Context, Poll};
-use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
-use shared_child::SharedChild;
+
+
 use std::pin::Pin;
 use std::thread;
 use tokio::future::poll_fn;

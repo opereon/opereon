@@ -1,6 +1,6 @@
 use shared_child::unix::SharedChildExt as OriginalSharedChildExt;
 use shared_child::SharedChild;
-use std::thread;
+
 
 pub trait SharedChildExt {
     fn send_sigterm(&self);
