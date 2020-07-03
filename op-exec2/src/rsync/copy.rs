@@ -288,6 +288,8 @@ impl RsyncCopy {
             .unwrap()
             .map_err(RsyncErrorDetail::spawn_err)?;
 
+        self.log.log_status(status.code())?;
+
         match status.code() {
             None => Err(RsyncErrorDetail::RsyncTerminated.into()),
             Some(0) => Ok(()),

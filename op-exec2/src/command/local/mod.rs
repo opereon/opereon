@@ -17,6 +17,7 @@ pub struct LocalCommand {
     done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
     out_rx: oneshot::Receiver<String>,
     err_rx: oneshot::Receiver<String>,
+    log: OutputLog,
 }
 
 impl LocalCommand {
@@ -57,7 +58,7 @@ impl LocalCommand {
         let l = log.clone();
         let out_rx = spawn_blocking(move || {
             // FIXME ws
-            let stdout = String::new();
+            let mut stdout = String::new();
             l.consume_stderr(out_reader).expect("Error logging stdout");
             stdout
         });
@@ -80,12 +81,15 @@ impl LocalCommand {
             done_rx,
             out_rx,
             err_rx,
+            log: log.clone()
         })
     }
 
     pub async fn wait(self) -> CommandResult<CommandOutput> {
         let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
         let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
+
+        self.log.log_status(status.code())?;
 
         Ok(CommandOutput::new(status.code(), out, err))
     }
@@ -99,7 +103,8 @@ pub struct LocalScript {
     child: Arc<SharedChild>,
     done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
     out_rx: oneshot::Receiver<String>,
-    err_rx: oneshot::Receiver<String>
+    err_rx: oneshot::Receiver<String>,
+    log: OutputLog
 }
 
 impl LocalScript {
@@ -180,12 +185,15 @@ impl LocalScript {
             done_rx,
             out_rx,
             err_rx,
+            log: log.clone(),
         })
     }
 
     pub async fn wait(self) -> CommandResult<CommandOutput> {
         let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
         let (status, out, err) = (status.unwrap()?, out.unwrap(), err.unwrap());
+
+        self.log.log_status(status.code())?;
 
         Ok(CommandOutput::new(status.code(), out, err))
     }
