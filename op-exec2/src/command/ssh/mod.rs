@@ -223,8 +223,8 @@ impl SshSession {
         &mut self,
         cmd: &str,
         args: &[String],
+        env: Option<&EnvVars>,
         // TODO ws is this necessary?
-        // env: Option<&EnvVars>,
         // cwd: Option<&Path>,
         // run_as: Option<&str>,
         log: &OutputLog,
@@ -232,12 +232,17 @@ impl SshSession {
         if !self.opened.get() {
             return SshErrorDetail::closed();
         }
+        let mut builder = CommandBuilder::new(cmd);
 
-        let usr_cmd = CommandBuilder::new(cmd)
+        if let Some(envs) = env {
+            for (k, v) in envs {
+                builder.env(k, v);
+            }
+        }
+
+        let usr_cmd = builder
             .args(args.iter().map(String::as_str))
-            .to_string();
-
-        log.log_in(usr_cmd.as_bytes())?;
+            .to_string_with_env();
 
         let mut ssh_cmd = self
             .ssh_cmd(true)
@@ -373,23 +378,43 @@ impl SshSessionRef {
 mod tests {
     use super::*;
     use op_test_helpers::UnwrapDisplay;
+    use tokio::time::Duration;
 
     #[test]
-    fn remote_shell_cmd() {
-        let dest = SshDest::new(
-            "127.0.0.1",
-            8821,
-            "root",
-            SshAuth::PublicKey {
-                identity_file: PathBuf::from("keys/vagrant"),
-            },
-        );
-        let config = SshConfig::default();
-        let sess = SshSession::new(dest, config);
+    fn cancel_command_test() {
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
+        let dest = SshDest::new("localhost", 22, "wiktor", auth);
+        let cfg = SshConfig::default();
 
-        let cmd = sess.remote_shell_cmd();
+        let mut sess = SshSession::new(dest, cfg);
 
-        eprintln!("cmd = {}", cmd);
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        rt.block_on(async move {
+            sess.open().await.unwrap_disp();
+            let log = OutputLog::new();
+
+            let handle = sess
+                .spawn_command("ls -alR", &["/".into()], None, &log)
+                .unwrap_disp();
+
+            let child = handle.child().clone();
+
+            tokio::spawn(async move {
+                println!("Waiting...");
+                tokio::time::delay_for(Duration::from_secs(1)).await;
+                println!("killing command...");
+                child.kill().unwrap();
+                println!("signal sent");
+            });
+
+            let out = handle.wait().await.unwrap_disp();
+
+            eprintln!("status = {:?}", out);
+            eprintln!("log = {}", log);
+        });
     }
 
     #[test]
@@ -409,7 +434,46 @@ mod tests {
             let log = OutputLog::new();
 
             let handle = sess
-                .spawn_command("ls", &["-al".into()], &log)
+                .spawn_command("ls", &["-al".into()], None, &log)
+                .unwrap_disp();
+
+            let out = handle.wait().await.unwrap_disp();
+
+            eprintln!("status = {:?}", out);
+            eprintln!("log = {}", log);
+        });
+    }
+
+    #[test]
+    fn run_command_env_test() {
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
+        let dest = SshDest::new("localhost", 22, "wiktor", auth);
+        let cfg = SshConfig::default();
+
+        let mut sess = SshSession::new(dest, cfg);
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        let mut env = EnvVars::new();
+
+        env.insert(
+            "TEST_ENV_VAR1".into(),
+            "This is environment variable content".into(),
+        );
+
+        env.insert(
+            "TEST_ENV_VAR2".into(),
+            "Another variable content".into(),
+        );
+
+        rt.block_on(async move {
+            sess.open().await.unwrap_disp();
+            let log = OutputLog::new();
+
+            let handle = sess
+                .spawn_command("printenv", &[], Some(&env), &log)
                 .unwrap_disp();
 
             let out = handle.wait().await.unwrap_disp();

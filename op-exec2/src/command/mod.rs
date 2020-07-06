@@ -266,7 +266,32 @@ impl CommandBuilder {
         self.handle_setsid_sync(&mut c);
         c
     }
-}
+
+    /// Returns command string representation with env vars at the beginning
+    /// eg. `ENV1='some value' printenv`
+    pub fn to_string_with_env(&self) -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+
+        let envs = self.envs.iter()
+            .map(|(k, v)| format!("{}='{}'", k, v))
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        write!(out, "{} ", envs).unwrap();
+
+        write!(out, "{}", self.cmd).unwrap();
+
+        for a in self.args.iter() {
+            if a.contains(' ') {
+                write!(out, " \"{}\"", a).unwrap();
+            } else {
+                write!(out, " {}", a).unwrap();
+            }
+        }
+        out
+    }
+ }
 
 impl std::fmt::Display for CommandBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
