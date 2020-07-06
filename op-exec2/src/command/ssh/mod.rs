@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::process::{ExitStatus, Stdio};
+use std::process::{ Stdio};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use os_pipe::pipe;
@@ -15,7 +15,6 @@ use crate::utils::spawn_blocking;
 use kg_diag::io::fs::create_dir_all;
 use kg_diag::io::ResultExt;
 use shared_child::SharedChild;
-use tokio::sync::oneshot;
 
 mod config;
 mod dest;
@@ -229,7 +228,7 @@ impl SshSession {
         // cwd: Option<&Path>,
         // run_as: Option<&str>,
         log: &OutputLog,
-    ) -> SshResult<SshHandle> {
+    ) -> SshResult<CommandHandle> {
         if !self.opened.get() {
             return SshErrorDetail::closed();
         }
@@ -261,26 +260,12 @@ impl SshSession {
         drop(ssh_cmd);
         let child = Arc::new(child);
 
-        let l = log.clone();
-        let out_rx = spawn_blocking(move || {
-            collect_out(out_reader, |line| {
-                l.log_out(line.as_bytes())?;
-                Ok(())
-            })
-        });
-
-        let l = log.clone();
-        let err_rx = spawn_blocking(move || {
-            collect_out(err_reader, |line| {
-                l.log_err(line.as_bytes())?;
-                Ok(())
-            })
-        });
+        let (out_rx, err_rx) = handle_std(log, out_reader, err_reader);
 
         let c = child.clone();
         let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
 
-        Ok(SshHandle {
+        Ok(CommandHandle {
             child,
             done_rx,
             out_rx,
@@ -297,7 +282,7 @@ impl SshSession {
         cwd: Option<&Path>,
         run_as: Option<&str>,
         log: &OutputLog,
-    ) -> SshResult<SshHandle> {
+    ) -> SshResult<CommandHandle> {
         if !self.opened.get() {
             return SshErrorDetail::closed();
         }
@@ -347,24 +332,12 @@ impl SshSession {
         let child = SharedChild::spawn(&mut ssh_cmd).map_err(SshErrorDetail::spawn_err)?;
         drop(ssh_cmd);
         let child = Arc::new(child);
-        let l = log.clone();
-        let out_rx = spawn_blocking(move || {
-            collect_out(out_reader, |line| {
-                l.log_out(line.as_bytes())?;
-                Ok(())
-            })
-        });
 
-        let l = log.clone();
-        let err_rx = spawn_blocking(move || {
-            collect_out(err_reader, |line| {
-                l.log_err(line.as_bytes())?;
-                Ok(())
-            })
-        });
+        let (out_rx, err_rx) = handle_std(log, out_reader, err_reader);
+
         let c = child.clone();
         let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
-        Ok(SshHandle {
+        Ok(CommandHandle {
             child,
             done_rx,
             out_rx,
@@ -393,29 +366,6 @@ impl SshSessionRef {
 
     pub fn read(&self) -> MutexGuard<SshSession> {
         self.0.lock().unwrap()
-    }
-}
-
-pub struct SshHandle {
-    child: Arc<SharedChild>,
-    done_rx: oneshot::Receiver<SshResult<ExitStatus>>,
-    out_rx: oneshot::Receiver<SshResult<String>>,
-    err_rx: oneshot::Receiver<SshResult<String>>,
-    log: OutputLog,
-}
-
-impl SshHandle {
-    pub async fn wait(self) -> SshResult<CommandOutput> {
-        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
-        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
-
-        self.log.log_status(status.code())?;
-
-        Ok(CommandOutput::new(status.code(), out, err))
-    }
-
-    pub fn child(&self) -> &Arc<SharedChild> {
-        &self.child
     }
 }
 

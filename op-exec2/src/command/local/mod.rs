@@ -1,5 +1,4 @@
 use super::*;
-use std::process::ExitStatus;
 
 pub mod config;
 
@@ -7,197 +6,122 @@ use crate::utils::spawn_blocking;
 use config::LocalConfig;
 use os_pipe::pipe;
 use shared_child::SharedChild;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{ Write};
 use std::sync::Arc;
-use std::thread;
-use tokio::sync::{mpsc, oneshot};
 
-pub struct LocalCommand {
-    child: Arc<SharedChild>,
-    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
-    out_rx: oneshot::Receiver<CommandResult<String>>,
-    err_rx: oneshot::Receiver<CommandResult<String>>,
-    log: OutputLog,
+pub fn spawn_local_command(
+    cmd: &str,
+    args: &[String],
+    env: Option<&EnvVars>,
+    cwd: Option<&Path>,
+    run_as: Option<&str>,
+    config: &LocalConfig,
+    log: &OutputLog,
+) -> CommandResult<CommandHandle> {
+    let mut builder = prepare_builder(cmd, env, run_as, config);
+
+    builder.args(args.iter().map(String::as_str));
+
+    if let Some(envs) = env {
+        for (k, v) in envs {
+            builder.env(k, v);
+        }
+    }
+
+    let mut command = builder.build();
+
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    let (out_reader, out_writer) = pipe().unwrap();
+    let (err_reader, err_writer) = pipe().unwrap();
+    command
+        .stdin(Stdio::null())
+        .stdout(out_writer)
+        .stderr(err_writer);
+
+    log.log_in(format!("{:?}", command).as_bytes())?;
+    let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
+    drop(command);
+    let child = Arc::new(child);
+
+    let (out_rx, err_rx) = handle_std(log, out_reader, err_reader);
+
+    let c = child.clone();
+    let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
+
+    Ok(CommandHandle {
+        child,
+        done_rx,
+        out_rx,
+        err_rx,
+        log: log.clone(),
+    })
 }
 
-impl LocalCommand {
-    pub fn spawn(
-        cmd: &str,
-        args: &[String],
-        env: Option<&EnvVars>,
-        cwd: Option<&Path>,
-        run_as: Option<&str>,
-        config: &LocalConfig,
-        log: &OutputLog,
-    ) -> CommandResult<Self> {
-        let mut builder = prepare_builder(cmd, env, run_as, config);
+pub fn spawn_local_script(
+    script: SourceRef<'_>,
+    args: &[String],
+    env: Option<&EnvVars>,
+    cwd: Option<&Path>,
+    run_as: Option<&str>,
+    config: &LocalConfig,
+    log: &OutputLog,
+) -> CommandResult<CommandHandle> {
+    let mut builder = prepare_builder(config.shell_cmd(), env, run_as, config);
 
-        builder.args(args.iter().map(String::as_str));
-
-        if let Some(envs) = env {
-            for (k, v) in envs {
-                builder.env(k, v);
-            }
+    match script {
+        SourceRef::Path(path) => {
+            builder.arg(path.to_string_lossy());
         }
-
-        let mut command = builder.build();
-
-        if let Some(cwd) = cwd {
-            command.current_dir(cwd);
+        SourceRef::Source(_) => {
+            builder.arg("/dev/stdin");
         }
-        let (out_reader, out_writer) = pipe().unwrap();
-        let (err_reader, err_writer) = pipe().unwrap();
-        command
-            .stdin(Stdio::null())
-            .stdout(out_writer)
-            .stderr(err_writer);
-
-        log.log_in(format!("{:?}", command).as_bytes())?;
-        let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
-        drop(command);
-        let child = Arc::new(child);
-
-        let l = log.clone();
-        let out_rx = spawn_blocking(move || {
-            collect_out(out_reader, |line| {
-                l.log_out(line.as_bytes())?;
-                Ok(())
-            })
-        });
-
-        let l = log.clone();
-        let err_rx = spawn_blocking(move || {
-            collect_out(err_reader, |line| {
-                l.log_err(line.as_bytes())?;
-                Ok(())
-            })
-        });
-
-        let c = child.clone();
-        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
-
-        Ok(LocalCommand {
-            child,
-            done_rx,
-            out_rx,
-            err_rx,
-            log: log.clone(),
-        })
     }
 
-    pub async fn wait(self) -> CommandResult<CommandOutput> {
-        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
-        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
+    builder.args(args.iter().map(String::as_str));
 
-        self.log.log_status(status.code())?;
-
-        Ok(CommandOutput::new(status.code(), out, err))
-    }
-
-    pub fn child(&self) -> &Arc<SharedChild> {
-        &self.child
-    }
-}
-
-pub struct LocalScript {
-    child: Arc<SharedChild>,
-    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
-    out_rx: oneshot::Receiver<CommandResult<String>>,
-    err_rx: oneshot::Receiver<CommandResult<String>>,
-    log: OutputLog,
-}
-
-impl LocalScript {
-    pub fn spawn(
-        script: SourceRef<'_>,
-        args: &[String],
-        env: Option<&EnvVars>,
-        cwd: Option<&Path>,
-        run_as: Option<&str>,
-        config: &LocalConfig,
-        log: &OutputLog,
-    ) -> CommandResult<Self> {
-        let mut builder = prepare_builder(config.shell_cmd(), env, run_as, config);
-
-        match script {
-            SourceRef::Path(path) => {
-                builder.arg(path.to_string_lossy());
-            }
-            SourceRef::Source(_) => {
-                builder.arg("/dev/stdin");
-            }
+    if let Some(envs) = env {
+        for (k, v) in envs {
+            builder.env(k, v);
         }
-
-        builder.args(args.iter().map(String::as_str));
-
-        if let Some(envs) = env {
-            for (k, v) in envs {
-                builder.env(k, v);
-            }
-        }
-
-        let mut command = builder.build();
-
-        if let Some(cwd) = cwd {
-            command.current_dir(cwd);
-        }
-        let (out_reader, out_writer) = pipe().unwrap();
-        let (err_reader, err_writer) = pipe().unwrap();
-        command.stdout(out_writer).stderr(err_writer);
-
-        if let SourceRef::Source(src) = script {
-            let (r_in, mut w_in) = pipe().unwrap();
-            command.stdin(Stdio::from(r_in));
-            w_in.write_all(src.as_bytes()).map_err_to_diag()?;
-        } else {
-            command.stdin(Stdio::null());
-        }
-
-        log.log_in(format!("{:?}", command).as_bytes())?;
-
-        let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
-        drop(command);
-        let child = Arc::new(child);
-        let l = log.clone();
-        let out_rx = spawn_blocking(move || {
-            collect_out(out_reader, |line| {
-                l.log_out(line.as_bytes())?;
-                Ok(())
-            })
-        });
-
-        let l = log.clone();
-        let err_rx = spawn_blocking(move || {
-            collect_out(err_reader, |line| {
-                l.log_err(line.as_bytes())?;
-                Ok(())
-            })
-        });
-
-        let c = child.clone();
-        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
-
-        Ok(LocalScript {
-            child,
-            done_rx,
-            out_rx,
-            err_rx,
-            log: log.clone(),
-        })
     }
 
-    pub async fn wait(self) -> CommandResult<CommandOutput> {
-        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
-        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
+    let mut command = builder.build();
 
-        self.log.log_status(status.code())?;
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    let (out_reader, out_writer) = pipe().unwrap();
+    let (err_reader, err_writer) = pipe().unwrap();
+    command.stdout(out_writer).stderr(err_writer);
 
-        Ok(CommandOutput::new(status.code(), out, err))
+    if let SourceRef::Source(src) = script {
+        let (r_in, mut w_in) = pipe().unwrap();
+        command.stdin(Stdio::from(r_in));
+        w_in.write_all(src.as_bytes()).map_err_to_diag()?;
+    } else {
+        command.stdin(Stdio::null());
     }
 
-    pub fn child(&self) -> &Arc<SharedChild> {
-        &self.child
-    }
+    log.log_in(format!("{:?}", command).as_bytes())?;
+
+    let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
+    drop(command);
+    let child = Arc::new(child);
+
+    let (out_rx, err_rx) = handle_std(log, out_reader, err_reader);
+
+    let c = child.clone();
+    let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
+
+    Ok(CommandHandle {
+        child,
+        done_rx,
+        out_rx,
+        err_rx,
+        log: log.clone(),
+    })
 }
 
 fn prepare_builder(
@@ -247,7 +171,7 @@ mod tests {
         rt.block_on(async move {
             let log = OutputLog::new();
 
-            let lc = LocalCommand::spawn(
+            let lc = spawn_local_command(
                 "yes",
                 &[],
                 Some(&env),
@@ -261,7 +185,7 @@ mod tests {
             let child = lc.child().clone();
 
             tokio::spawn(async move {
-                tokio::time::delay_for(Duration::from_secs(2)).await;
+                tokio::time::delay_for(Duration::from_secs(1)).await;
                 println!("killing command...");
                 child.kill().unwrap();
                 println!("signal sent");
@@ -291,7 +215,7 @@ mod tests {
         rt.block_on(async move {
             let log = OutputLog::new();
 
-            let lc = LocalCommand::spawn(
+            let lc = spawn_local_command(
                 "ls",
                 &["-a".into(), "-l".into()],
                 Some(&env),
@@ -349,7 +273,7 @@ mod tests {
         rt.block_on(async move {
             let log = OutputLog::new();
 
-            let ls = LocalScript::spawn(
+            let ls = spawn_local_script(
                 script,
                 &["-a1".into(), "-l2".into()],
                 Some(&env),

@@ -1,13 +1,14 @@
 use super::*;
 
-use futures::future::try_join;
 use kg_diag::io::ResultExt;
 
+use crate::utils::spawn_blocking;
+use shared_child::SharedChild;
 use std::io::{BufRead, BufReader, Read};
-use std::process::Command;
 use std::process::Stdio;
-use tokio::io::AsyncRead;
-use utils::lines;
+use std::process::{Command, ExitStatus};
+use std::sync::Arc;
+use tokio::sync::oneshot;
 
 pub mod local;
 pub mod ssh;
@@ -45,6 +46,29 @@ impl CommandOutput {
             stdout,
             stderr,
         }
+    }
+}
+
+pub struct CommandHandle {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
+    out_rx: oneshot::Receiver<CommandResult<String>>,
+    err_rx: oneshot::Receiver<CommandResult<String>>,
+    log: OutputLog,
+}
+
+impl CommandHandle {
+    pub async fn wait(self) -> CommandResult<CommandOutput> {
+        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
+        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
+
+        self.log.log_status(status.code())?;
+
+        Ok(CommandOutput::new(status.code(), out, err))
+    }
+
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
     }
 }
 
@@ -275,6 +299,32 @@ fn collect_out<R: Read, F: FnMut(&str) -> CommandResult<()>>(
     }
 
     Ok(out)
+}
+
+fn handle_std<O: Read + Send + 'static, E: Read + Send + 'static>(
+    log: &OutputLog,
+    out_reader: O,
+    err_reader: E,
+) -> (
+    oneshot::Receiver<CommandResult<String>>,
+    oneshot::Receiver<CommandResult<String>>,
+) {
+    let l = log.clone();
+    let out_rx = spawn_blocking(move || {
+        collect_out(out_reader, |line| {
+            l.log_out(line.as_bytes())?;
+            Ok(())
+        })
+    });
+
+    let l = log.clone();
+    let err_rx = spawn_blocking(move || {
+        collect_out(err_reader, |line| {
+            l.log_err(line.as_bytes())?;
+            Ok(())
+        })
+    });
+    (out_rx, err_rx)
 }
 
 /*
