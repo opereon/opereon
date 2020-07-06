@@ -12,7 +12,10 @@ use std::io::{Seek, SeekFrom, Write};
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
 use crate::utils::spawn_blocking;
+use kg_diag::io::fs::create_dir_all;
 use kg_diag::io::ResultExt;
+use shared_child::SharedChild;
+use tokio::sync::oneshot;
 
 mod config;
 mod dest;
@@ -30,6 +33,9 @@ pub enum SshErrorDetail {
 
     #[display(fmt = "cannot spawn ssh process")]
     SshSpawn,
+
+    #[display(fmt = "cannot create master socket directory")]
+    SocketDir,
 }
 
 impl SshErrorDetail {
@@ -131,6 +137,14 @@ impl SshSession {
     }
 
     async fn open(&mut self) -> SshResult<()> {
+        let sock_dir = self.config.socket_dir().to_owned();
+        let sock_dir_res = spawn_blocking(move || {
+            create_dir_all(sock_dir)
+                .into_diag_res()
+                .map_err_as_cause(|| SshErrorDetail::SocketDir)
+        });
+        sock_dir_res.await.unwrap()?;
+
         let mut cmd = self
             .ssh_cmd(true)
             .arg("-n")
@@ -205,8 +219,8 @@ impl SshSession {
             SshErrorDetail::process_exit(String::from_utf8_lossy(&output.stderr).to_string())
         }
     }
-    /*
-    async fn run_command(
+
+    fn spawn_command(
         &mut self,
         cmd: &str,
         args: &[String],
@@ -215,7 +229,7 @@ impl SshSession {
         // cwd: Option<&Path>,
         // run_as: Option<&str>,
         log: &OutputLog,
-    ) -> SshResult<ExitStatus> {
+    ) -> SshResult<SshHandle> {
         if !self.opened.get() {
             return SshErrorDetail::closed();
         }
@@ -233,28 +247,49 @@ impl SshSession {
             .arg(usr_cmd)
             .build();
 
-        log.log_in(format!("{:?}", ssh_cmd).as_bytes())?;
+        let (out_reader, out_writer) = pipe().unwrap();
+        let (err_reader, err_writer) = pipe().unwrap();
 
         ssh_cmd
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stdout(out_writer)
+            .stderr(err_writer);
 
-        let mut child = ssh_cmd.spawn().map_err(SshErrorDetail::spawn_err)?;
+        log.log_in(format!("{:?}", ssh_cmd).as_bytes())?;
 
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-        let stderr = BufReader::new(child.stderr.take().unwrap());
-        drop(child.stdin.take());
+        let child = SharedChild::spawn(&mut ssh_cmd).map_err(SshErrorDetail::spawn_err)?;
+        drop(ssh_cmd);
+        let child = Arc::new(child);
 
-        // TODO ws handle stdout and stderr
-        // handle_out(stdout, stderr).await?;
+        let l = log.clone();
+        let out_rx = spawn_blocking(move || {
+            collect_out(out_reader, |line| {
+                l.log_out(line.as_bytes())?;
+                Ok(())
+            })
+        });
 
-        let status = child.await.map_err_to_diag()?;
-        log.log_status(status.code())?;
+        let l = log.clone();
+        let err_rx = spawn_blocking(move || {
+            collect_out(err_reader, |line| {
+                l.log_err(line.as_bytes())?;
+                Ok(())
+            })
+        });
 
-        Ok(status)
+        let c = child.clone();
+        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
+
+        Ok(SshHandle {
+            child,
+            done_rx,
+            out_rx,
+            err_rx,
+            log: log.clone(),
+        })
     }
-    async fn run_script(
+
+    fn spawn_script(
         &mut self,
         script: SourceRef<'_>,
         args: &[String],
@@ -262,7 +297,7 @@ impl SshSession {
         cwd: Option<&Path>,
         run_as: Option<&str>,
         log: &OutputLog,
-    ) -> SshResult<ExitStatus> {
+    ) -> SshResult<SshHandle> {
         if !self.opened.get() {
             return SshErrorDetail::closed();
         }
@@ -280,9 +315,11 @@ impl SshSession {
 
         let usr_cmd = builder.to_string();
 
-        let (r_in, mut w_in) = pipe().unwrap();
-        let _r = r_in.try_clone().unwrap();
-        log.log_in(usr_cmd.as_bytes())?;
+        let (in_reader, mut in_writer) = pipe().unwrap();
+        let (out_reader, out_writer) = pipe().unwrap();
+        let (err_reader, err_writer) = pipe().unwrap();
+
+        let _r = in_reader.try_clone().unwrap();
 
         let mut ssh_cmd = self
             .ssh_cmd(true)
@@ -292,27 +329,49 @@ impl SshSession {
             .build();
 
         ssh_cmd
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdin(Stdio::from(r_in));
+            .stdout(out_writer)
+            .stderr(err_writer)
+            .stdin(in_reader);
+
+        log.log_in(format!("{:?}", ssh_cmd).as_bytes())?;
 
         let mut buf = Cursor::new(Vec::new());
         prepare_script(script, args, env, cwd, &mut buf)?;
         buf.seek(SeekFrom::Start(0)).map_err_to_diag()?;
 
-        w_in.write_all(buf.get_ref()).map_err_to_diag()?;
-        std::mem::drop(w_in);
-        let mut child = ssh_cmd.spawn().map_err(SshErrorDetail::spawn_err)?;
+        log.log_in(buf.get_ref().as_slice())?;
 
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-        let stderr = BufReader::new(child.stderr.take().unwrap());
+        in_writer.write_all(buf.get_ref()).map_err_to_diag()?;
+        std::mem::drop(in_writer);
 
-        // handle_out(stdout, stderr).await?;
+        let child = SharedChild::spawn(&mut ssh_cmd).map_err(SshErrorDetail::spawn_err)?;
+        drop(ssh_cmd);
+        let child = Arc::new(child);
+        let l = log.clone();
+        let out_rx = spawn_blocking(move || {
+            collect_out(out_reader, |line| {
+                l.log_out(line.as_bytes())?;
+                Ok(())
+            })
+        });
 
-        let status = child.await.map_err_to_diag()?;
-        Ok(status)
+        let l = log.clone();
+        let err_rx = spawn_blocking(move || {
+            collect_out(err_reader, |line| {
+                l.log_err(line.as_bytes())?;
+                Ok(())
+            })
+        });
+        let c = child.clone();
+        let done_rx = spawn_blocking(move || c.wait().map_err(CommandErrorDetail::spawn_err));
+        Ok(SshHandle {
+            child,
+            done_rx,
+            out_rx,
+            err_rx,
+            log: log.clone(),
+        })
     }
-    */
 }
 
 impl Drop for SshSession {
@@ -337,9 +396,33 @@ impl SshSessionRef {
     }
 }
 
+pub struct SshHandle {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<SshResult<ExitStatus>>,
+    out_rx: oneshot::Receiver<SshResult<String>>,
+    err_rx: oneshot::Receiver<SshResult<String>>,
+    log: OutputLog,
+}
+
+impl SshHandle {
+    pub async fn wait(self) -> SshResult<CommandOutput> {
+        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
+        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
+
+        self.log.log_status(status.code())?;
+
+        Ok(CommandOutput::new(status.code(), out, err))
+    }
+
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use op_test_helpers::UnwrapDisplay;
 
     #[test]
     fn remote_shell_cmd() {
@@ -359,85 +442,92 @@ mod tests {
         eprintln!("cmd = {}", cmd);
     }
 
-    // #[test]
-    // fn run_command_test() {
-    //     let auth = SshAuth::PublicKey {
-    //         identity_file: "/home/wiktor/.ssh/id_rsa".into(),
-    //     };
-    //     let dest = SshDest::new("localhost", 22, "wiktor", auth);
-    //     let cfg = SshConfig::default();
-    //
-    //     let mut sess = SshSession::new(dest, cfg);
-    //
-    //     let mut rt = tokio::runtime::Runtime::new().expect("runtime");
-    //
-    //     rt.block_on(async move {
-    //         sess.open().await.expect("Cannot open session");
-    //         let log = OutputLog::new();
-    //
-    //         let status = sess
-    //             .run_command("ls", &["-al".into()], &log)
-    //             .await
-    //             .expect("Error");
-    //         eprintln!("status = {:?}", status);
-    //         eprintln!("log = {}", log);
-    //     });
-    // }
-    //
-    // #[test]
-    // fn run_script_test() {
-    //     let auth = SshAuth::PublicKey {
-    //         identity_file: "/home/wiktor/.ssh/id_rsa".into(),
-    //     };
-    //     let dest = SshDest::new("localhost", 22, "wiktor", auth);
-    //     let cfg = SshConfig::default();
-    //
-    //     let mut sess = SshSession::new(dest, cfg);
-    //
-    //     let mut rt = tokio::runtime::Runtime::new().expect("runtime");
-    //
-    //     let script = SourceRef::Source(
-    //         r#"
-    //     echo 'printing cwd'
-    //     pwd
-    //
-    //     echo 'printing arguments...'
-    //     echo $@
-    //
-    //     echo "listing files..."
-    //     ls -al
-    //
-    //     echo 'Printing $TEST_ENV_VAR ...'
-    //     echo $TEST_ENV_VAR
-    //     exit 2
-    //
-    //     "#,
-    //     );
-    //
-    //     let mut env = EnvVars::new();
-    //
-    //     env.insert(
-    //         "TEST_ENV_VAR".into(),
-    //         "This is environment variable content ".into(),
-    //     );
-    //
-    //     rt.block_on(async move {
-    //         sess.open().await.expect("Error opening session");
-    //         let log = OutputLog::new();
-    //
-    //         let status = sess
-    //             .run_script(
-    //                 script,
-    //                 &["-some_argument".into()],
-    //                 Some(&env),
-    //                 Some(&PathBuf::from("/home")),
-    //                 None,
-    //                 &log,
-    //             )
-    //             .await
-    //             .expect("Error");
-    //         eprintln!("status = {:?}", status);
-    //         eprintln!("log = {}", log);
-    //     });
-    // }
+    #[test]
+    fn run_command_test() {
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
+        let dest = SshDest::new("localhost", 22, "wiktor", auth);
+        let cfg = SshConfig::default();
+
+        let mut sess = SshSession::new(dest, cfg);
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        rt.block_on(async move {
+            sess.open().await.unwrap_disp();
+            let log = OutputLog::new();
+
+            let handle = sess
+                .spawn_command("ls", &["-al".into()], &log)
+                .unwrap_disp();
+
+            let out = handle.wait().await.unwrap_disp();
+
+            eprintln!("status = {:?}", out);
+            eprintln!("log = {}", log);
+        });
+    }
+
+    #[test]
+    fn run_script_test() {
+        let auth = SshAuth::PublicKey {
+            identity_file: "/home/wiktor/.ssh/id_rsa".into(),
+        };
+        let dest = SshDest::new("localhost", 22, "wiktor", auth);
+        let cfg = SshConfig::default();
+
+        let mut sess = SshSession::new(dest, cfg);
+
+        let mut rt = tokio::runtime::Runtime::new().expect("runtime");
+
+        let script = SourceRef::Source(
+            r#"
+        echo 'printing cwd'
+        pwd
+
+        echo 'Printing to stderr...'
+        echo 'This should go to stderr' >&2
+
+        echo 'printing arguments...'
+        echo $@
+
+        echo "listing files..."
+        ls -al
+
+        echo 'Printing $TEST_ENV_VAR ...'
+        echo $TEST_ENV_VAR
+        exit 2
+
+        "#,
+        );
+
+        let mut env = EnvVars::new();
+
+        env.insert(
+            "TEST_ENV_VAR".into(),
+            "This is environment variable content ".into(),
+        );
+
+        rt.block_on(async move {
+            sess.open().await.unwrap_disp();
+            let log = OutputLog::new();
+
+            let handle = sess
+                .spawn_script(
+                    script,
+                    &["-some_argument".into()],
+                    Some(&env),
+                    Some(&PathBuf::from("/home")),
+                    None,
+                    &log,
+                )
+                .unwrap_disp();
+
+            let out = handle.wait().await.unwrap_disp();
+
+            eprintln!("status = {:?}", out);
+            eprintln!("log = {}", log);
+        });
+    }
 }
