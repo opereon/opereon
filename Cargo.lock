@@ -52,6 +52,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a265e3abeffdce30b2e26b7a11b222fe37c6067404001b434101457d0385eb92"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -989,19 +1000,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
 
 [[package]]
-name = "op-async"
-version = "0.1.1"
-dependencies = [
- "futures 0.3.5",
- "kg-utils",
- "rand 0.7.3",
- "serde",
- "serde_derive",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "op-cli"
 version = "0.1.1"
 dependencies = [
@@ -1025,6 +1023,40 @@ dependencies = [
  "tokio",
  "toml",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "op-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures 0.3.5",
+ "kg-tree",
+ "lazy_static",
+ "libc",
+ "op-engine",
+ "op-exec2",
+ "serde",
+ "serde_derive",
+ "shared_child",
+ "tokio",
+]
+
+[[package]]
+name = "op-engine"
+version = "0.1.1"
+dependencies = [
+ "async-trait",
+ "futures 0.3.5",
+ "kg-diag",
+ "kg-diag-derive",
+ "kg-display-derive",
+ "kg-utils",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "tokio",
  "uuid",
 ]
 
@@ -1105,6 +1137,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "shared_child",
  "slog",
  "tempfile 3.1.0",
  "time 0.2.16",
@@ -1672,6 +1705,16 @@ name = "sha1"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2579985fda508104f7587689507983eadd6a6e84dd35d6d115361f530916fa0d"
+
+[[package]]
+name = "shared_child"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cebcf3a403e4deafaf34dc882c4a1b6a648b43e5670aa2e4bb985914eaeb2d2"
+dependencies = [
+ "libc",
+ "winapi 0.3.8",
+]
 
 [[package]]
 name = "signal-hook-registry"
