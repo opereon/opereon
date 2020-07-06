@@ -1,147 +1,365 @@
 use super::*;
 
-use tokio::process::{Command, Child};
-use tokio::io::{BufReader, AsyncRead, AsyncBufRead, AsyncBufReadExt};
-use futures::future::try_join;
+use kg_diag::io::ResultExt;
+
+use crate::utils::spawn_blocking;
+use shared_child::SharedChild;
+use std::io::{BufRead, BufReader, Read};
 use std::process::Stdio;
-use std::pin::Pin;
-use futures::task::{Context, Poll};
-use tokio::future::poll_fn;
+use std::process::{Command, ExitStatus};
+use std::sync::Arc;
+use tokio::sync::oneshot;
 
-#[pin_project]
-#[must_use = "streams do nothing unless polled"]
-#[derive(Debug)]
-struct Lines<R> {
-    #[pin]
-    reader: R,
-    buf: String,
-    bytes: Vec<u8>,
-    read: usize,
+pub mod local;
+pub mod ssh;
+
+pub type CommandError = BasicDiag;
+pub type CommandResult<T> = Result<T, CommandError>;
+
+#[derive(Debug, Display, Detail)]
+pub enum CommandErrorDetail {
+    #[display(fmt = "cannot spawn command")]
+    CommandSpawn,
+
+    #[display(fmt = "malformed command output")]
+    MalformedOutput,
 }
 
-fn lines<R: AsyncBufRead>(reader: R) -> Lines<R> {
-    Lines {
-        reader,
-        buf: String::new(),
-        bytes: Vec::new(),
-        read: 0,
-    }
-}
-
-impl<R: AsyncBufRead + Unpin> Lines<R> {
-    pub async fn next_line(&mut self) -> std::io::Result<Option<String>> {
-        poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
-    }
-
-    /// Obtain a mutable reference to the underlying reader
-    pub fn get_mut(&mut self) -> &mut R {
-        &mut self.reader
-    }
-
-    /// Obtain a reference to the underlying reader
-    pub fn get_ref(&mut self) -> &R {
-        &self.reader
-    }
-
-    /// Unwraps this `Lines<R>`, returning the underlying reader.
-    ///
-    /// Note that any leftover data in the internal buffer is lost.
-    /// Therefore, a following read from the underlying reader may lead to data loss.
-    pub fn into_inner(self) -> R {
-        self.reader
+impl CommandErrorDetail {
+    pub fn spawn_err(err: std::io::Error) -> CommandError {
+        let err = IoErrorDetail::from(err);
+        CommandErrorDetail::CommandSpawn.with_cause(BasicDiag::from(err))
     }
 }
 
-impl<R: AsyncBufRead> Lines<R> {
-    #[doc(hidden)]
-    pub fn poll_next_line(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<Option<String>>> {
-        let me = self.project();
-        let n = ready!(read_line_internal(me.reader, cx, me.buf, me.bytes, me.read))?;
-        if n == 0 && me.buf.is_empty() {
-            return Poll::Ready(Ok(None));
+#[derive(Debug, Clone)]
+pub struct CommandOutput {
+    code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+impl CommandOutput {
+    pub fn new(code: Option<i32>, stdout: String, stderr: String) -> Self {
+        CommandOutput {
+            code,
+            stdout,
+            stderr,
         }
-        Poll::Ready(Ok(Some(std::mem::replace(me.buf, String::new()))))
     }
 }
 
-impl<R: AsyncBufRead> tokio::stream::Stream for Lines<R> {
-    type Item = std::io::Result<String>;
+pub struct CommandHandle {
+    child: Arc<SharedChild>,
+    done_rx: oneshot::Receiver<CommandResult<ExitStatus>>,
+    out_rx: oneshot::Receiver<CommandResult<String>>,
+    err_rx: oneshot::Receiver<CommandResult<String>>,
+    log: OutputLog,
+}
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_line(cx)) {
-            Ok(Some(line)) => Some(Ok(line)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
+impl CommandHandle {
+    pub async fn wait(self) -> CommandResult<CommandOutput> {
+        let (status, out, err) = futures::join!(self.done_rx, self.out_rx, self.err_rx);
+        let (status, out, err) = (status.unwrap()?, out.unwrap()?, err.unwrap()?);
+
+        self.log.log_status(status.code())?;
+
+        Ok(CommandOutput::new(status.code(), out, err))
+    }
+
+    pub fn child(&self) -> &Arc<SharedChild> {
+        &self.child
     }
 }
 
-fn read_line_internal<R: AsyncBufRead + ?Sized>(
-    reader: Pin<&mut R>,
-    cx: &mut Context<'_>,
-    buf: &mut String,
-    bytes: &mut Vec<u8>,
-    read: &mut usize,
-) -> Poll<std::io::Result<usize>> {
-    let ret = ready!(read_until_internal(reader, cx, bytes, read));
-    if std::str::from_utf8(&bytes).is_err() {
-        Poll::Ready(ret.and_then(|_| {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "stream did not contain valid UTF-8",
-            ))
-        }))
+pub type EnvVars = LinkedHashMap<String, String>;
+
+pub enum SourceRef<'a> {
+    Path(&'a Path),
+    Source(&'a str),
+}
+
+impl<'a> SourceRef<'a> {
+    pub fn read(&self) -> Result<String, kg_diag::IoErrorDetail> {
+        match *self {
+            SourceRef::Path(path) => {
+                let mut s = String::new();
+                fs::read_to_string(path, &mut s)?;
+                Ok(s)
+            }
+            SourceRef::Source(src) => Ok(src.into()),
+        }
+    }
+
+    pub fn read_to(&self, buf: &mut String) -> Result<(), kg_diag::IoErrorDetail> {
+        match *self {
+            SourceRef::Path(path) => {
+                fs::read_to_string(path, buf)?;
+                Ok(())
+            }
+            SourceRef::Source(src) => {
+                buf.push_str(src);
+                Ok(())
+            }
+        }
+    }
+}
+
+fn prepare_script<W: std::io::Write>(
+    script: SourceRef,
+    args: &[String],
+    env: Option<&EnvVars>,
+    cwd: Option<&Path>,
+    mut out: W,
+) -> Result<(), IoErrorDetail> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    let script = script.read()?;
+
+    write!(out, "#!/usr/bin/env bash\n")?;
+
+    if let Some(cwd) = cwd {
+        write!(out, "cd \"{}\"\n", cwd.display())?;
+    }
+    if let Some(env) = env {
+        for (k, v) in env {
+            write!(out, "export {}='{}'\n", k, v)?;
+        }
+    }
+
+    // Create temp script file in ramdisk
+    let tmp_path = format!("/dev/shm/op_{:0x}", rng.gen::<u64>());
+    write!(out, "cat > {} <<-'%%EOF%%'\n", tmp_path)?;
+    write!(out, "{}\n", script.trim())?;
+    write!(out, "%%EOF%%\n")?;
+
+    // Make temp script executable
+    write!(out, "chmod +x {}\n", tmp_path)?;
+
+    // Execute tmp script
+    if args.is_empty() {
+        write!(out, "({})\n", tmp_path)?;
     } else {
-        debug_assert!(buf.is_empty());
-        debug_assert_eq!(*read, 0);
-        // Safety: `bytes` is a valid UTF-8 because `str::from_utf8` returned `Ok`.
-        std::mem::swap(unsafe { buf.as_mut_vec() }, bytes);
-        Poll::Ready(ret)
+        write!(out, "({}", tmp_path)?;
+        for arg in args {
+            write!(out, " \'{}\'", arg)?;
+        }
+        write!(out, ")\n")?;
     }
+
+    // Capture script status
+    write!(out, "STATUS=$?\n")?;
+
+    // Remove temp script
+    write!(out, "rm -f {}\n", tmp_path)?;
+
+    // Exit with tmp script status code
+    write!(out, "exit $STATUS\n")?;
+
+    Ok(())
 }
 
-fn read_until_internal<R: AsyncBufRead + ?Sized>(
-    mut reader: Pin<&mut R>,
-    cx: &mut Context<'_>,
-    buf: &mut Vec<u8>,
-    read: &mut usize,
-) -> Poll<std::io::Result<usize>> {
-    loop {
-        let (done, used) = {
-            let available = ready!(reader.as_mut().poll_fill_buf(cx))?;
-            let mut nl = std::usize::MAX;
-            for (i, &b) in available.iter().enumerate() {
-                if b == b'\r' || b == b'\n' {
-                    nl = i;
-                    break;
-                }
-            }
-            if nl < std::usize::MAX {
-                buf.extend_from_slice(&available[..=nl]);
-                (true, nl + 1)
-            } else {
-                buf.extend_from_slice(available);
-                (false, available.len())
-            }
-        };
-        reader.as_mut().consume(used);
-        *read += used;
-        if done || used == 0 {
-            return Poll::Ready(Ok(std::mem::replace(read, 0)));
+#[derive(Debug, Clone)]
+pub struct CommandBuilder {
+    cmd: String,
+    args: Vec<String>,
+    envs: LinkedHashMap<String, String>,
+    setsid: bool,
+}
+
+impl CommandBuilder {
+    pub fn new<S: Into<String>>(cmd: S) -> CommandBuilder {
+        CommandBuilder {
+            cmd: cmd.into(),
+            args: Vec::new(),
+            envs: LinkedHashMap::new(),
+            setsid: false,
         }
     }
+
+    pub fn arg<S: Into<String>>(&mut self, arg: S) -> &mut CommandBuilder {
+        self.args.push(arg.into());
+        self
+    }
+
+    pub fn args<S: Into<String>, I: Iterator<Item = S>>(&mut self, args: I) -> &mut CommandBuilder {
+        for a in args {
+            self.args.push(a.into());
+        }
+        self
+    }
+
+    pub fn env<K: Into<String>, V: Into<String>>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> &mut CommandBuilder {
+        self.envs.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn setsid(&mut self, enable: bool) -> &mut CommandBuilder {
+        self.setsid = enable;
+        self
+    }
+
+    #[cfg(unix)]
+    fn handle_setsid(&self, c: &mut Command) {
+        use std::os::unix::process::CommandExt;
+
+        if self.setsid {
+            unsafe {
+                c.pre_exec(|| {
+                    if libc::setsid() == -1 {
+                        Err(std::io::Error::last_os_error())
+                    } else {
+                        Ok(())
+                    }
+                });
+            }
+        }
+    }
+    #[cfg(unix)]
+    fn handle_setsid_sync(&self, c: &mut std::process::Command) {
+        use std::os::unix::process::CommandExt;
+
+        if self.setsid {
+            unsafe {
+                c.pre_exec(|| {
+                    if libc::setsid() == -1 {
+                        Err(std::io::Error::last_os_error())
+                    } else {
+                        Ok(())
+                    }
+                });
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    fn handle_setsid(&self, c: &mut Command) {
+        if self.setsid {
+            unsupported!()
+        }
+    }
+
+    pub fn build(&self) -> Command {
+        let mut c = Command::new(&self.cmd);
+        for a in self.args.iter() {
+            c.arg(a);
+        }
+        for (k, v) in self.envs.iter() {
+            c.env(k, v);
+        }
+        self.handle_setsid(&mut c);
+        c
+    }
+    // sync version of this method is necessary because we cannot call async code in SshSession destructor
+    pub fn build_sync(&self) -> std::process::Command {
+        let mut c = std::process::Command::new(&self.cmd);
+        for a in self.args.iter() {
+            c.arg(a);
+        }
+        for (k, v) in self.envs.iter() {
+            c.env(k, v);
+        }
+        self.handle_setsid_sync(&mut c);
+        c
+    }
+
+    /// Returns command string representation with env vars at the beginning
+    /// eg. `ENV1='some value' printenv`
+    pub fn to_string_with_env(&self) -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+
+        let envs = self.envs.iter()
+            .map(|(k, v)| format!("{}='{}'", k, v))
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        write!(out, "{} ", envs).unwrap();
+
+        write!(out, "{}", self.cmd).unwrap();
+
+        for a in self.args.iter() {
+            if a.contains(' ') {
+                write!(out, " \"{}\"", a).unwrap();
+            } else {
+                write!(out, " {}", a).unwrap();
+            }
+        }
+        out
+    }
+ }
+
+impl std::fmt::Display for CommandBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.cmd)?;
+        for a in self.args.iter() {
+            if a.contains(' ') {
+                write!(f, " \"{}\"", a)?;
+            } else {
+                write!(f, " {}", a)?;
+            }
+        }
+        Ok(())
+    }
 }
 
+fn collect_out<R: Read, F: FnMut(&str) -> CommandResult<()>>(
+    reader: R,
+    mut line_cb: F,
+) -> CommandResult<String> {
+    let mut out = String::new();
+    let r = BufReader::new(reader);
+    let lines = r.lines();
 
-async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::Error> {
+    use std::fmt::Write;
+
+    for res in lines {
+        let line = res.map_err_to_diag()?;
+        line_cb(&line)?;
+        writeln!(&mut out, "{}", &line).unwrap();
+    }
+
+    Ok(out)
+}
+
+fn handle_std<O: Read + Send + 'static, E: Read + Send + 'static>(
+    log: &OutputLog,
+    out_reader: O,
+    err_reader: E,
+) -> (
+    oneshot::Receiver<CommandResult<String>>,
+    oneshot::Receiver<CommandResult<String>>,
+) {
+    let l = log.clone();
+    let out_rx = spawn_blocking(move || {
+        collect_out(out_reader, |line| {
+            l.log_out(line.as_bytes())?;
+            Ok(())
+        })
+    });
+
+    let l = log.clone();
+    let err_rx = spawn_blocking(move || {
+        collect_out(err_reader, |line| {
+            l.log_err(line.as_bytes())?;
+            Ok(())
+        })
+    });
+    (out_rx, err_rx)
+}
+
+/*
+
+async fn execute(mut command: Command, _log: &OutputLog) -> CommandResult<()> {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     command.stdin(Stdio::null());
 
-    let mut child = command.spawn()?;
+    let mut child = command.spawn().map_err_to_diag()?;
 
     let stdout = BufReader::new(child.stdout.take().unwrap());
     let stderr = BufReader::new(child.stderr.take().unwrap());
@@ -152,7 +370,26 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
         println!("status: {}", status);
         Ok(())
     }
+    handle_out(stdout, stderr).await?;
+    status(child).await.map_err_to_diag()?;
+    Ok(())
+}
 
+async fn execute_pty(
+    command: std::process::Command,
+    _log: &OutputLog,
+) -> Result<(), std::io::Error> {
+    let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
+    while let Ok(line) = session.read_line() {
+        println!("out: {:?}", line);
+    }
+    Ok(())
+}
+
+async fn handle_out<R1: AsyncRead + Unpin, R2: AsyncRead + Unpin>(
+    stdout: BufReader<R1>,
+    stderr: BufReader<R2>,
+) -> CommandResult<()> {
     async fn stdout_read<R: AsyncRead + Unpin>(s: BufReader<R>) -> Result<(), std::io::Error> {
         let mut stdout = lines(s);
         while let Some(line) = stdout.next_line().await? {
@@ -170,20 +407,11 @@ async fn execute(mut command: Command, log: &OutputLog) -> Result<(), std::io::E
         println!("err: ---");
         Ok(())
     };
-
-    try_join(stdout_read(stdout), stderr_read(stderr)).await?;
-
-    status(child).await
-}
-
-async fn execute_pty(command: std::process::Command, log: &OutputLog) -> Result<(), std::io::Error> {
-    let mut session = rexpect::session::spawn_command(command, None).expect("spawn");
-    while let Ok(line) = session.read_line() {
-        println!("out: {:?}", line);
-    }
+    try_join(stdout_read(stdout), stderr_read(stderr))
+        .await
+        .map_err_to_diag()?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,7 +419,8 @@ mod tests {
     #[test]
     fn ssh_command() {
         let mut cmd = Command::new("/usr/bin/bash");
-        cmd.arg("-c").arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2;  done;");
+        cmd.arg("-c")
+            .arg("for i in {1..10}; do echo stdout output; echo stderr output 1>&2;  done;");
 
         let log = OutputLog::new();
 
@@ -221,3 +450,4 @@ mod tests {
         });
     }
 }
+*/
