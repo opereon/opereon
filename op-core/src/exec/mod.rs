@@ -1,8 +1,10 @@
+use async_trait::*;
 use op_engine::operation::OperationResult;
 use op_exec2::command::CommandHandle;
 
+#[async_trait]
 pub trait SpawnableCommand {
-    fn spawn(&self) -> OperationResult<CommandHandle>;
+    async fn spawn(&self) -> OperationResult<CommandHandle>;
 }
 
 macro_rules! command_operation_impl {
@@ -14,7 +16,7 @@ macro_rules! command_operation_impl {
                 _engine: &EngineRef<Outcome>,
                 operation: &OperationRef<Outcome>,
             ) -> OperationResult<Outcome> {
-                let handle = self.spawn()?;
+                let handle = self.spawn().await?;
 
                 let child = handle.child().clone();
                 let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();

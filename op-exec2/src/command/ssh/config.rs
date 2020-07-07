@@ -30,6 +30,10 @@ impl SshConfig {
     pub fn cache_limit(&self) -> usize {
         self.cache_limit
     }
+
+    pub fn set_socket_dir(&mut self, socket_dir: &Path) {
+        self.socket_dir = socket_dir.to_path_buf();
+    }
 }
 
 impl Default for SshConfig {

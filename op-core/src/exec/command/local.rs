@@ -42,9 +42,9 @@ impl LocalCommandOperation {
         }
     }
 }
-
+#[async_trait]
 impl SpawnableCommand for LocalCommandOperation {
-    fn spawn(&self) -> OperationResult<CommandHandle> {
+    async fn spawn(&self) -> OperationResult<CommandHandle> {
         spawn_local_command(
             &self.cmd,
             &self.args,
@@ -90,9 +90,9 @@ impl LocalScriptOperation {
         }
     }
 }
-
+#[async_trait]
 impl SpawnableCommand for LocalScriptOperation {
-    fn spawn(&self) -> OperationResult<CommandHandle> {
+    async fn spawn(&self) -> OperationResult<CommandHandle> {
         spawn_local_script(
             self.script.as_ref(),
             &self.args,
