@@ -1,3 +1,4 @@
+use crate::ops::combinators::handle_cancel;
 use crate::outcome::Outcome;
 use async_trait::*;
 use futures::{Future, FutureExt};
@@ -7,7 +8,7 @@ use tokio::task::JoinHandle;
 
 #[derive(Copy, Clone, Debug)]
 pub enum ParallelPolicy {
-    /// All operations must complete
+    /// Get outcome of each operation or error if any of them fail
     All,
 
     /// Get result of operation that completes first
@@ -39,20 +40,6 @@ impl ParallelOperation {
             done_handle: None,
         }
     }
-
-    fn handle_cancel(&self, operation: &OperationRef<Outcome>) {
-        let ops = self.ops.clone();
-        let mut cancel_rx = operation.write().take_cancel_receiver().unwrap();
-        tokio::spawn(async move {
-            if cancel_rx.recv().await.is_some() {
-                let mut futs = Vec::with_capacity(ops.len());
-                for op in ops.iter() {
-                    futs.push(op.cancel())
-                }
-                futures::future::join_all(futs).await;
-            }
-        });
-    }
 }
 
 #[async_trait]
@@ -62,7 +49,7 @@ impl OperationImpl<Outcome> for ParallelOperation {
         engine: &EngineRef<Outcome>,
         operation: &OperationRef<Outcome>,
     ) -> OperationResult<()> {
-        self.handle_cancel(operation);
+        handle_cancel(self.ops.clone(), operation);
 
         let mut futs = vec![];
 
@@ -71,19 +58,15 @@ impl OperationImpl<Outcome> for ParallelOperation {
         }
 
         let done_handle = match self.policy {
-            ParallelPolicy::All => {
-                tokio::spawn(async {
-                    let results = futures::future::try_join_all(futs).await;
-                    results
-                })
-            }
-            ParallelPolicy::First => {
-                tokio::spawn(async {
-                    let fut = futures::future::select_all(futs);
-                    let (res, _idx, _rest) = fut.await;
-                    res.map(|o| vec![o])
-                })
-            }
+            ParallelPolicy::All => tokio::spawn(async {
+                let results = futures::future::try_join_all(futs).await;
+                results
+            }),
+            ParallelPolicy::First => tokio::spawn(async {
+                let fut = futures::future::select_all(futs);
+                let (res, _idx, _rest) = fut.await;
+                res.map(|o| vec![o])
+            }),
         };
         self.done_handle = Some(done_handle);
         Ok(())
@@ -119,9 +102,9 @@ mod tests {
     use op_engine::{EngineRef, OperationImpl, OperationRef};
     use tokio::time::Duration;
 
+    use crate::ops::combinators::parallel::ParallelOperation;
     use async_trait::*;
     use kg_diag::io::ResultExt;
-    use crate::ops::combinators::parallel::ParallelOperation;
 
     pub struct TestOp {
         should_fail: bool,
@@ -201,7 +184,6 @@ mod tests {
                 } else {
                     panic!();
                 }
-
             });
 
             e.start().await;
@@ -231,7 +213,6 @@ mod tests {
                 } else {
                     panic!();
                 }
-
             });
 
             e.start().await;
