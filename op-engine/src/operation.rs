@@ -8,9 +8,8 @@ use uuid::Uuid;
 use async_trait::async_trait;
 use kg_diag::BasicDiag;
 
-
-use tokio::sync::oneshot;
 use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
@@ -56,7 +55,7 @@ pub enum OperationState {
 pub struct Operation<T> {
     id: Uuid,
     parent: Uuid,
-    operations: Vec<Uuid>,
+    // operations: Vec<Uuid>,
     name: String,
     progress: Progress,
     waker: Option<Waker>,
@@ -65,7 +64,7 @@ pub struct Operation<T> {
     outcome: Option<OperationResult<T>>,
     done_sender: Option<oneshot::Sender<()>>,
     cancel_sender: mpsc::Sender<()>,
-    cancel_receiver: Option<mpsc::Receiver<()>>
+    cancel_receiver: Option<mpsc::Receiver<()>>,
 }
 
 impl<T: Clone + 'static> Operation<T> {
@@ -74,7 +73,7 @@ impl<T: Clone + 'static> Operation<T> {
         Operation {
             id: Uuid::new_v4(),
             parent: Uuid::nil(),
-            operations: Vec::new(),
+            // operations: Vec::new(),
             name: name.into(),
             progress: Progress::default(),
             waker: None,
@@ -83,7 +82,7 @@ impl<T: Clone + 'static> Operation<T> {
             outcome: None,
             done_sender: None,
             cancel_sender: cancel_tx,
-            cancel_receiver: Some(cancel_rx)
+            cancel_receiver: Some(cancel_rx),
         }
     }
 
@@ -128,19 +127,19 @@ impl<T: Clone + 'static> Operation<T> {
         self.outcome = Some(outcome)
     }
 
-    pub (crate) fn set_done_sender(&mut self, sender: oneshot::Sender<()>) {
+    pub(crate) fn set_done_sender(&mut self, sender: oneshot::Sender<()>) {
         self.done_sender = Some(sender)
     }
 
-    pub (crate) fn take_done_sender(&mut self) -> Option<oneshot::Sender<()>>{
+    pub(crate) fn take_done_sender(&mut self) -> Option<oneshot::Sender<()>> {
         self.done_sender.take()
     }
 
-    pub fn take_cancel_receiver(&mut self) -> Option<mpsc::Receiver<()>>{
+    pub fn take_cancel_receiver(&mut self) -> Option<mpsc::Receiver<()>> {
         self.cancel_receiver.take()
     }
 
-    pub (crate) fn cancel_sender_mut(&mut self) -> &mut mpsc::Sender<()> {
+    pub(crate) fn cancel_sender_mut(&mut self) -> &mut mpsc::Sender<()> {
         &mut self.cancel_sender
     }
 }
@@ -169,9 +168,9 @@ impl<T: Clone + 'static> OperationRef<T> {
         self.0.read().id
     }
 
-    pub (crate) fn set_waker(&self, waker: Waker) {
-        self.write().set_waker(waker);
-    }
+    // pub(crate) fn set_waker(&self, waker: Waker) {
+    //     self.write().set_waker(waker);
+    // }
 
     pub(crate) fn take_op_impl(&mut self) -> Option<Box<dyn OperationImpl<T>>> {
         self.0.write().op_impl.take()

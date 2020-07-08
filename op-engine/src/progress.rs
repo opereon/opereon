@@ -48,7 +48,7 @@ impl Progress {
     pub fn new_partial(label: &str, min: f64, max: f64, unit: Unit) -> Progress {
         Progress {
             label: Some(label.to_string()),
-            .. Progress::new(min, max, unit)
+            ..Progress::new(min, max, unit)
         }
     }
 
@@ -66,7 +66,10 @@ impl Progress {
                 counter: 0,
                 label: None,
                 speed: None,
-                parts: parts.into_iter().map(|p| (p.label.as_ref().cloned().take().unwrap(), p)).collect()
+                parts: parts
+                    .into_iter()
+                    .map(|p| (p.label.as_ref().cloned().take().unwrap(), p))
+                    .collect(),
             }
         } else {
             Progress {
@@ -77,7 +80,10 @@ impl Progress {
                 counter: 0,
                 label: None,
                 speed: None,
-                parts: parts.into_iter().map(|mut p| (p.label.take().unwrap(), p)).collect(),
+                parts: parts
+                    .into_iter()
+                    .map(|mut p| (p.label.take().unwrap(), p))
+                    .collect(),
             }
         }
     }
@@ -139,7 +145,11 @@ impl Progress {
 
     pub fn update(&mut self, u: ProgressUpdate) {
         match u {
-            ProgressUpdate::Main { value, speed, label } => {
+            ProgressUpdate::Main {
+                value,
+                speed,
+                label,
+            } => {
                 if value.is_finite() {
                     self.set_value(value);
                 } else {
@@ -152,7 +162,11 @@ impl Progress {
                     self.label = label;
                 }
             }
-            ProgressUpdate::Partial { value, speed, label } => {
+            ProgressUpdate::Partial {
+                value,
+                speed,
+                label,
+            } => {
                 if !self.parts.contains_key(&label) {
                     let mut part = Progress::default();
                     part.unit = self.unit;
@@ -176,7 +190,7 @@ impl Progress {
         }
     }
 
-    pub(super) fn counter(&self) -> u32 {
+    pub fn counter(&self) -> u32 {
         self.counter
     }
 
@@ -268,7 +282,7 @@ impl ProgressUpdate {
         ProgressUpdate::Partial {
             value,
             label,
-            speed: None
+            speed: None,
         }
     }
 
@@ -288,18 +302,17 @@ impl ProgressUpdate {
         }
     }
 
-
-        pub fn value(&self) -> f64 {
+    pub fn value(&self) -> f64 {
         match self {
-            ProgressUpdate::Main { value, .. } => { *value }
-            ProgressUpdate::Partial { value, .. } => { *value }
+            ProgressUpdate::Main { value, .. } => *value,
+            ProgressUpdate::Partial { value, .. } => *value,
         }
     }
 
     pub fn speed(&self) -> Option<f64> {
         match self {
-            ProgressUpdate::Main { speed, .. } => { speed.as_ref().copied() }
-            ProgressUpdate::Partial { speed, .. } => { speed.as_ref().copied() }
+            ProgressUpdate::Main { speed, .. } => speed.as_ref().copied(),
+            ProgressUpdate::Partial { speed, .. } => speed.as_ref().copied(),
         }
     }
 
@@ -315,12 +328,8 @@ impl ProgressUpdate {
 
     pub fn set_label(&mut self, new_label: String) {
         match self {
-            ProgressUpdate::Main { ref mut label, .. } => {
-                *label = Some(new_label)
-            }
-            ProgressUpdate::Partial { ref mut label, .. } => {
-                *label = new_label
-            }
+            ProgressUpdate::Main { ref mut label, .. } => *label = Some(new_label),
+            ProgressUpdate::Partial { ref mut label, .. } => *label = new_label,
         }
     }
 }

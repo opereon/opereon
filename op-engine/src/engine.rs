@@ -1,15 +1,18 @@
-use std::collections::VecDeque;
-use crate::{OperationRef, OperationImpl};
+use crate::{OperationImpl, OperationRef};
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::{SyncRef, SyncRefMapReadGuard, SyncRefReadGuard};
+use std::collections::VecDeque;
 
-use uuid::Uuid;
-use std::task::{Waker, Context, Poll};
-use tokio::runtime::Runtime;
-use std::future::Future;
 use crate::operation::OperationResult;
-use tokio::sync::{oneshot};
+use futures::lock::{Mutex, MutexGuard};
+use std::any::Any;
+use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
+use tokio::runtime::Runtime;
+use tokio::sync::oneshot;
+use uuid::Uuid;
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -43,7 +46,7 @@ impl<T: Clone + 'static> Operations<T> {
 struct Core<T: Clone + 'static> {
     waker: Option<Waker>,
     progress_callback: Option<Box<dyn FnMut(&EngineRef<T>, &OperationRef<T>)>>,
-    stopped: bool
+    stopped: bool,
 }
 
 impl<T: Clone + 'static> Core<T> {
@@ -74,27 +77,28 @@ impl<T: Clone + 'static> Core<T> {
     }
 }
 
-struct Services {}
-
-impl Services {
-    fn new() -> Services {
-        Services {}
-    }
-}
+type Services = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
 
 #[derive(Clone)]
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: SyncRef<Services>,
+    services: Services,
 }
 
 impl<T: Clone + 'static> EngineRef<T> {
+
     pub fn new() -> EngineRef<T> {
+        EngineRef::with_services(())
+    }
+
+    pub fn with_services<S: Any + Send + 'static>(services: S) -> EngineRef<T> {
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
-            services: SyncRef::new(Services::new()),
+            services: Arc::new(Mutex::new(
+                Box::new(services) as Box<dyn Any + Send + 'static>
+            )),
         }
     }
 
@@ -122,7 +126,7 @@ impl<T: Clone + 'static> EngineRef<T> {
     //     self.run_with(|_| {})
     // }
 
-    pub async fn start(&self)  -> EngineResult {
+    pub async fn start(&self) -> EngineResult {
         self.main_task().await
     }
 
@@ -150,7 +154,7 @@ impl<T: Clone + 'static> EngineRef<T> {
         self.core.write().set_waker(waker);
     }
 
-    pub fn enqueue_operation(&self, operation: OperationRef<T>) -> oneshot::Receiver<()>{
+    pub fn enqueue_operation(&self, operation: OperationRef<T>) -> oneshot::Receiver<()> {
         let (done_tx, done_rx) = oneshot::channel();
         operation.write().set_done_sender(done_tx);
 
@@ -159,7 +163,10 @@ impl<T: Clone + 'static> EngineRef<T> {
         done_rx
     }
 
-    pub fn enqueue_with_res(&self, operation: OperationRef<T>) -> impl Future<Output=OperationResult<T>> {
+    pub fn enqueue_with_res(
+        &self,
+        operation: OperationRef<T>,
+    ) -> impl Future<Output = OperationResult<T>> {
         let receiver = self.enqueue_operation(operation.clone());
 
         async move {
@@ -167,13 +174,13 @@ impl<T: Clone + 'static> EngineRef<T> {
                 Ok(_) => {
                     // outcome is always set after operation completion
                     operation.write().take_outcome().unwrap()
-                },
+                }
                 Err(_) => {
                     // should never happen since only way to drop sender is:
                     // - complete operation (notification sent before drop)
                     // - drop entire operation (engine will never drop operation without completion)
                     unreachable!()
-                },
+                }
             }
         }
     }
@@ -183,11 +190,10 @@ impl<T: Clone + 'static> EngineRef<T> {
         // this is safe since operations scheduled with `enqueue_operation` always have `done_sender`
         let sender = operation.write().take_done_sender().unwrap();
         match sender.send(()) {
-            Ok(_) => {
-            },
+            Ok(_) => {}
             Err(_) => {
                 // nothing to do here. Its totally ok to have receiver deallocated (Fire and forget scenario)
-            },
+            }
         };
 
         if operation.read().parent().is_some() {
@@ -209,6 +215,35 @@ impl<T: Clone + 'static> EngineRef<T> {
         if let Some(ref mut cb) = self.core.write().progress_callback {
             cb(&self, operation);
         }
+    }
+
+    pub async fn services(&self) -> EngineServicesGuard<'_> {
+        let guard = self.services.lock().await;
+        EngineServicesGuard { guard }
+    }
+}
+
+pub struct EngineServicesGuard<'a> {
+    guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
+}
+
+impl EngineServicesGuard<'_> {
+    /// Get mutable reference to services.
+    /// # Panics
+    /// Panics if requested type is different from type registered in Engine constructor
+    pub fn get_mut<S: 'static>(&mut self) -> &mut S {
+        self.guard
+            .downcast_mut()
+            .expect("Unexpected engine services type")
+    }
+
+    /// Get reference to services.
+    /// # Panics
+    /// Panics if requested type is different from type registered in Engine constructor
+    pub fn get<S: 'static>(&self) -> &S {
+        self.guard
+            .downcast_ref()
+            .expect("Unexpected engine services type")
     }
 }
 
