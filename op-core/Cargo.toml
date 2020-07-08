@@ -20,3 +20,6 @@ futures = {version ="0.3.5", features = ["async-await"]}
 shared_child = "0.3.4"
 serde_derive = "1.0.110"
 libc = "0.2.71"
+kg-diag = "0.4.0"
+kg-diag-derive = "0.4.0"
+kg-display-derive = "0.1.1"

@@ -36,3 +36,4 @@ macro_rules! command_operation_impl {
 
 mod command;
 mod rsync;
+mod combinators;
