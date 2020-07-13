@@ -96,15 +96,15 @@ pub fn spawn_local_script(
     let (err_reader, err_writer) = pipe().unwrap();
     command.stdout(out_writer).stderr(err_writer);
 
+    log.log_in(format!("{:?}", command).as_bytes())?;
     if let SourceRef::Source(src) = script {
         let (r_in, mut w_in) = pipe().unwrap();
         command.stdin(Stdio::from(r_in));
+        log.log_in(src.as_bytes())?;
         w_in.write_all(src.as_bytes()).map_err_to_diag()?;
     } else {
         command.stdin(Stdio::null());
     }
-
-    log.log_in(format!("{:?}", command).as_bytes())?;
 
     let child = SharedChild::spawn(&mut command).map_err(CommandErrorDetail::spawn_err)?;
     drop(command);

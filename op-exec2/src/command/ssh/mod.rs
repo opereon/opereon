@@ -1,8 +1,8 @@
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::process::{ Stdio};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::process::{Stdio};
+use std::sync::{Arc};
 
 use os_pipe::pipe;
 
@@ -15,6 +15,7 @@ use crate::utils::spawn_blocking;
 use kg_diag::io::fs::create_dir_all;
 use kg_diag::io::ResultExt;
 use shared_child::SharedChild;
+use futures::lock::{Mutex, MutexGuard};
 
 mod config;
 mod dest;
@@ -66,9 +67,15 @@ impl SshSessionCache {
         }
     }
 
-    pub fn init(&mut self) -> IoResult<()> {
-        std::fs::remove_dir_all(self.config.socket_dir())?;
-        fs::create_dir_all(self.config.socket_dir())?;
+    pub async fn init(&mut self) -> SshResult<()> {
+        // std::fs::remove_dir_all(self.config.socket_dir())?;
+        let socket_dir = self.config.socket_dir().to_path_buf();
+        let done_rx = spawn_blocking(move || {
+            fs::create_dir_all(socket_dir)
+                .into_diag_res()
+                .map_err_as_cause(|| SshErrorDetail::SocketDir)
+        });
+        done_rx.await.unwrap()?;
         Ok(())
     }
 
@@ -83,6 +90,24 @@ impl SshSessionCache {
         let s_ref = SshSessionRef::new(s);
         self.cache.insert(key, s_ref.clone());
         Ok(s_ref)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SshSessionCacheRef(Arc<Mutex<SshSessionCache>>);
+
+impl SshSessionCacheRef {
+    pub fn new(config: SshConfig) -> Self {
+        let cache = SshSessionCache::new(config);
+        SshSessionCacheRef(Arc::new(Mutex::new(cache)))
+    }
+
+    pub fn from_cache(cache: SshSessionCache) -> Self {
+        SshSessionCacheRef(Arc::new(Mutex::new(cache)))
+    }
+
+    pub async fn lock(&self) -> MutexGuard<'_, SshSessionCache> {
+        self.0.lock().await
     }
 }
 
@@ -136,6 +161,11 @@ impl SshSession {
     }
 
     async fn open(&mut self) -> SshResult<()> {
+        if self.opened.get() {
+            // Without this check multiple calls to this function will cause deadlock at filesystem level.
+            // Ssh will hang if socket already exists
+            return Ok(());
+        }
         let sock_dir = self.config.socket_dir().to_owned();
         let sock_dir_res = spawn_blocking(move || {
             create_dir_all(sock_dir)
@@ -219,7 +249,7 @@ impl SshSession {
         }
     }
 
-    fn spawn_command(
+    pub fn spawn_command(
         &mut self,
         cmd: &str,
         args: &[String],
@@ -279,7 +309,7 @@ impl SshSession {
         })
     }
 
-    fn spawn_script(
+    pub fn spawn_script(
         &mut self,
         script: SourceRef<'_>,
         args: &[String],
@@ -369,8 +399,8 @@ impl SshSessionRef {
         SshSessionRef(Arc::new(Mutex::new(session)))
     }
 
-    pub fn read(&self) -> MutexGuard<SshSession> {
-        self.0.lock().unwrap()
+    pub async fn lock(&self) -> MutexGuard<'_, SshSession> {
+        self.0.lock().await
     }
 }
 
@@ -386,7 +416,8 @@ mod tests {
             identity_file: "/home/wiktor/.ssh/id_rsa".into(),
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
+        let mut cfg = SshConfig::default();
+        cfg.set_socket_dir(&PathBuf::from("/home/wiktor/.ssh/connections"));
 
         let mut sess = SshSession::new(dest, cfg);
 
@@ -423,7 +454,8 @@ mod tests {
             identity_file: "/home/wiktor/.ssh/id_rsa".into(),
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
+        let mut cfg = SshConfig::default();
+        cfg.set_socket_dir(&PathBuf::from("/home/wiktor/.ssh/connections"));
 
         let mut sess = SshSession::new(dest, cfg);
 
@@ -450,7 +482,8 @@ mod tests {
             identity_file: "/home/wiktor/.ssh/id_rsa".into(),
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
+        let mut cfg = SshConfig::default();
+        cfg.set_socket_dir(&PathBuf::from("/home/wiktor/.ssh/connections"));
 
         let mut sess = SshSession::new(dest, cfg);
 
@@ -489,7 +522,8 @@ mod tests {
             identity_file: "/home/wiktor/.ssh/id_rsa".into(),
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
-        let cfg = SshConfig::default();
+        let mut cfg = SshConfig::default();
+        cfg.set_socket_dir(&PathBuf::from("/home/wiktor/.ssh/connections"));
 
         let mut sess = SshSession::new(dest, cfg);
 
