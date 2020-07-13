@@ -1,6 +1,6 @@
 [workspace]
 members = ["op-*"]
-exclude = ["kg-*"]
+exclude = ["kg-*", "op-exec"]
 
 [patch.crates-io]
 kg-diag = { path = "kg-diag/kg-diag" }

@@ -2,7 +2,7 @@
 name = "op-exec"
 version = "0.1.1"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
-workspace = ".."
+#workspace = ".."
 edition = "2018"
 
 [dependencies]

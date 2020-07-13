@@ -13,8 +13,10 @@ extern crate kg_diag_derive;
 extern crate kg_display_derive;
 
 mod ops;
-mod outcome;
 mod utils;
+pub mod config;
+pub mod outcome;
+pub mod context;
 
 #[cfg(test)]
 mod tests {

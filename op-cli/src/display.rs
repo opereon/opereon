@@ -5,7 +5,7 @@ use serde_json;
 use serde_yaml;
 use toml;
 
-use op_exec::Outcome;
+use op_core::outcome::Outcome;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum DisplayFormat {
@@ -76,6 +76,9 @@ pub fn display_outcome(outcome: &Outcome, format: DisplayFormat) {
         }
         Outcome::NodeSet(ref node_set) => {
             display_nodeset(&*node_set.lock(), format);
+        }
+        _ => {
+            unimplemented!()
         }
     }
 }

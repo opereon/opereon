@@ -144,7 +144,7 @@ impl<T: Clone + 'static> Operation<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct OperationRef<T>(SyncRef<Operation<T>>);
 
 impl<T> Deref for OperationRef<T> {

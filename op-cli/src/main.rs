@@ -4,6 +4,7 @@ extern crate structopt;
 #[macro_use]
 extern crate op_log;
 
+use op_core::*;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
@@ -14,17 +15,19 @@ use url::Url;
 use crate::slog::Drain;
 use display::DisplayFormat;
 use futures::stream::Stream;
-use kg_diag::BasicDiag;
+use kg_diag::{BasicDiag, Diag};
 use op_rev::{RevPath};
-use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef};
-use op_exec::{SshAuth, SshDest};
 use op_log::{build_file_drain, CliLogger};
 use options::*;
 use slog::{FnValue, o, error};
 use std::sync::atomic::*;
 use std::sync::Arc;
 use tokio::runtime;
+use op_core::config::ConfigRef;
+use op_core::context::Context as ExecContext;
+use op_engine::EngineRef;
+use op_core::outcome::Outcome;
+
 mod display;
 mod options;
 
@@ -37,39 +40,61 @@ fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
 
-fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
-    let file_drain = build_file_drain(
-        config.log().log_path().to_path_buf(),
-        (*config.log().level()).into(),
-    );
-
-    let logger = slog::Logger::root(
-        file_drain.fuse(),
-        o!("module" =>
-         FnValue(move |info| {
-              info.module()
-         })
-        ),
-    );
-
-    let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
-    op_log::set_logger(cli_logger);
-    logger
-}
+// fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
+//     let file_drain = build_file_drain(
+//         config.log().log_path().to_path_buf(),
+//         (*config.log().level()).into(),
+//     );
+//
+//     let logger = slog::Logger::root(
+//         file_drain.fuse(),
+//         o!("module" =>
+//          FnValue(move |info| {
+//               info.module()
+//          })
+//         ),
+//     );
+//
+//     let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
+//     op_log::set_logger(cli_logger);
+//     logger
+// }
 
 /// start engine and execute provided operation. Returns exit code
 fn local_run(
     current_dir: PathBuf,
     config: ConfigRef,
-    operation: ExecContext,
+    ctx: ExecContext,
     disp_format: DisplayFormat,
     verbose: u8,
 ) -> Result<u32, BasicDiag> {
-    let logger = init_logger(&config, verbose);
+    // let logger = init_logger(&config, verbose);
 
-    let engine = EngineRef::start(current_dir, config, logger.clone())?;
-    let outcome_fut: OutcomeFuture = engine.enqueue_operation(operation.into(), false)?;
+    let mut rt = EngineRef::<()>::build_runtime();
 
+    let out_res = rt.block_on(async {
+        let engine = EngineRef::new();
+        let e = engine.clone();
+        let res = tokio::spawn(async move {
+            let res = e.enqueue_with_res(ctx.into()).await;
+            e.stop();
+            res
+        });
+        engine.register_progress_cb(|_e, o| {
+            if !o.read().progress().is_done() {
+                println!("{}", o.read().progress())
+            }
+        });
+        let (_engine_result, res) = futures::future::join(engine.start(), res).await;
+        let op_res = res.unwrap();
+        op_res
+    });
+
+    let outcome = out_res?;
+
+    display::display_outcome(&outcome, disp_format);
+    Ok(0)
+/*
     let progress_fut = outcome_fut.progress().for_each(|p| {
         println!("=========================================");
         eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
@@ -119,6 +144,7 @@ fn local_run(
     )
     .unwrap();
     Ok(exit_code.load(Ordering::Relaxed))
+    */
 }
 
 fn main() {
@@ -152,15 +178,15 @@ fn main() {
 
     let cmd: ExecContext = match command {
         //////////////////////////////// CLI client options ////////////////////////////////
-        Command::Config { format } => {
-            disp_format = format;
-
-            ExecContext::ConfigGet
-        }
-        Command::Commit { message } => {
-            disp_format = DisplayFormat::Text;
-            ExecContext::ModelCommit(message)
-        }
+        // Command::Config { format } => {
+        //     disp_format = format;
+        //
+        //     ExecContext::ConfigGet
+        // }
+        // Command::Commit { message } => {
+        //     disp_format = DisplayFormat::Text;
+        //     ExecContext::ModelCommit(message)
+        // }
         Command::Query {
             expr,
             model,
@@ -169,90 +195,93 @@ fn main() {
             disp_format = format;
             ExecContext::ModelQuery { model, expr }
         }
-        Command::Test { format, model } => {
-            disp_format = format;
-            ExecContext::ModelTest { model }
-        }
-        Command::Diff {
-            format,
-            source,
-            target,
-        } => {
-            // FIXME fails when id provided instead of path (because of canonicalize)
-            disp_format = format;
-
-            ExecContext::ModelDiff {
-                prev_model: source,
-                next_model: target,
-            }
-        }
-        Command::Update {
-            format,
-            source,
-            target,
-            dry_run,
-        } => {
-            disp_format = format;
-            ExecContext::ModelUpdate {
-                prev_model: source,
-                next_model: target,
-                dry_run,
-            }
-        }
-        Command::Exec { path } => {
-            make_path_absolute(&path);
-            ExecContext::ProcExec { exec_path: path }
-        }
-        Command::Check {
-            model,
-            filter,
-            dry_run,
-        } => {
-            ExecContext::ModelCheck {
-                model,
-                filter,
-                dry_run,
-            }
-        }
-        Command::Probe {
-            model,
-            url,
-            password,
-            identity_file,
-            filter,
-            args,
-        } => {
-            let ssh_auth = if let Some(password) = password {
-                SshAuth::Password { password }
-            } else if let Some(identity_file) = identity_file {
-                SshAuth::PublicKey { identity_file }
-            } else {
-                SshAuth::Default
-            };
-
-            let ssh_dest = SshDest::from_url(&url, ssh_auth);
-
-            ExecContext::ModelProbe {
-                ssh_dest,
-                model,
-                filter,
-                args,
-            }
-        }
-        Command::Init { path } => ExecContext::ModelInit {
-            path: path.canonicalize().expect("Error resolving path"),
-        },
-        Command::Remote {
-            expr,
-            command,
-            model,
-        } => {
-            let command = command.join(" ");
-            ExecContext::RemoteExec {
-                expr,
-                command,
-                model_path: model,
-            }
+        // Command::Test { format, model } => {
+        //     disp_format = format;
+        //     ExecContext::ModelTest { model }
+        // }
+        // Command::Diff {
+        //     format,
+        //     source,
+        //     target,
+        // } => {
+        //     // FIXME fails when id provided instead of path (because of canonicalize)
+        //     disp_format = format;
+        //
+        //     ExecContext::ModelDiff {
+        //         prev_model: source,
+        //         next_model: target,
+        //     }
+        // }
+        // Command::Update {
+        //     format,
+        //     source,
+        //     target,
+        //     dry_run,
+        // } => {
+        //     disp_format = format;
+        //     ExecContext::ModelUpdate {
+        //         prev_model: source,
+        //         next_model: target,
+        //         dry_run,
+        //     }
+        // }
+        // Command::Exec { path } => {
+        //     make_path_absolute(&path);
+        //     ExecContext::ProcExec { exec_path: path }
+        // }
+        // Command::Check {
+        //     model,
+        //     filter,
+        //     dry_run,
+        // } => {
+        //     ExecContext::ModelCheck {
+        //         model,
+        //         filter,
+        //         dry_run,
+        //     }
+        // }
+        // Command::Probe {
+        //     model,
+        //     url,
+        //     password,
+        //     identity_file,
+        //     filter,
+        //     args,
+        // } => {
+        //     let ssh_auth = if let Some(password) = password {
+        //         SshAuth::Password { password }
+        //     } else if let Some(identity_file) = identity_file {
+        //         SshAuth::PublicKey { identity_file }
+        //     } else {
+        //         SshAuth::Default
+        //     };
+        //
+        //     let ssh_dest = SshDest::from_url(&url, ssh_auth);
+        //
+        //     ExecContext::ModelProbe {
+        //         ssh_dest,
+        //         model,
+        //         filter,
+        //         args,
+        //     }
+        // }
+        // Command::Init { path } => ExecContext::ModelInit {
+        //     path: path.canonicalize().expect("Error resolving path"),
+        // },
+        // Command::Remote {
+        //     expr,
+        //     command,
+        //     model,
+        // } => {
+        //     let command = command.join(" ");
+        //     ExecContext::RemoteExec {
+        //         expr,
+        //         command,
+        //         model_path: model,
+        //     }
+        // }
+        _ => {
+            unimplemented!()
         }
     };
 
