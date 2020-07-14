@@ -19,8 +19,6 @@ mod tests {
     use super::*;
     use crate::operation::OperationResult;
     use async_trait::*;
-    use futures::lock::MutexGuard;
-    use std::any::Any;
     use tokio::time::{Duration, Interval};
 
     struct TestOp {
@@ -72,7 +70,7 @@ mod tests {
             let s = service.get_mut();
             s.set_counter(s.counter() + 1);
             eprintln!("counter = {:?}", s.counter());
-            s.foo().await;
+            // s.foo().await;
             drop(service); // keep critical section as small as possible
 
             //println!("progress: {}", operation.read().name);

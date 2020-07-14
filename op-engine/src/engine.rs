@@ -1,10 +1,12 @@
 use crate::{OperationImpl, OperationRef};
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::{SyncRef, SyncRefMapReadGuard, SyncRefReadGuard};
-use std::collections::{VecDeque, HashMap};
+use std::collections::{HashMap, VecDeque};
 
 use crate::operation::OperationResult;
 use futures::lock::{Mutex, MutexGuard};
+use kg_diag::Detail;
+use serde::export::PhantomData;
 use std::any::{Any, TypeId};
 use std::future::Future;
 use std::pin::Pin;
@@ -13,8 +15,6 @@ use std::task::{Context, Poll, Waker};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use uuid::Uuid;
-use serde::export::PhantomData;
-use kg_diag::{Diag, Detail};
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -85,17 +85,17 @@ type Service = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: HashMap<TypeId, Service>
+    services: HashMap<TypeId, Service>,
 }
 
 impl<T: Clone + 'static> EngineRef<T> {
-
     pub fn new() -> EngineRef<T> {
         EngineRef::with_services(vec![])
     }
 
     pub fn with_services(services: Vec<Box<dyn Any + Send + 'static>>) -> EngineRef<T> {
-        let services = services.into_iter()
+        let services = services
+            .into_iter()
             .map(|s| {
                 // use as_ref() to get type of boxed struct instead of Box
                 let type_id = s.as_ref().type_id();
@@ -106,7 +106,7 @@ impl<T: Clone + 'static> EngineRef<T> {
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
-            services
+            services,
         }
     }
 
@@ -244,19 +244,15 @@ pub struct EngineServiceGuard<'a, S> {
     guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
 }
 
-impl <S: 'static> EngineServiceGuard<'_, S> {
+impl<S: 'static> EngineServiceGuard<'_, S> {
     /// Get mutable reference to specific service.
     pub fn get_mut(&mut self) -> &mut S {
-        self.guard
-            .downcast_mut()
-            .expect("Unexpected service type")
+        self.guard.downcast_mut().expect("Unexpected service type")
     }
 
     /// Get reference to service.
     pub fn get(&self) -> &S {
-        self.guard
-            .downcast_ref()
-            .expect("Unexpected service type")
+        self.guard.downcast_ref().expect("Unexpected service type")
     }
 }
 
