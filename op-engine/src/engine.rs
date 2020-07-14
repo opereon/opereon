@@ -1,11 +1,11 @@
 use crate::{OperationImpl, OperationRef};
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::{SyncRef, SyncRefMapReadGuard, SyncRefReadGuard};
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 
 use crate::operation::OperationResult;
 use futures::lock::{Mutex, MutexGuard};
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -13,6 +13,8 @@ use std::task::{Context, Poll, Waker};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use uuid::Uuid;
+use serde::export::PhantomData;
+use kg_diag::{Diag, Detail};
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -77,28 +79,34 @@ impl<T: Clone + 'static> Core<T> {
     }
 }
 
-type Services = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
+type Service = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
 
 #[derive(Clone)]
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: Services,
+    services: HashMap<TypeId, Service>
 }
 
 impl<T: Clone + 'static> EngineRef<T> {
 
     pub fn new() -> EngineRef<T> {
-        EngineRef::with_services(())
+        EngineRef::with_services(vec![])
     }
 
-    pub fn with_services<S: Any + Send + 'static>(services: S) -> EngineRef<T> {
+    pub fn with_services(services: Vec<Box<dyn Any + Send + 'static>>) -> EngineRef<T> {
+        let services = services.into_iter()
+            .map(|s| {
+                // use as_ref() to get type of boxed struct instead of Box
+                let type_id = s.as_ref().type_id();
+                (type_id, Arc::new(Mutex::new(s)))
+            })
+            .collect::<HashMap<_, _>>();
+
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
-            services: Arc::new(Mutex::new(
-                Box::new(services) as Box<dyn Any + Send + 'static>
-            )),
+            services
         }
     }
 
@@ -217,33 +225,38 @@ impl<T: Clone + 'static> EngineRef<T> {
         }
     }
 
-    pub async fn services(&self) -> EngineServicesGuard<'_> {
-        let guard = self.services.lock().await;
-        EngineServicesGuard { guard }
+    pub async fn service<S: 'static>(&self) -> Option<EngineServiceGuard<'_, S>> {
+        let s = self.services.get(&TypeId::of::<S>());
+        if let Some(service) = s {
+            let guard = service.lock().await;
+            Some(EngineServiceGuard {
+                phantom: PhantomData::<S>,
+                guard,
+            })
+        } else {
+            None
+        }
     }
 }
 
-pub struct EngineServicesGuard<'a> {
+pub struct EngineServiceGuard<'a, S> {
+    phantom: PhantomData<S>,
     guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
 }
 
-impl EngineServicesGuard<'_> {
-    /// Get mutable reference to services.
-    /// # Panics
-    /// Panics if requested type is different from type registered in Engine constructor
-    pub fn get_mut<S: 'static>(&mut self) -> &mut S {
+impl <S: 'static> EngineServiceGuard<'_, S> {
+    /// Get mutable reference to specific service.
+    pub fn get_mut(&mut self) -> &mut S {
         self.guard
             .downcast_mut()
-            .expect("Unexpected engine services type")
+            .expect("Unexpected service type")
     }
 
-    /// Get reference to services.
-    /// # Panics
-    /// Panics if requested type is different from type registered in Engine constructor
-    pub fn get<S: 'static>(&self) -> &S {
+    /// Get reference to service.
+    pub fn get(&self) -> &S {
         self.guard
             .downcast_ref()
-            .expect("Unexpected engine services type")
+            .expect("Unexpected service type")
     }
 }
 
