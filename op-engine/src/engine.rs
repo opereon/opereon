@@ -79,13 +79,13 @@ impl<T: Clone + 'static> Core<T> {
     }
 }
 
-type Service = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
+pub type Service = Box<dyn Any + Send + 'static>;
 
 #[derive(Clone)]
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: HashMap<TypeId, Service>,
+    services: HashMap<TypeId, Arc<Mutex<Service>>>,
 }
 
 impl<T: Clone + 'static> EngineRef<T> {

@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-use op_rev::RevPath;
-use op_exec2::command::ssh::SshDest;
-use op_engine::OperationRef;
-use crate::outcome::Outcome;
 use crate::ops::model::ModelQueryOperation;
+use crate::outcome::Outcome;
+use op_engine::OperationRef;
+use op_exec2::command::ssh::SshDest;
+use op_rev::RevPath;
+use std::path::PathBuf;
 
 #[derive(PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -98,10 +98,10 @@ impl Into<OperationRef<Outcome>> for Context {
         let label = self.label().to_string();
         match self {
             Context::ModelQuery { model, expr } => {
-                let op_impl = ModelQueryOperation::new();
+                let op_impl = ModelQueryOperation::new(model, expr);
                 OperationRef::new(label, op_impl)
             }
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 }

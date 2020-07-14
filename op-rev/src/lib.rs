@@ -34,12 +34,12 @@ pub trait FileVersionManager: std::fmt::Debug {
 }
 
 
-pub fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager>, BasicDiag> {
+pub fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
     let git = GitManager::open(repo_path)?;
     Ok(Box::new(git))
 }
 
-pub fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager>, BasicDiag> {
+pub fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
     let git = GitManager::create(repo_path)?;
     Ok(Box::new(git))
 }

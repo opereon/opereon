@@ -5,11 +5,11 @@ use kg_diag::io::ResultExt;
 use crate::utils::spawn_blocking;
 use shared_child::SharedChild;
 use std::io::{BufRead, BufReader, Read};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::process::{Command, ExitStatus};
 use std::sync::Arc;
 use tokio::sync::oneshot;
-use std::path::PathBuf;
 
 pub mod local;
 pub mod ssh;
@@ -107,8 +107,8 @@ impl<'a> SourceRef<'a> {
 
     pub fn to_owned(&self) -> Source {
         match self {
-            SourceRef::Path(p) => { Source::Path(p.to_path_buf()) }
-            SourceRef::Source(src) => { Source::Source(src.to_string()) }
+            SourceRef::Path(p) => Source::Path(p.to_path_buf()),
+            SourceRef::Source(src) => Source::Source(src.to_string()),
         }
     }
 }
@@ -121,8 +121,8 @@ pub enum Source {
 impl Source {
     pub fn as_ref(&self) -> SourceRef<'_> {
         match self {
-            Source::Path(p) => { SourceRef::Path(p.as_path()) }
-            Source::Source(src) => { SourceRef::Source(src.as_str()) }
+            Source::Path(p) => SourceRef::Path(p.as_path()),
+            Source::Source(src) => SourceRef::Source(src.as_str()),
         }
     }
 }
@@ -205,7 +205,7 @@ impl CommandBuilder {
         self
     }
 
-    pub fn args<S: Into<String>, I: Iterator<Item=S>>(&mut self, args: I) -> &mut CommandBuilder {
+    pub fn args<S: Into<String>, I: Iterator<Item = S>>(&mut self, args: I) -> &mut CommandBuilder {
         for a in args {
             self.args.push(a.into());
         }
@@ -295,7 +295,9 @@ impl CommandBuilder {
         use std::fmt::Write;
         let mut out = String::new();
 
-        let envs = self.envs.iter()
+        let envs = self
+            .envs
+            .iter()
             .map(|(k, v)| format!("{}='{}'", k, v))
             .collect::<Vec<String>>()
             .join(" ");

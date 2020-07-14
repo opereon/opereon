@@ -1,12 +1,16 @@
-use std::borrow::Cow;
-use std::ops::Deref;
-use std::sync::Arc;
+use kg_diag::io::fs;
 use kg_diag::Severity;
+use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
+use kg_tree::diff::NodeDiffOptions;
 use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
 use kg_tree::serial::{from_tree, to_tree};
+use kg_tree::NodeRef;
 use regex::{Captures, Regex};
-// use slog::Level;
-
+use slog::Level;
+use std::borrow::Cow;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 pub type ConfigResult<T> = Result<T, BasicDiag>;
 
 #[derive(Debug, Display, Detail)]
@@ -27,13 +31,6 @@ pub enum ConfigErrorDetail {
     #[display(fmt = "cannot create config")]
     DeserializationErr,
 }
-
-use super::*;
-use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
-use std::path::{PathBuf, Path};
-use kg_tree::diff::NodeDiffOptions;
-use kg_diag::io::fs;
-use kg_tree::NodeRef;
 
 pub fn resolve_env_vars(input: &str) -> Cow<str> {
     use std::env;
@@ -149,18 +146,19 @@ pub enum LogLevel {
     Debug,
     Trace,
 }
-// impl Into<Level> for LogLevel {
-//     fn into(self) -> Level {
-//         match self {
-//             LogLevel::Trace => Level::Trace,
-//             LogLevel::Debug => Level::Debug,
-//             LogLevel::Info => Level::Info,
-//             LogLevel::Warning => Level::Warning,
-//             LogLevel::Error => Level::Error,
-//             LogLevel::Critical => Level::Critical,
-//         }
-//     }
-// }
+
+impl Into<Level> for LogLevel {
+    fn into(self) -> Level {
+        match self {
+            LogLevel::Trace => Level::Trace,
+            LogLevel::Debug => Level::Debug,
+            LogLevel::Info => Level::Info,
+            LogLevel::Warning => Level::Warning,
+            LogLevel::Error => Level::Error,
+            LogLevel::Critical => Level::Critical,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -230,7 +228,7 @@ impl Config {
             return Err(ConfigErrorDetail::NotFound {
                 paths: path_list.to_string(),
             }
-                .into());
+            .into());
         }
 
         let mut r = TreeResolver::with_delims("${", "}");

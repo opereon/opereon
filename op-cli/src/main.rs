@@ -40,25 +40,25 @@ fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
 
-// fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
-//     let file_drain = build_file_drain(
-//         config.log().log_path().to_path_buf(),
-//         (*config.log().level()).into(),
-//     );
-//
-//     let logger = slog::Logger::root(
-//         file_drain.fuse(),
-//         o!("module" =>
-//          FnValue(move |info| {
-//               info.module()
-//          })
-//         ),
-//     );
-//
-//     let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
-//     op_log::set_logger(cli_logger);
-//     logger
-// }
+fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
+    let file_drain = build_file_drain(
+        config.log().log_path().to_path_buf(),
+        (*config.log().level()).into(),
+    );
+
+    let logger = slog::Logger::root(
+        file_drain.fuse(),
+        o!("module" =>
+         FnValue(move |info| {
+              info.module()
+         })
+        ),
+    );
+
+    let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
+    op_log::set_logger(cli_logger);
+    logger
+}
 
 /// start engine and execute provided operation. Returns exit code
 fn local_run(
@@ -68,12 +68,15 @@ fn local_run(
     disp_format: DisplayFormat,
     verbose: u8,
 ) -> Result<u32, BasicDiag> {
-    // let logger = init_logger(&config, verbose);
+    let logger = init_logger(&config, verbose);
 
     let mut rt = EngineRef::<()>::build_runtime();
 
     let out_res = rt.block_on(async {
-        let engine = EngineRef::new();
+        let services = init_services(current_dir, config, logger).await;
+
+        let engine = EngineRef::with_services(services);
+
         let e = engine.clone();
         let res = tokio::spawn(async move {
             let res = e.enqueue_with_res(ctx.into()).await;
