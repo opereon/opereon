@@ -26,6 +26,7 @@ mod utils;
 pub mod config;
 pub mod context;
 pub mod outcome;
+pub mod state;
 
 pub async fn init_services(
     repo_path: PathBuf,

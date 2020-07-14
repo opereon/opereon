@@ -121,7 +121,7 @@ mod tests {
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
 
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let mut cfg = SshConfig::default();
@@ -168,7 +168,7 @@ mod tests {
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
 
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let mut cfg = SshConfig::default();

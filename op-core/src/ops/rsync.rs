@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn cancel_file_copy_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn file_copy_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
         let cfg = RsyncConfig::default();
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn compare_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn cancel_compare_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 

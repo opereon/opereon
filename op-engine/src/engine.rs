@@ -80,20 +80,25 @@ impl<T: Clone + 'static> Core<T> {
 }
 
 pub type Service = Box<dyn Any + Send + 'static>;
+pub type State = Box<dyn Any + Send + Sync + 'static>;
 
 #[derive(Clone)]
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: HashMap<TypeId, Arc<Mutex<Service>>>,
+    services: Arc<HashMap<TypeId, Arc<Mutex<Service>>>>,
+    state: Arc<State>,
 }
 
 impl<T: Clone + 'static> EngineRef<T> {
-    pub fn new() -> EngineRef<T> {
-        EngineRef::with_services(vec![])
+    pub fn default() -> EngineRef<T> {
+        EngineRef::new(vec![], ())
     }
 
-    pub fn with_services(services: Vec<Box<dyn Any + Send + 'static>>) -> EngineRef<T> {
+    pub fn new<S: Any + Send + Sync + 'static>(
+        services: Vec<Box<dyn Any + Send + 'static>>,
+        state: S,
+    ) -> EngineRef<T> {
         let services = services
             .into_iter()
             .map(|s| {
@@ -106,7 +111,8 @@ impl<T: Clone + 'static> EngineRef<T> {
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
-            services,
+            services: Arc::new(services),
+            state: Arc::new(Box::new(state)),
         }
     }
 
@@ -236,6 +242,10 @@ impl<T: Clone + 'static> EngineRef<T> {
         } else {
             None
         }
+    }
+
+    pub fn state<S: 'static>(&self) -> Option<&S> {
+        self.state.downcast_ref::<S>()
     }
 }
 

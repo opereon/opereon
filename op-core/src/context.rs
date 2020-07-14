@@ -1,3 +1,4 @@
+use crate::ops::config::ConfigGetOperation;
 use crate::ops::model::ModelQueryOperation;
 use crate::outcome::Outcome;
 use op_engine::OperationRef;
@@ -97,6 +98,10 @@ impl Into<OperationRef<Outcome>> for Context {
     fn into(self) -> OperationRef<Outcome> {
         let label = self.label().to_string();
         match self {
+            Context::ConfigGet => {
+                let op_impl = ConfigGetOperation::new();
+                OperationRef::new(label, op_impl)
+            }
             Context::ModelQuery { model, expr } => {
                 let op_impl = ModelQueryOperation::new(model, expr);
                 OperationRef::new(label, op_impl)

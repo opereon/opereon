@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn local_command_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = LocalConfig::default();
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn local_script_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = LocalConfig::default();

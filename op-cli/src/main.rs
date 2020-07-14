@@ -27,6 +27,7 @@ use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
 use op_engine::EngineRef;
 use op_core::outcome::Outcome;
+use op_core::state::CoreState;
 
 mod display;
 mod options;
@@ -73,9 +74,10 @@ fn local_run(
     let mut rt = EngineRef::<()>::build_runtime();
 
     let out_res = rt.block_on(async {
-        let services = init_services(current_dir, config, logger).await;
+        let services = init_services(current_dir, config.clone(), logger).await;
+        let state = CoreState::new(config);
 
-        let engine = EngineRef::with_services(services);
+        let engine = EngineRef::new(services, state);
 
         let e = engine.clone();
         let res = tokio::spawn(async move {
@@ -181,11 +183,11 @@ fn main() {
 
     let cmd: ExecContext = match command {
         //////////////////////////////// CLI client options ////////////////////////////////
-        // Command::Config { format } => {
-        //     disp_format = format;
-        //
-        //     ExecContext::ConfigGet
-        // }
+        Command::Config { format } => {
+            disp_format = format;
+
+            ExecContext::ConfigGet
+        }
         // Command::Commit { message } => {
         //     disp_format = DisplayFormat::Text;
         //     ExecContext::ModelCommit(message)

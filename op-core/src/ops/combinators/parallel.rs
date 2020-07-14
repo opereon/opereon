@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn parallel_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![TestOp::new_op(1), TestOp::new_op(1), TestOp::new_op(1)];
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn parallel_operation_first_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![TestOp::new_op(1), TestOp::new_op(1), TestOp::new_op(1)];
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn cancel_parallel_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![TestOp::new_op(5), TestOp::new_op(5), TestOp::new_op(5)];
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn parallel_operation_err_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![

@@ -36,5 +36,6 @@ macro_rules! command_operation_impl {
 
 mod combinators;
 mod command;
+pub mod config;
 pub mod model;
 mod rsync;

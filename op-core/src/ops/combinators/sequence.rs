@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn sequence_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![TestOp::new_op(1), TestOp::new_op(1), TestOp::new_op(1)];
