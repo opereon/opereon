@@ -15,6 +15,7 @@ use std::task::{Context, Poll, Waker};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use uuid::Uuid;
+use std::ops::{Deref, DerefMut};
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -263,6 +264,20 @@ impl<S: 'static> EngineServiceGuard<'_, S> {
     /// Get reference to service.
     pub fn get(&self) -> &S {
         self.guard.downcast_ref().expect("Unexpected service type")
+    }
+}
+
+impl <S: 'static> Deref for EngineServiceGuard<'_, S> {
+    type Target = S;
+
+    fn deref(&self) -> &S {
+        self.get()
+    }
+}
+
+impl <S: 'static> DerefMut for EngineServiceGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut S {
+        self.get_mut()
     }
 }
 

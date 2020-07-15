@@ -67,9 +67,9 @@ mod tests {
             _operation: &OperationRef<OutputType>,
         ) -> OperationResult<ProgressUpdate> {
             let mut service = engine.service::<TestService>().await.unwrap();
-            let s = service.get_mut();
-            s.set_counter(s.counter() + 1);
-            eprintln!("counter = {:?}", s.counter());
+            let counter = service.counter();
+            service.set_counter(counter + 1);
+            eprintln!("counter = {:?}", service.counter());
             // s.foo().await;
             drop(service); // keep critical section as small as possible
 
@@ -122,7 +122,7 @@ mod tests {
     fn test_operation() {
         let service = TestService::new();
 
-        let engine: EngineRef<String> = EngineRef::with_services(vec![Box::new(service)]);
+        let engine: EngineRef<String> = EngineRef::new(vec![Box::new(service)], ());
 
         engine.register_progress_cb(|e, _o| {
             print_progress(e, false);
