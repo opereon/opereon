@@ -170,7 +170,7 @@ impl Model {
         m.parse_defs()
             .map_err_as_cause(|| ModelErrorDetail::DefsParse)?;
 
-        return Ok(m);
+        Ok(m)
     }
 
     pub fn create(rev_info: RevInfo, logger: Logger) -> ModelResult<Model> {
@@ -341,7 +341,7 @@ impl Model {
 
         let scope_def = self.scoped.scope_def_mut();
 
-        scope_def.set_var_def("$defines".into(), ValueDef::Static(defs.into()));
+        scope_def.set_var_def("$defines".into(), ValueDef::Static(defs));
         scope_def.set_var_def(
             "$hosts".into(),
             ValueDef::Resolvable(manifest.defines().hosts().clone()),

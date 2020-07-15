@@ -154,11 +154,11 @@ impl ParsedModelDef for Step {
                 tasks,
             })
         } else {
-            return Err(DefsErrorDetail::UnexpectedPropType {
+            Err(DefsErrorDetail::UnexpectedPropType {
                 kind: node.data().kind(),
                 expected: vec![Kind::Object],
             }
-            .into());
+            .into())
         }
     }
 }

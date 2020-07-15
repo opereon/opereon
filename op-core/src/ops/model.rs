@@ -1,16 +1,16 @@
 use crate::outcome::Outcome;
 use crate::services::model_manager::ModelManager;
+use crate::state::CoreState;
 use async_trait::*;
 use kg_diag::DiagResultExt;
 use kg_diag::Severity;
+use kg_tree::diff::NodeDiff;
 use kg_tree::opath::Opath;
 use kg_tree::serial::to_tree;
 use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef};
 use op_model::{ModelDef, ScopedModelDef};
 use op_rev::RevPath;
-use kg_tree::diff::NodeDiff;
-use crate::state::CoreState;
 use std::path::PathBuf;
 
 #[derive(Debug, Detail, Display)]
@@ -54,7 +54,7 @@ impl OperationImpl<Outcome> for ModelQueryOperation {
 }
 
 pub struct ModelCommitOperation {
-    message: String
+    message: String,
 }
 
 impl ModelCommitOperation {
@@ -65,7 +65,11 @@ impl ModelCommitOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelCommitOperation {
-    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+    async fn done(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let _m = manager.commit(&self.message)?;
         Ok(Outcome::Empty)
@@ -109,7 +113,11 @@ impl ModelDiffOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelDiffOperation {
-    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+    async fn done(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let m1 = manager.resolve(&self.source)?;
         let m2 = manager.resolve(&self.target)?;
@@ -127,7 +135,7 @@ impl OperationImpl<Outcome> for ModelDiffOperation {
 }
 
 pub struct ModelInitOperation {
-    path: PathBuf
+    path: PathBuf,
 }
 
 impl ModelInitOperation {
@@ -138,7 +146,11 @@ impl ModelInitOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelInitOperation {
-    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+    async fn done(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         manager.create_model(self.path.clone())?;
         Ok(Outcome::Empty)

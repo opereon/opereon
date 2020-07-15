@@ -1,32 +1,29 @@
 extern crate slog;
 extern crate structopt;
 
-#[macro_use]
-extern crate op_log;
-
 use op_core::*;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::Future;
+
 use structopt::StructOpt;
 use url::Url;
 
 use crate::slog::Drain;
 use display::DisplayFormat;
-use futures::stream::Stream;
-use kg_diag::{BasicDiag, Diag};
+
+use kg_diag::{BasicDiag};
 use op_rev::{RevPath};
 use op_log::{build_file_drain, CliLogger};
 use options::*;
-use slog::{FnValue, o, error};
-use std::sync::atomic::*;
-use std::sync::Arc;
-use tokio::runtime;
+use slog::{FnValue, o};
+
+
+
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
 use op_engine::EngineRef;
-use op_core::outcome::Outcome;
+
 use op_core::state::CoreState;
 
 mod display;
@@ -91,8 +88,7 @@ fn local_run(
             }
         });
         let (_engine_result, res) = futures::future::join(engine.start(), res).await;
-        let op_res = res.unwrap();
-        op_res
+        res.unwrap()
     });
 
     let outcome = out_res?;

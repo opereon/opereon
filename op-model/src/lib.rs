@@ -25,19 +25,19 @@ use kg_utils::collections::LinkedHashMap;
 use op_rev::*;
 use slog::{o, warn, Logger};
 
-pub static DEFAULT_CONFIG_FILENAME: &'static str = ".operc";
-pub static DEFAULT_MANIFEST_FILENAME: &'static str = "op.toml";
-pub static DEFAULT_WORK_DIR_PATH: &'static str = ".op/";
+pub static DEFAULT_CONFIG_FILENAME: &str = ".operc";
+pub static DEFAULT_MANIFEST_FILENAME: &str = "op.toml";
+pub static DEFAULT_WORK_DIR_PATH: &str = ".op/";
 
 // language=toml
-pub static INITIAL_MANIFEST: &'static str = r#"
+pub static INITIAL_MANIFEST: &str = r#"
 [info]
 authors = [""]
 description = ""
 "#;
 
 // language=toml
-pub static INITIAL_CONFIG: &'static str = r#"
+pub static INITIAL_CONFIG: &str = r#"
 [[exclude]]
 path = "*.sh"
 "#;

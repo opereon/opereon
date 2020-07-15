@@ -139,35 +139,35 @@ fn prepare_script<W: std::io::Write>(
 
     let script = script.read()?;
 
-    write!(out, "#!/usr/bin/env bash\n")?;
+    writeln!(out, "#!/usr/bin/env bash")?;
 
     if let Some(cwd) = cwd {
-        write!(out, "cd \"{}\"\n", cwd.display())?;
+        writeln!(out, "cd \"{}\"", cwd.display())?;
     }
     if let Some(env) = env {
         for (k, v) in env {
-            write!(out, "export {}='{}'\n", k, v)?;
+            writeln!(out, "export {}='{}'", k, v)?;
         }
     }
 
     // Create temp script file in ramdisk
     let tmp_path = format!("/dev/shm/op_{:0x}", rng.gen::<u64>());
-    write!(out, "cat > {} <<-'%%EOF%%'\n", tmp_path)?;
-    write!(out, "{}\n", script.trim())?;
-    write!(out, "%%EOF%%\n")?;
+    writeln!(out, "cat > {} <<-'%%EOF%%'", tmp_path)?;
+    writeln!(out, "{}", script.trim())?;
+    writeln!(out, "%%EOF%%")?;
 
     // Make temp script executable
-    write!(out, "chmod +x {}\n", tmp_path)?;
+    writeln!(out, "chmod +x {}", tmp_path)?;
 
     // Execute tmp script
     if args.is_empty() {
-        write!(out, "({})\n", tmp_path)?;
+        writeln!(out, "({})", tmp_path)?;
     } else {
         write!(out, "({}", tmp_path)?;
         for arg in args {
             write!(out, " \'{}\'", arg)?;
         }
-        write!(out, ")\n")?;
+        writeln!(out, ")")?;
     }
 
     // Capture script status

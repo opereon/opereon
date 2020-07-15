@@ -203,7 +203,7 @@ impl Config {
         self.exclude_globset()
             .matches_candidate_into(&cpath, &mut matches);
         for &i in matches.iter() {
-            let ref exclude = self.excludes[i];
+            let exclude = &self.excludes[i];
             if exclude.matches_file_type(file_type) {
                 return None;
             }
@@ -212,7 +212,7 @@ impl Config {
         self.include_globset()
             .matches_candidate_into(&cpath, &mut matches);
         for &i in matches.iter() {
-            let ref include = self.includes[i];
+            let include = &self.includes[i];
             if include.matches_file_type(file_type) {
                 return Some(include);
             }

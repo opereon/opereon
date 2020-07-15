@@ -92,7 +92,7 @@ impl FileCopyOperation {
     }
 }
 
-fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
+fn build_progress(diffs: &[DiffInfo]) -> Progress {
     let mut parts = vec![];
 
     for diff in diffs {
@@ -105,8 +105,7 @@ fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
             ));
         }
     }
-    let progress = Progress::from_parts(parts);
-    progress
+    Progress::from_parts(parts)
 }
 
 #[async_trait]

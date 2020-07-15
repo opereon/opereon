@@ -97,8 +97,8 @@ impl SpawnableCommand for SshScriptOperation {
             self.script.as_ref(),
             &self.args,
             self.env.as_ref(),
-            self.cwd.as_ref().map(|c| c.as_path()),
-            self.run_as.as_ref().map(|s| s.as_str()),
+            self.cwd.as_deref(),
+            self.run_as.as_deref(),
             &self.log,
         )
     }

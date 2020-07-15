@@ -61,11 +61,11 @@ impl NodeRefExt for NodeRef {
 
     fn get_key(&self, key: &str) -> NodeRef {
         self.get_child_key(key)
-            .expect(&format!("key not found: '{}'", key))
+            .unwrap_or_else(|| panic!("key not found: '{}'", key))
     }
 
     fn get_idx(&self, idx: usize) -> NodeRef {
         self.get_child_index(idx)
-            .expect(&format!("index not found: '{}'", idx))
+            .unwrap_or_else(|| panic!("index not found: '{}'", idx))
     }
 }

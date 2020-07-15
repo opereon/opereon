@@ -1,8 +1,11 @@
 use crate::ops::config::ConfigGetOperation;
-use crate::ops::model::{ModelQueryOperation, ModelTestOperation, ModelDiffOperation, ModelCommitOperation, ModelInitOperation};
+use crate::ops::model::{
+    ModelCommitOperation, ModelDiffOperation, ModelInitOperation, ModelQueryOperation,
+    ModelTestOperation,
+};
 use crate::outcome::Outcome;
 use op_engine::operation::OperationImplExt;
-use op_engine::{OperationImpl, OperationRef};
+use op_engine::OperationRef;
 use op_exec2::command::ssh::SshDest;
 use op_rev::RevPath;
 use std::path::PathBuf;
@@ -99,20 +102,53 @@ impl Into<OperationRef<Outcome>> for Context {
     fn into(self) -> OperationRef<Outcome> {
         let label = self.label().to_string();
         let op_impl = match self {
-            Context::ModelInit {path} => ModelInitOperation::new(path).boxed(),
+            Context::ModelInit { path } => ModelInitOperation::new(path).boxed(),
             Context::ConfigGet => ConfigGetOperation::new().boxed(),
             Context::ModelCommit(message) => ModelCommitOperation::new(message).boxed(),
             Context::ModelQuery { model, expr } => ModelQueryOperation::new(model, expr).boxed(),
             Context::ModelTest { model } => ModelTestOperation::new(model).boxed(),
-            Context::ModelDiff { prev_model, next_model } => ModelDiffOperation::new(prev_model, next_model).boxed(),
-            Context::ModelUpdate { prev_model, next_model, dry_run } => { unimplemented!()}
-            Context::ModelCheck { model, filter, dry_run } => { unimplemented!()}
-            Context::ModelProbe { ssh_dest, model, filter, args } => { unimplemented!()}
-            Context::ProcExec { exec_path } => { unimplemented!()}
-            Context::StepExec { exec_path, step_index } => { unimplemented!()}
-            Context::TaskExec { exec_path, step_index, task_index } => { unimplemented!()}
-            Context::FileCopyExec { curr_dir, src_path, dst_path, chown, chmod } => { unimplemented!()}
-            Context::RemoteExec { expr, command, model_path } => { unimplemented!()}
+            Context::ModelDiff {
+                prev_model,
+                next_model,
+            } => ModelDiffOperation::new(prev_model, next_model).boxed(),
+            Context::ModelUpdate {
+                prev_model: _,
+                next_model: _,
+                dry_run: _,
+            } => unimplemented!(),
+            Context::ModelCheck {
+                model: _,
+                filter: _,
+                dry_run: _,
+            } => unimplemented!(),
+            Context::ModelProbe {
+                ssh_dest: _,
+                model: _,
+                filter: _,
+                args: _,
+            } => unimplemented!(),
+            Context::ProcExec { exec_path: _ } => unimplemented!(),
+            Context::StepExec {
+                exec_path: _,
+                step_index: _,
+            } => unimplemented!(),
+            Context::TaskExec {
+                exec_path: _,
+                step_index: _,
+                task_index: _,
+            } => unimplemented!(),
+            Context::FileCopyExec {
+                curr_dir: _,
+                src_path: _,
+                dst_path: _,
+                chown: _,
+                chmod: _,
+            } => unimplemented!(),
+            Context::RemoteExec {
+                expr: _,
+                command: _,
+                model_path: _,
+            } => unimplemented!(),
         };
         OperationRef::new(label, op_impl)
     }

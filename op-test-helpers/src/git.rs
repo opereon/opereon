@@ -18,5 +18,4 @@ pub fn initial_commit(path: &Path) -> git2::Oid {
     let tree = repo.find_tree(tree_id).unwrap();
     repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
         .unwrap()
-        .into()
 }

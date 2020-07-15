@@ -14,7 +14,7 @@ extern crate kg_display_derive;
 #[macro_use]
 extern crate slog;
 
-use crate::config::{ConfigRef, ModelConfig};
+use crate::config::ConfigRef;
 use crate::services::model_manager::ModelManager;
 use op_engine::engine::Service;
 use std::path::PathBuf;

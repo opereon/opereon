@@ -3,8 +3,7 @@ use crate::outcome::Outcome;
 use async_trait::*;
 use op_engine::operation::OperationResult;
 use op_engine::progress::{Progress, Unit};
-use op_engine::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
-use tokio::task::JoinHandle;
+use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
 pub struct SequenceOperation {
     ops: Vec<OperationRef<Outcome>>,
@@ -73,10 +72,6 @@ mod tests {
     use op_engine::operation::{OperationImplExt, OperationResult};
     use op_engine::{EngineRef, OperationImpl, OperationRef};
     use tokio::time::Duration;
-
-    use crate::ops::combinators::parallel::ParallelOperation;
-    use async_trait::*;
-    use kg_diag::io::ResultExt;
 
     pub struct TestOp {
         should_fail: bool,

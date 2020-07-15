@@ -203,7 +203,7 @@ impl FileVersionManager for GitManager {
             } else {
                 fs::create_dir_all(&checkout_path)?;
 
-                let tree = self.get_tree(rev_id.into())?;
+                let tree = self.get_tree(rev_id)?;
 
                 let mut opts = CheckoutBuilder::new();
                 opts.target_dir(&checkout_path);

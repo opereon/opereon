@@ -1,7 +1,7 @@
 use crate::ops::combinators::handle_cancel;
 use crate::outcome::Outcome;
 use async_trait::*;
-use futures::Future;
+
 use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 use tokio::task::JoinHandle;
@@ -103,8 +103,6 @@ mod tests {
     use tokio::time::Duration;
 
     use crate::ops::combinators::parallel::ParallelOperation;
-    use async_trait::*;
-    use kg_diag::io::ResultExt;
 
     pub struct TestOp {
         should_fail: bool,
