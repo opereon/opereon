@@ -9,13 +9,13 @@ use kg_diag::Detail;
 use serde::export::PhantomData;
 use std::any::{Any, TypeId};
 use std::future::Future;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use uuid::Uuid;
-use std::ops::{Deref, DerefMut};
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -267,7 +267,7 @@ impl<S: 'static> EngineServiceGuard<'_, S> {
     }
 }
 
-impl <S: 'static> Deref for EngineServiceGuard<'_, S> {
+impl<S: 'static> Deref for EngineServiceGuard<'_, S> {
     type Target = S;
 
     fn deref(&self) -> &S {
@@ -275,7 +275,7 @@ impl <S: 'static> Deref for EngineServiceGuard<'_, S> {
     }
 }
 
-impl <S: 'static> DerefMut for EngineServiceGuard<'_, S> {
+impl<S: 'static> DerefMut for EngineServiceGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut S {
         self.get_mut()
     }

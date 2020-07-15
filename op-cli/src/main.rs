@@ -99,57 +99,6 @@ fn local_run(
 
     display::display_outcome(&outcome, disp_format);
     Ok(0)
-/*
-    let progress_fut = outcome_fut.progress().for_each(|p| {
-        println!("=========================================");
-        eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-        for p in p.steps() {
-            if let Some(ref file_name) = p.file_name() {
-                eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-            } else {
-                eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-            }
-        }
-        //            eprintln!("p = {:#?}", p);
-        Ok(())
-    });
-
-    let progress_fut = progress_fut.map_err(|err| {
-        eprintln!("progress error \n{}", err);
-    });
-
-    let engine_fut = engine.clone().then(|_| {
-        // Nothing to do when engine future complete
-        futures::future::ok(())
-    });
-
-    let exit_code = Arc::new(AtomicU32::new(0));
-    let code = exit_code.clone();
-    let outcome_fut = outcome_fut
-        .and_then(move |outcome| {
-            display::display_outcome(&outcome, disp_format);
-            futures::future::ok(())
-        })
-        .map_err(move |err| {
-            use kg_diag::Diag;
-            code.store(err.detail().code(), Ordering::Relaxed);
-            error!(logger, "Operation execution error"; "err" => err.to_string());
-            op_error!(0, "Operation execution error:\n{}", err);
-        })
-        .then(move |_| {
-            engine.stop();
-            futures::future::ok::<(), ()>(())
-        });
-
-    let mut rt = runtime::Builder::new().build().unwrap();
-    rt.block_on(
-        outcome_fut
-            .join3(engine_fut, progress_fut)
-            .then(|_| futures::future::ok::<(), ()>(())),
-    )
-    .unwrap();
-    Ok(exit_code.load(Ordering::Relaxed))
-    */
 }
 
 fn main() {
@@ -200,10 +149,10 @@ fn main() {
             disp_format = format;
             ExecContext::ModelQuery { model, expr }
         }
-        // Command::Test { format, model } => {
-        //     disp_format = format;
-        //     ExecContext::ModelTest { model }
-        // }
+        Command::Test { format, model } => {
+            disp_format = format;
+            ExecContext::ModelTest { model }
+        }
         // Command::Diff {
         //     format,
         //     source,

@@ -109,6 +109,7 @@ command_operation_impl!(LocalScriptOperation);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use op_engine::operation::OperationImplExt;
 
     #[test]
     fn local_command_operation_test() {
@@ -135,7 +136,7 @@ mod tests {
             &cfg,
             &log,
         );
-        let op = OperationRef::new("local_command", op_impl);
+        let op = OperationRef::new("local_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -198,7 +199,7 @@ mod tests {
             &cfg,
             &log,
         );
-        let op = OperationRef::new("local_script", op_impl);
+        let op = OperationRef::new("local_script", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();

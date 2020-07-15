@@ -109,6 +109,7 @@ command_operation_impl!(SshScriptOperation);
 mod tests {
     use super::*;
     use crate::outcome::Outcome;
+    use op_engine::operation::OperationImplExt;
     use op_engine::{EngineRef, OperationRef};
     use op_exec2::command::ssh::{SshAuth, SshConfig};
     use op_exec2::command::SourceRef;
@@ -146,7 +147,7 @@ mod tests {
             &dest,
             &cache,
         );
-        let op = OperationRef::new("ssh_command", op_impl);
+        let op = OperationRef::new("ssh_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -214,7 +215,7 @@ mod tests {
             &dest,
             &cache,
         );
-        let op = OperationRef::new("ssh_command", op_impl);
+        let op = OperationRef::new("ssh_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();

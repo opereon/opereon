@@ -1,7 +1,8 @@
 use crate::ops::config::ConfigGetOperation;
-use crate::ops::model::ModelQueryOperation;
+use crate::ops::model::{ModelQueryOperation, ModelTestOperation};
 use crate::outcome::Outcome;
-use op_engine::OperationRef;
+use op_engine::operation::OperationImplExt;
+use op_engine::{OperationImpl, OperationRef};
 use op_exec2::command::ssh::SshDest;
 use op_rev::RevPath;
 use std::path::PathBuf;
@@ -97,16 +98,12 @@ impl Context {
 impl Into<OperationRef<Outcome>> for Context {
     fn into(self) -> OperationRef<Outcome> {
         let label = self.label().to_string();
-        match self {
-            Context::ConfigGet => {
-                let op_impl = ConfigGetOperation::new();
-                OperationRef::new(label, op_impl)
-            }
-            Context::ModelQuery { model, expr } => {
-                let op_impl = ModelQueryOperation::new(model, expr);
-                OperationRef::new(label, op_impl)
-            }
+        let op_impl = match self {
+            Context::ConfigGet => ConfigGetOperation::new().boxed(),
+            Context::ModelQuery { model, expr } => ModelQueryOperation::new(model, expr).boxed(),
+            Context::ModelTest { model } => ModelTestOperation::new(model).boxed(),
             _ => unimplemented!(),
-        }
+        };
+        OperationRef::new(label, op_impl)
     }
 }

@@ -17,7 +17,7 @@ pub use progress::ProgressUpdate;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operation::OperationResult;
+    use crate::operation::{OperationImplExt, OperationResult};
     use async_trait::*;
     use tokio::time::{Duration, Interval};
 
@@ -135,11 +135,11 @@ mod tests {
         rt.block_on(async move {
             let e = engine.clone();
             tokio::spawn(async move {
-                engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new()));
-                engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new()));
-                engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new()));
+                engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new().boxed()));
+                engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new().boxed()));
+                engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new().boxed()));
                 engine
-                    .enqueue_with_res(OperationRef::new("ddd4", TestOp::new()))
+                    .enqueue_with_res(OperationRef::new("ddd4", TestOp::new().boxed()))
                     .await
                     .unwrap();
                 engine.stop()

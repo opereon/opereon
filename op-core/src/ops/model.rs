@@ -4,6 +4,7 @@ use async_trait::*;
 use kg_diag::DiagResultExt;
 use kg_diag::Severity;
 use kg_tree::opath::Opath;
+use kg_tree::serial::to_tree;
 use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef};
 use op_model::{ModelDef, ScopedModelDef};
@@ -45,6 +46,30 @@ impl OperationImpl<Outcome> for ModelQueryOperation {
             expr.apply_ext(m.root(), m.root(), &scope)?
         };
 
+        Ok(Outcome::NodeSet(res.into()))
+    }
+}
+
+pub struct ModelTestOperation {
+    model_path: RevPath,
+}
+
+impl ModelTestOperation {
+    pub fn new(model_path: RevPath) -> Self {
+        ModelTestOperation { model_path }
+    }
+}
+
+#[async_trait]
+impl OperationImpl<Outcome> for ModelTestOperation {
+    async fn done(
+        &mut self,
+        engine: &EngineRef<Outcome>,
+        _operation: &OperationRef<Outcome>,
+    ) -> OperationResult<Outcome> {
+        let mut manager = engine.service::<ModelManager>().await.unwrap();
+        let model = manager.resolve(&self.model_path)?;
+        let res = to_tree(&*model.lock()).unwrap();
         Ok(Outcome::NodeSet(res.into()))
     }
 }
