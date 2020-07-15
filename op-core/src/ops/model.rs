@@ -9,6 +9,9 @@ use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef};
 use op_model::{ModelDef, ScopedModelDef};
 use op_rev::RevPath;
+use kg_tree::diff::NodeDiff;
+use crate::state::CoreState;
+use std::path::PathBuf;
 
 #[derive(Debug, Detail, Display)]
 pub enum ModelOpErrorDetail {
@@ -50,6 +53,25 @@ impl OperationImpl<Outcome> for ModelQueryOperation {
     }
 }
 
+pub struct ModelCommitOperation {
+    message: String
+}
+
+impl ModelCommitOperation {
+    pub fn new(message: String) -> Self {
+        ModelCommitOperation { message }
+    }
+}
+
+#[async_trait]
+impl OperationImpl<Outcome> for ModelCommitOperation {
+    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+        let mut manager = engine.service::<ModelManager>().await.unwrap();
+        let _m = manager.commit(&self.message)?;
+        Ok(Outcome::Empty)
+    }
+}
+
 pub struct ModelTestOperation {
     model_path: RevPath,
 }
@@ -71,5 +93,54 @@ impl OperationImpl<Outcome> for ModelTestOperation {
         let model = manager.resolve(&self.model_path)?;
         let res = to_tree(&*model.lock()).unwrap();
         Ok(Outcome::NodeSet(res.into()))
+    }
+}
+
+pub struct ModelDiffOperation {
+    source: RevPath,
+    target: RevPath,
+}
+
+impl ModelDiffOperation {
+    pub fn new(source: RevPath, target: RevPath) -> Self {
+        ModelDiffOperation { source, target }
+    }
+}
+
+#[async_trait]
+impl OperationImpl<Outcome> for ModelDiffOperation {
+    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+        let mut manager = engine.service::<ModelManager>().await.unwrap();
+        let m1 = manager.resolve(&self.source)?;
+        let m2 = manager.resolve(&self.target)?;
+        let state = engine.state::<CoreState>().unwrap();
+        let diff = {
+            NodeDiff::diff(
+                m1.lock().root(),
+                m2.lock().root(),
+                state.config().model().diff(),
+            )
+        };
+
+        Ok(Outcome::NodeSet(to_tree(&diff).unwrap().into()))
+    }
+}
+
+pub struct ModelInitOperation {
+    path: PathBuf
+}
+
+impl ModelInitOperation {
+    pub fn new(path: PathBuf) -> Self {
+        ModelInitOperation { path }
+    }
+}
+
+#[async_trait]
+impl OperationImpl<Outcome> for ModelInitOperation {
+    async fn done(&mut self, engine: &EngineRef<Outcome>, _operation: &OperationRef<Outcome>) -> OperationResult<Outcome> {
+        let mut manager = engine.service::<ModelManager>().await.unwrap();
+        manager.create_model(self.path.clone())?;
+        Ok(Outcome::Empty)
     }
 }

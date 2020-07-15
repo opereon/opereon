@@ -28,6 +28,8 @@ pub mod context;
 pub mod outcome;
 pub mod state;
 
+pub use op_exec2::command::ssh::{SshAuth, SshDest};
+
 pub async fn init_services(
     repo_path: PathBuf,
     config: ConfigRef,

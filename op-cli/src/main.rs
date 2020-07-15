@@ -137,10 +137,10 @@ fn main() {
 
             ExecContext::ConfigGet
         }
-        // Command::Commit { message } => {
-        //     disp_format = DisplayFormat::Text;
-        //     ExecContext::ModelCommit(message)
-        // }
+        Command::Commit { message } => {
+            disp_format = DisplayFormat::Text;
+            ExecContext::ModelCommit(message)
+        }
         Command::Query {
             expr,
             model,
@@ -153,89 +153,86 @@ fn main() {
             disp_format = format;
             ExecContext::ModelTest { model }
         }
-        // Command::Diff {
-        //     format,
-        //     source,
-        //     target,
-        // } => {
-        //     // FIXME fails when id provided instead of path (because of canonicalize)
-        //     disp_format = format;
-        //
-        //     ExecContext::ModelDiff {
-        //         prev_model: source,
-        //         next_model: target,
-        //     }
-        // }
-        // Command::Update {
-        //     format,
-        //     source,
-        //     target,
-        //     dry_run,
-        // } => {
-        //     disp_format = format;
-        //     ExecContext::ModelUpdate {
-        //         prev_model: source,
-        //         next_model: target,
-        //         dry_run,
-        //     }
-        // }
-        // Command::Exec { path } => {
-        //     make_path_absolute(&path);
-        //     ExecContext::ProcExec { exec_path: path }
-        // }
-        // Command::Check {
-        //     model,
-        //     filter,
-        //     dry_run,
-        // } => {
-        //     ExecContext::ModelCheck {
-        //         model,
-        //         filter,
-        //         dry_run,
-        //     }
-        // }
-        // Command::Probe {
-        //     model,
-        //     url,
-        //     password,
-        //     identity_file,
-        //     filter,
-        //     args,
-        // } => {
-        //     let ssh_auth = if let Some(password) = password {
-        //         SshAuth::Password { password }
-        //     } else if let Some(identity_file) = identity_file {
-        //         SshAuth::PublicKey { identity_file }
-        //     } else {
-        //         SshAuth::Default
-        //     };
-        //
-        //     let ssh_dest = SshDest::from_url(&url, ssh_auth);
-        //
-        //     ExecContext::ModelProbe {
-        //         ssh_dest,
-        //         model,
-        //         filter,
-        //         args,
-        //     }
-        // }
-        // Command::Init { path } => ExecContext::ModelInit {
-        //     path: path.canonicalize().expect("Error resolving path"),
-        // },
-        // Command::Remote {
-        //     expr,
-        //     command,
-        //     model,
-        // } => {
-        //     let command = command.join(" ");
-        //     ExecContext::RemoteExec {
-        //         expr,
-        //         command,
-        //         model_path: model,
-        //     }
-        // }
-        _ => {
-            unimplemented!()
+        Command::Diff {
+            format,
+            source,
+            target,
+        } => {
+            // FIXME fails when id provided instead of path (because of canonicalize)
+            disp_format = format;
+
+            ExecContext::ModelDiff {
+                prev_model: source,
+                next_model: target,
+            }
+        }
+        Command::Update {
+            format,
+            source,
+            target,
+            dry_run,
+        } => {
+            disp_format = format;
+            ExecContext::ModelUpdate {
+                prev_model: source,
+                next_model: target,
+                dry_run,
+            }
+        }
+        Command::Exec { path } => {
+            make_path_absolute(&path);
+            ExecContext::ProcExec { exec_path: path }
+        }
+        Command::Check {
+            model,
+            filter,
+            dry_run,
+        } => {
+            ExecContext::ModelCheck {
+                model,
+                filter,
+                dry_run,
+            }
+        }
+        Command::Probe {
+            model,
+            url,
+            password,
+            identity_file,
+            filter,
+            args,
+        } => {
+            let ssh_auth = if let Some(password) = password {
+                SshAuth::Password { password }
+            } else if let Some(identity_file) = identity_file {
+                SshAuth::PublicKey { identity_file }
+            } else {
+                SshAuth::Default
+            };
+
+            let ssh_dest = SshDest::from_url(&url, ssh_auth);
+
+            ExecContext::ModelProbe {
+                ssh_dest,
+                model,
+                filter,
+                args,
+            }
+        }
+        Command::Init { path } => ExecContext::ModelInit {
+            path: path.canonicalize().expect("Error resolving path"),
+        },
+        Command::Remote {
+            expr,
+            command,
+            model,
+        } => {
+            let command = command.join(" ");
+            ExecContext::RemoteExec {
+                expr,
+                command,
+                model_path: model,
+            }
         }
     };
 

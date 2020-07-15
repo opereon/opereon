@@ -1,5 +1,5 @@
 use crate::ops::config::ConfigGetOperation;
-use crate::ops::model::{ModelQueryOperation, ModelTestOperation};
+use crate::ops::model::{ModelQueryOperation, ModelTestOperation, ModelDiffOperation, ModelCommitOperation, ModelInitOperation};
 use crate::outcome::Outcome;
 use op_engine::operation::OperationImplExt;
 use op_engine::{OperationImpl, OperationRef};
@@ -99,10 +99,20 @@ impl Into<OperationRef<Outcome>> for Context {
     fn into(self) -> OperationRef<Outcome> {
         let label = self.label().to_string();
         let op_impl = match self {
+            Context::ModelInit {path} => ModelInitOperation::new(path).boxed(),
             Context::ConfigGet => ConfigGetOperation::new().boxed(),
+            Context::ModelCommit(message) => ModelCommitOperation::new(message).boxed(),
             Context::ModelQuery { model, expr } => ModelQueryOperation::new(model, expr).boxed(),
             Context::ModelTest { model } => ModelTestOperation::new(model).boxed(),
-            _ => unimplemented!(),
+            Context::ModelDiff { prev_model, next_model } => ModelDiffOperation::new(prev_model, next_model).boxed(),
+            Context::ModelUpdate { prev_model, next_model, dry_run } => { unimplemented!()}
+            Context::ModelCheck { model, filter, dry_run } => { unimplemented!()}
+            Context::ModelProbe { ssh_dest, model, filter, args } => { unimplemented!()}
+            Context::ProcExec { exec_path } => { unimplemented!()}
+            Context::StepExec { exec_path, step_index } => { unimplemented!()}
+            Context::TaskExec { exec_path, step_index, task_index } => { unimplemented!()}
+            Context::FileCopyExec { curr_dir, src_path, dst_path, chown, chmod } => { unimplemented!()}
+            Context::RemoteExec { expr, command, model_path } => { unimplemented!()}
         };
         OperationRef::new(label, op_impl)
     }
