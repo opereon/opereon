@@ -15,6 +15,8 @@ slog = "2.5.2"
 git2 = "0.13.6"
 serde = "1.0.110"
 serde_derive = "1.0.110"
+async-trait = "0.1.36"
+tokio = { version = "0.2.21"}
 
 [dev-dependencies]
 indoc = "0.3.5"

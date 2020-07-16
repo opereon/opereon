@@ -28,9 +28,9 @@ impl DirManager {
         })
     }
 }
-
+#[async_trait]
 impl FileVersionManager for DirManager {
-    fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
+    async fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
         match *rev_path {
             RevPath::Current => Ok(Oid::nil()),
             RevPath::Revision(ref spec) => {
@@ -51,7 +51,7 @@ impl FileVersionManager for DirManager {
         }
     }
 
-    fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
+    async fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
         if rev_id.is_nil() {
             Ok(RevInfo::new(rev_id, self.path.clone()))
         } else {
@@ -67,11 +67,11 @@ impl FileVersionManager for DirManager {
         }
     }
 
-    fn commit(&mut self, _message: &str) -> Result<Oid, BasicDiag> {
+    async fn commit(&mut self, _message: &str) -> Result<Oid, BasicDiag> {
         unimplemented!()
     }
 
-    fn get_file_diff(&mut self, _old_rev_id: Oid, _new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
+    async fn get_file_diff(&mut self, _old_rev_id: Oid, _new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
         unimplemented!()
     }
 }

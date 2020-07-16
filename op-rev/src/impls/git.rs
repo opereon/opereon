@@ -4,6 +4,8 @@ use git2::build::CheckoutBuilder;
 
 use kg_diag::io::fs;
 use kg_diag::{BasicDiag, IntoDiagRes};
+use std::sync::{Arc, Mutex};
+use git2::Repository;
 
 pub type GitResult<T> = Result<T, BasicDiag>;
 
@@ -42,12 +44,41 @@ pub enum GitErrorDetail {
     Custom { err: git2::Error },
 }
 
+fn get_tree(repo: &Repository, oid: Oid) -> GitResult<git2::Tree>{
+    let obj = repo
+        .find_object(oid.into(), None)
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+
+    let tree = obj
+        .peel_to_tree()
+        .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
+    Ok(tree)
+}
+
+fn find_last_commit(repo: &Repository) -> GitResult<Option<git2::Commit>> {
+    let obj = match repo.head() {
+        Ok(head) => head,
+        Err(err) => match err.code() {
+            git2::ErrorCode::UnbornBranch => return Ok(None),
+            _ => return Err(GitErrorDetail::Custom { err }).into_diag_res(),
+        },
+    };
+
+    let obj = obj
+        .resolve()
+        .map_err(|err| GitErrorDetail::ResolveReference { err })?;
+    let commit = obj
+        .peel_to_commit()
+        .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
+
+    Ok(Some(commit))
+}
 
 /// Struct to manage git repository
 pub struct GitManager {
     path: PathBuf,
     /// Contains opened repository
-    repo: git2::Repository,
+    repo: Arc<Mutex<git2::Repository>>,
 }
 
 impl GitManager {
@@ -58,7 +89,7 @@ impl GitManager {
             .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
         Ok(GitManager {
             path,
-            repo,
+            repo: Arc::new(Mutex::new(repo)),
         })
     }
 
@@ -99,45 +130,24 @@ impl GitManager {
 
         Ok(GitManager {
             path,
-            repo,
+            repo: Arc::new(Mutex::new(repo)),
         })
     }
 
-    fn repo(&self) -> &git2::Repository {
-        &self.repo
+    fn repo(&self) -> Arc<Mutex<git2::Repository>>{
+        self.repo.clone()
     }
 
     /// Returns last commit or `None` if repository have no commits (eg. new repository).
     fn find_last_commit(&self) -> GitResult<Option<git2::Commit>> {
-        let obj = match self.repo().head() {
-            Ok(head) => head,
-            Err(err) => match err.code() {
-                git2::ErrorCode::UnbornBranch => return Ok(None),
-                _ => return Err(GitErrorDetail::Custom { err }).into_diag_res(),
-            },
-        };
-
-        let obj = obj
-            .resolve()
-            .map_err(|err| GitErrorDetail::ResolveReference { err })?;
-        let commit = obj
-            .peel_to_commit()
-            .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
-
-        Ok(Some(commit))
+        let repo = self.repo().lock().unwrap();
+        find_last_commit(&*repo)
     }
 
     /// Get git tree for provided `oid`
     fn get_tree(&self, oid: Oid) -> GitResult<git2::Tree> {
-        let obj = self
-            .repo()
-            .find_object(oid.into(), None)
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        let tree = obj
-            .peel_to_tree()
-            .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
-        Ok(tree)
+        let repo = self.repo().lock().unwrap();
+        get_tree(&*repo, oid)
     }
 
     /// Update provided repository index and return created tree Oid.
@@ -176,22 +186,27 @@ impl std::fmt::Debug for GitManager {
             .finish()
     }
 }
-
+#[async_trait]
 impl FileVersionManager for GitManager {
-    fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
+    async fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
         match *rev_path {
             RevPath::Current => Ok(Oid::nil()),
             RevPath::Revision(ref spec) => {
-                let obj = self
-                    .repo()
-                    .revparse_single(spec)
-                    .map_err(|err| GitErrorDetail::RevisionNotFound { err })?;
-                Ok(obj.id().into())
+                let repo = self.repo();
+                let spec = spec.clone();
+                spawn_blocking(move || {
+                    let guard = repo.lock().unwrap();
+
+                    let obj = guard
+                        .revparse_single(&spec)
+                        .map_err(|err| GitErrorDetail::RevisionNotFound { err })?;
+                    Ok(obj.id().into())
+                }).await.unwrap()
             }
         }
     }
 
-    fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
+    async fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
         if rev_id.is_nil() {
             Ok(RevInfo::new(rev_id, self.path.clone()))
         } else {
@@ -201,55 +216,61 @@ impl FileVersionManager for GitManager {
             if checkout_path.is_dir() {
                 Ok(RevInfo::new(rev_id, checkout_path))
             } else {
-                fs::create_dir_all(&checkout_path)?;
+                let repo = self.repo();
+                spawn_blocking(move || {
+                    fs::create_dir_all(&checkout_path)?;
+                    let repo = repo.lock().unwrap();
+                    let tree = get_tree(&*repo, rev_id)?;
 
-                let tree = self.get_tree(rev_id)?;
+                    let mut opts = CheckoutBuilder::new();
+                    opts.target_dir(&checkout_path);
+                    opts.recreate_missing(true);
+                    repo.checkout_tree(tree.as_object(), Some(&mut opts))
+                        .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
 
-                let mut opts = CheckoutBuilder::new();
-                opts.target_dir(&checkout_path);
-                opts.recreate_missing(true);
-                self.repo.checkout_tree(tree.as_object(), Some(&mut opts))
-                    .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
-
-                Ok(RevInfo::new(rev_id, checkout_path))
+                    Ok(RevInfo::new(rev_id, checkout_path))
+                }).await.unwrap()
             }
         }
     }
 
-    fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag> {
+    async fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag> {
         let repo = self.repo();
 
-        let sig = repo
-            .signature()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+        spawn_blocking(move || {
+            let repo = repo.lock().unwrap();
+            let sig = repo
+                .signature()
+                .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        let oid = self.update_index()?;
-        let parent = self.find_last_commit()?;
-        let tree = self.get_tree(oid.into())?;
+            let oid = self.update_index()?;
+            let parent = self.find_last_commit()?;
+            let tree = self.get_tree(oid.into())?;
 
-        let commit = if let Some(parent) = parent {
-            repo.commit(
-                Some("HEAD"),
-                &sig,
-                &sig,
-                message,
-                &tree,
-                &[&parent],
-            )
-                .map_err(|err| GitErrorDetail::Commit { err })?
-        } else {
-            repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
-                .map_err(|err| GitErrorDetail::Commit { err })?
-        };
+            let commit = if let Some(parent) = parent {
+                repo.commit(
+                    Some("HEAD"),
+                    &sig,
+                    &sig,
+                    message,
+                    &tree,
+                    &[&parent],
+                )
+                    .map_err(|err| GitErrorDetail::Commit { err })?
+            } else {
+                repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                    .map_err(|err| GitErrorDetail::Commit { err })?
+            };
 
-        let mut opts = CheckoutBuilder::new();
-        repo.checkout_index(None, Some(&mut opts))
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+            let mut opts = CheckoutBuilder::new();
+            repo.checkout_index(None, Some(&mut opts))
+                .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        Ok(commit.into())
+            Ok(commit.into())
+        }).await.unwrap()
     }
 
-    fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
+    async fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
         //FIXME (jc) error handling
 
         if old_rev_id.is_nil() {

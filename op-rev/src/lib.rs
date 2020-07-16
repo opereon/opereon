@@ -11,6 +11,8 @@ extern crate serde_derive;
 extern crate kg_display_derive;
 #[macro_use]
 extern crate kg_diag_derive;
+#[macro_use]
+extern crate async_trait;
 
 use std::path::{Path, PathBuf};
 
@@ -22,15 +24,18 @@ mod impls;
 
 pub use self::meta::*;
 pub use self::impls::*;
+use std::thread;
+use tokio::sync::oneshot;
 
-pub trait FileVersionManager: std::fmt::Debug {
-    fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag>;
+#[async_trait]
+pub trait FileVersionManager: Send + std::fmt::Debug {
+    async fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag>;
 
-    fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag>;
+    async fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag>;
 
-    fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag>;
+    async fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag>;
 
-    fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag>;
+    async fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag>;
 }
 
 
@@ -42,4 +47,21 @@ pub fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<B
 pub fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
     let git = GitManager::create(repo_path)?;
     Ok(Box::new(git))
+}
+
+fn spawn_blocking<T, F>(f: F) -> oneshot::Receiver<T>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+{
+    let (result_tx, result_rx) = oneshot::channel();
+
+    // TODO ws use threadpool? see https://docs.rs/tokio/0.2.21/tokio/runtime/struct.Handle.html#method.spawn_blocking
+
+    tokio::task::spawn_blocking(|| {
+        let res = f();
+        let _ = result_tx.send(res);
+    });
+
+    result_rx
 }
