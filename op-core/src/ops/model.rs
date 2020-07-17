@@ -38,7 +38,7 @@ impl OperationImpl<Outcome> for ModelQueryOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        let model = manager.resolve(&self.model_path)?;
+        let model = manager.resolve(&self.model_path).await?;
         let expr = Opath::parse(&self.expr).map_err_as_cause(|| ModelOpErrorDetail::QueryOp)?;
 
         // info!(self.logger, "Querying model...");
@@ -71,7 +71,7 @@ impl OperationImpl<Outcome> for ModelCommitOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        let _m = manager.commit(&self.message)?;
+        let _m = manager.commit(&self.message).await?;
         Ok(Outcome::Empty)
     }
 }
@@ -94,7 +94,7 @@ impl OperationImpl<Outcome> for ModelTestOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        let model = manager.resolve(&self.model_path)?;
+        let model = manager.resolve(&self.model_path).await?;
         let res = to_tree(&*model.lock()).unwrap();
         Ok(Outcome::NodeSet(res.into()))
     }
@@ -119,8 +119,8 @@ impl OperationImpl<Outcome> for ModelDiffOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        let m1 = manager.resolve(&self.source)?;
-        let m2 = manager.resolve(&self.target)?;
+        let m1 = manager.resolve(&self.source).await?;
+        let m2 = manager.resolve(&self.target).await?;
         let state = engine.state::<CoreState>().unwrap();
         let diff = {
             NodeDiff::diff(
@@ -152,7 +152,7 @@ impl OperationImpl<Outcome> for ModelInitOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        manager.create_model(self.path.clone())?;
+        manager.create_model(self.path.clone()).await?;
         Ok(Outcome::Empty)
     }
 }

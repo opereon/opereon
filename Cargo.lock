@@ -1111,6 +1111,7 @@ dependencies = [
 name = "op-rev"
 version = "0.1.1"
 dependencies = [
+ "async-trait",
  "git2",
  "indoc",
  "kg-diag",
@@ -1123,6 +1124,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "slog",
+ "tokio",
 ]
 
 [[package]]

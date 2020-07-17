@@ -31,53 +31,52 @@ impl ModelManager {
     }
 
     /// Commit current model
-    pub fn commit(&mut self, message: &str) -> ModelManagerResult<Oid> {
-        self.init()?;
-
-        let oid = self.repo_manager_mut().commit(message)?;
+    pub async fn commit(&mut self, message: &str) -> ModelManagerResult<Oid> {
+        self.init().await?;
+        let oid = self.repo_manager_mut().commit(message).await?;
         Ok(oid)
     }
 
-    pub fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
-        self.init()?;
+    pub async fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
+        self.init().await?;
 
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
         }
 
-        let rev_info = self.repo_manager_mut().checkout(id)?;
+        let rev_info = self.repo_manager_mut().checkout(id).await?;
         let model = ModelRef::read(rev_info, self.logger.clone())?;
         self.cache_model(model.clone());
         Ok(model)
     }
 
-    pub fn resolve(&mut self, rev_path: &RevPath) -> ModelManagerResult<ModelRef> {
-        self.init()?;
+    pub async fn resolve(&mut self, rev_path: &RevPath) -> ModelManagerResult<ModelRef> {
+        self.init().await?;
 
-        let oid = self.repo_manager_mut().resolve(rev_path)?;
-        self.get(oid)
+        let oid = self.repo_manager_mut().resolve(rev_path).await?;
+        self.get(oid).await
     }
 
     /// Returns current model
-    pub fn current(&mut self) -> ModelManagerResult<ModelRef> {
-        self.resolve(&RevPath::Current)
+    pub async fn current(&mut self) -> ModelManagerResult<ModelRef> {
+        self.resolve(&RevPath::Current).await
     }
 
-    pub fn get_file_diff(
+    pub async fn get_file_diff(
         &mut self,
         old_rev: &RevPath,
         new_rev: &RevPath,
     ) -> ModelManagerResult<FileDiff> {
-        self.init()?;
+        self.init().await?;
 
         let repo_manager = self.repo_manager_mut();
-        let old_id = repo_manager.resolve(old_rev)?;
-        let new_id = repo_manager.resolve(new_rev)?;
-        repo_manager.get_file_diff(old_id, new_id)
+        let old_id = repo_manager.resolve(old_rev).await?;
+        let new_id = repo_manager.resolve(new_rev).await?;
+        repo_manager.get_file_diff(old_id, new_id).await
     }
 
-    pub fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
-        let repo_manager = op_rev::create_repository(&repo_path)?;
+    pub async fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
+        let repo_manager = op_rev::create_repository(&repo_path).await?;
 
         let logger = self
             .logger
@@ -94,7 +93,7 @@ impl ModelManager {
         Ok(model)
     }
 
-    fn init(&mut self) -> ModelManagerResult<()> {
+    async fn init(&mut self) -> ModelManagerResult<()> {
         if self.repo_manager.is_some() {
             return Ok(());
         }
@@ -107,7 +106,7 @@ impl ModelManager {
 
         info!(self.logger, "opened repository {}", repo_path.display());
         self.repo_path = repo_path;
-        self.repo_manager = Some(op_rev::open_repository(&self.repo_path)?);
+        self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);
 
         Ok(())
     }

@@ -4,6 +4,8 @@ use git2::build::CheckoutBuilder;
 
 use kg_diag::io::fs;
 use kg_diag::{BasicDiag, IntoDiagRes};
+use std::sync::{Arc, Mutex};
+use git2::Repository;
 
 pub type GitResult<T> = Result<T, BasicDiag>;
 
@@ -42,130 +44,137 @@ pub enum GitErrorDetail {
     Custom { err: git2::Error },
 }
 
+/// Get git tree for provided `oid`
+fn get_tree(repo: &Repository, oid: Oid) -> GitResult<git2::Tree> {
+    let obj = repo
+        .find_object(oid.into(), None)
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+
+    let tree = obj
+        .peel_to_tree()
+        .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
+    Ok(tree)
+}
+
+/// Returns last commit or `None` if repository have no commits (eg. new repository).
+fn find_last_commit(repo: &Repository) -> GitResult<Option<git2::Commit>> {
+    let obj = match repo.head() {
+        Ok(head) => head,
+        Err(err) => match err.code() {
+            git2::ErrorCode::UnbornBranch => return Ok(None),
+            _ => return Err(GitErrorDetail::Custom { err }).into_diag_res(),
+        },
+    };
+
+    let obj = obj
+        .resolve()
+        .map_err(|err| GitErrorDetail::ResolveReference { err })?;
+    let commit = obj
+        .peel_to_commit()
+        .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
+
+    Ok(Some(commit))
+}
+
+/// Update provided repository index and return created tree Oid.
+/// Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes.
+fn update_index(repo: &Repository) -> GitResult<git2::Oid> {
+    let mut index = repo
+        .index()
+        .map_err(|err| GitErrorDetail::GetIndex { err })?;
+
+    index
+        .clear()
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+
+    let opts = git2::IndexAddOption::default();
+
+    index
+        .add_all(&["*"], opts, None)
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+    // Changes in index won't be saved to disk until index.write*() called.
+    let oid = index
+        .write_tree()
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+    index
+        .write()
+        .map_err(|err| GitErrorDetail::Custom { err })?;
+    Ok(oid)
+}
 
 /// Struct to manage git repository
 pub struct GitManager {
     path: PathBuf,
     /// Contains opened repository
-    repo: git2::Repository,
+    repo: Arc<Mutex<git2::Repository>>,
 }
 
 impl GitManager {
     /// Open existing git repository and return `GitManager`
-    pub fn open<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
-        let path = fs::canonicalize(repo_dir.as_ref())?;
-        let repo = git2::Repository::open(&path)
-            .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
-        Ok(GitManager {
-            path,
-            repo,
-        })
+    pub async fn open<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
+        let repo_dir = repo_dir.into();
+        spawn_blocking(move || {
+            let path = fs::canonicalize(&repo_dir)?;
+            let repo = git2::Repository::open(&path)
+                .map_err(|err| BasicDiag::from(GitErrorDetail::OpenRepository { err }))?;
+            Ok(GitManager {
+                path,
+                repo: Arc::new(Mutex::new(repo)),
+            })
+        }).await.unwrap()
     }
 
     /// Create a new git repository and return `GitManager`
-    pub fn create<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
+    pub async fn create<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> GitResult<Self> {
         use std::fmt::Write;
+        let repo_dir = repo_dir.into();
+        spawn_blocking(move || {
+            let path = fs::canonicalize(&repo_dir)?;
 
-        let path = fs::canonicalize(repo_dir.as_ref())?;
+            let mut opts = git2::RepositoryInitOptions::new();
+            opts.no_reinit(true);
 
-        let mut opts = git2::RepositoryInitOptions::new();
-        opts.no_reinit(true);
+            let repo = git2::Repository::init_opts(&path, &opts)
+                .map_err(|err| GitErrorDetail::CreateRepository { err })?;
 
-        let repo = git2::Repository::init_opts(&path, &opts)
-            .map_err(|err| GitErrorDetail::CreateRepository { err })?;
+            let mut config = repo.config().unwrap();
 
-        let mut config = repo.config().unwrap();
+            // TODO parameterize
+            config
+                .set_str("user.name", "opereon")
+                .map_err(|err| GitErrorDetail::SetConfig {
+                    key: "user.name".to_string(),
+                    err,
+                })?;
+            config
+                .set_str("user.email", "opereon")
+                .map_err(|err| GitErrorDetail::SetConfig {
+                    key: "user.email".to_string(),
+                    err,
+                })?;
 
-        // TODO parameterize
-        config
-            .set_str("user.name", "opereon")
-            .map_err(|err| GitErrorDetail::SetConfig {
-                key: "user.name".to_string(),
-                err,
-            })?;
-        config
-            .set_str("user.email", "opereon")
-            .map_err(|err| GitErrorDetail::SetConfig {
-                key: "user.email".to_string(),
-                err,
-            })?;
+            // ignore ./op directory
+            let excludes = path.join(Path::new(".git/info/exclude"));
+            let mut content = fs::read_string(&excludes)?;
 
-        // ignore ./op directory
-        let excludes = path.join(Path::new(".git/info/exclude"));
-        let mut content = fs::read_string(&excludes)?;
+            writeln!(&mut content, ".op/").map_err(IoErrorDetail::from)?;
+            fs::write(excludes, content)?;
 
-        writeln!(&mut content, ".op/").map_err(IoErrorDetail::from)?;
-        fs::write(excludes, content)?;
-
-        Ok(GitManager {
-            path,
-            repo,
-        })
+            Ok(GitManager {
+                path,
+                repo: Arc::new(Mutex::new(repo)),
+            })
+        }).await.unwrap()
     }
 
-    fn repo(&self) -> &git2::Repository {
-        &self.repo
+    fn repo(&self) -> Arc<Mutex<git2::Repository>> {
+        self.repo.clone()
     }
 
-    /// Returns last commit or `None` if repository have no commits (eg. new repository).
-    fn find_last_commit(&self) -> GitResult<Option<git2::Commit>> {
-        let obj = match self.repo().head() {
-            Ok(head) => head,
-            Err(err) => match err.code() {
-                git2::ErrorCode::UnbornBranch => return Ok(None),
-                _ => return Err(GitErrorDetail::Custom { err }).into_diag_res(),
-            },
-        };
-
-        let obj = obj
-            .resolve()
-            .map_err(|err| GitErrorDetail::ResolveReference { err })?;
-        let commit = obj
-            .peel_to_commit()
-            .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
-
-        Ok(Some(commit))
-    }
-
-    /// Get git tree for provided `oid`
-    fn get_tree(&self, oid: Oid) -> GitResult<git2::Tree> {
-        let obj = self
-            .repo()
-            .find_object(oid.into(), None)
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        let tree = obj
-            .peel_to_tree()
-            .map_err(|err| GitErrorDetail::UnexpectedObjectType { err })?;
-        Ok(tree)
-    }
-
-    /// Update provided repository index and return created tree Oid.
-    /// Clear index and rebuild it from working dir. Necessary to reflect .gitignore changes.
     fn update_index(&self) -> GitResult<git2::Oid> {
-        let mut index = self
-            .repo()
-            .index()
-            .map_err(|err| GitErrorDetail::GetIndex { err })?;
-
-        index
-            .clear()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        let opts = git2::IndexAddOption::default();
-
-        index
-            .add_all(&["*"], opts, None)
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-        // Changes in index won't be saved to disk until index.write*() called.
-        let oid = index
-            .write_tree()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-        index
-            .write()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
-
-        Ok(oid)
+        let r = self.repo();
+        let repo = r.lock().unwrap();
+        update_index(&*repo)
     }
 }
 
@@ -177,21 +186,27 @@ impl std::fmt::Debug for GitManager {
     }
 }
 
+#[async_trait]
 impl FileVersionManager for GitManager {
-    fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
+    async fn resolve(&mut self, rev_path: &RevPath) -> Result<Oid, BasicDiag> {
         match *rev_path {
             RevPath::Current => Ok(Oid::nil()),
             RevPath::Revision(ref spec) => {
-                let obj = self
-                    .repo()
-                    .revparse_single(spec)
-                    .map_err(|err| GitErrorDetail::RevisionNotFound { err })?;
-                Ok(obj.id().into())
+                let repo = self.repo();
+                let spec = spec.clone();
+                spawn_blocking(move || {
+                    let guard = repo.lock().unwrap();
+
+                    let obj = guard
+                        .revparse_single(&spec)
+                        .map_err(|err| GitErrorDetail::RevisionNotFound { err })?;
+                    Ok(obj.id().into())
+                }).await.unwrap()
             }
         }
     }
 
-    fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
+    async fn checkout(&mut self, rev_id: Oid) -> Result<RevInfo, BasicDiag> {
         if rev_id.is_nil() {
             Ok(RevInfo::new(rev_id, self.path.clone()))
         } else {
@@ -201,99 +216,109 @@ impl FileVersionManager for GitManager {
             if checkout_path.is_dir() {
                 Ok(RevInfo::new(rev_id, checkout_path))
             } else {
-                fs::create_dir_all(&checkout_path)?;
+                let repo = self.repo();
+                spawn_blocking(move || {
+                    fs::create_dir_all(&checkout_path)?;
+                    let repo = repo.lock().unwrap();
+                    let tree = get_tree(&*repo, rev_id)?;
 
-                let tree = self.get_tree(rev_id)?;
+                    let mut opts = CheckoutBuilder::new();
+                    opts.target_dir(&checkout_path);
+                    opts.recreate_missing(true);
+                    repo.checkout_tree(tree.as_object(), Some(&mut opts))
+                        .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
 
-                let mut opts = CheckoutBuilder::new();
-                opts.target_dir(&checkout_path);
-                opts.recreate_missing(true);
-                self.repo.checkout_tree(tree.as_object(), Some(&mut opts))
-                    .map_err(|err| GitErrorDetail::Checkout { rev_id, err })?;
-
-                Ok(RevInfo::new(rev_id, checkout_path))
+                    Ok(RevInfo::new(rev_id, checkout_path))
+                }).await.unwrap()
             }
         }
     }
 
-    fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag> {
+    async fn commit(&mut self, message: &str) -> Result<Oid, BasicDiag> {
         let repo = self.repo();
+        let message = message.to_string();
 
-        let sig = repo
-            .signature()
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+        spawn_blocking(move || {
+            let repo = repo.lock().unwrap();
+            let sig = repo
+                .signature()
+                .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        let oid = self.update_index()?;
-        let parent = self.find_last_commit()?;
-        let tree = self.get_tree(oid.into())?;
+            let oid = update_index(&*repo)?;
+            let parent = find_last_commit(&*repo)?;
+            let tree = get_tree(&*repo, oid.into())?;
 
-        let commit = if let Some(parent) = parent {
-            repo.commit(
-                Some("HEAD"),
-                &sig,
-                &sig,
-                message,
-                &tree,
-                &[&parent],
-            )
-                .map_err(|err| GitErrorDetail::Commit { err })?
-        } else {
-            repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
-                .map_err(|err| GitErrorDetail::Commit { err })?
-        };
+            let commit = if let Some(parent) = parent {
+                repo.commit(
+                    Some("HEAD"),
+                    &sig,
+                    &sig,
+                    &message,
+                    &tree,
+                    &[&parent],
+                )
+                    .map_err(|err| GitErrorDetail::Commit { err })?
+            } else {
+                repo.commit(Some("HEAD"), &sig, &sig, &message, &tree, &[])
+                    .map_err(|err| GitErrorDetail::Commit { err })?
+            };
 
-        let mut opts = CheckoutBuilder::new();
-        repo.checkout_index(None, Some(&mut opts))
-            .map_err(|err| GitErrorDetail::Custom { err })?;
+            let mut opts = CheckoutBuilder::new();
+            repo.checkout_index(None, Some(&mut opts))
+                .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        Ok(commit.into())
+            Ok(commit.into())
+        }).await.unwrap()
     }
 
-    fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
+    async fn get_file_diff(&mut self, old_rev_id: Oid, new_rev_id: Oid) -> Result<FileDiff, BasicDiag> {
         //FIXME (jc) error handling
 
         if old_rev_id.is_nil() {
             unimplemented!(); // Cannot compare workdir as old tree against new tree, only the other way around
         }
 
-        let mut diff = {
+        let repo = self.repo();
+
+        spawn_blocking(move || {
+            let repo = repo.lock().unwrap();
             let mut opts = git2::DiffOptions::new();
             opts.minimal(true);
+            let mut diff = {
+                if new_rev_id.is_nil() {
+                    let old: git2::Oid = old_rev_id.into();
+                    let old_commit = repo.find_object(old, None).map_err(|err| GitErrorDetail::Custom { err })?;
+                    let old_tree = old_commit.peel_to_tree().map_err(|err| GitErrorDetail::Custom { err })?;
 
-            if new_rev_id.is_nil() {
-                let old: git2::Oid = old_rev_id.into();
-                let old_commit = self.repo().find_object(old, None).expect("Cannot find commit");
-                let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
+                    repo
+                        .diff_tree_to_workdir(Some(&old_tree), Some(&mut opts))
+                        .map_err(|err| GitErrorDetail::Custom { err })?
+                } else {
+                    let old: git2::Oid = old_rev_id.into();
+                    let old_commit = repo.find_object(old, None).map_err(|err| GitErrorDetail::Custom { err })?;
+                    let old_tree = old_commit.peel_to_tree().map_err(|err| GitErrorDetail::Custom { err })?;
 
-                self.repo()
-                    .diff_tree_to_workdir(Some(&old_tree), Some(&mut opts))
-                    .expect("Cannot get diff")
-            } else {
-                let old: git2::Oid = old_rev_id.into();
-                let old_commit = self.repo().find_object(old, None).expect("Cannot find commit");
-                let old_tree = old_commit.peel_to_tree().expect("Cannot get commit tree");
+                    let new: git2::Oid = new_rev_id.into();
+                    let new_commit = repo.find_object(new, None).map_err(|err| GitErrorDetail::Custom { err })?;
+                    let new_tree = new_commit.peel_to_tree().map_err(|err| GitErrorDetail::Custom { err })?;
 
-                let new: git2::Oid = new_rev_id.into();
-                let new_commit = self.repo().find_object(new, None).expect("Cannot find commit");
-                let new_tree = new_commit.peel_to_tree().expect("Cannot get commit tree");
+                    repo
+                        .diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
+                        .map_err(|err| GitErrorDetail::Custom { err })?
+                }
+            };
+            let mut find_opts = git2::DiffFindOptions::new();
+            find_opts.renames(true);
+            find_opts.renames_from_rewrites(true);
+            find_opts.remove_unmodified(true);
 
-                self.repo()
-                    .diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
-                    .expect("Cannot get diff")
-            }
-        };
+            diff.find_similar(Some(&mut find_opts))
+                .map_err(|err| GitErrorDetail::Custom { err })?;
 
-        let mut find_opts = git2::DiffFindOptions::new();
-        find_opts.renames(true);
-        find_opts.renames_from_rewrites(true);
-        find_opts.remove_unmodified(true);
+            let changes = diff.deltas().map(|d| d.into()).collect();
 
-        diff.find_similar(Some(&mut find_opts))
-            .expect("Cannot find similar!");
-
-        let changes = diff.deltas().map(|d| d.into()).collect();
-
-        Ok(FileDiff::new(changes))
+            Ok(FileDiff::new(changes))
+        }).await.unwrap()
     }
 }
 

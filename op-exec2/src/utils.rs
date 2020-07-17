@@ -142,7 +142,7 @@ where
 
     // TODO ws use threadpool? see https://docs.rs/tokio/0.2.21/tokio/runtime/struct.Handle.html#method.spawn_blocking
 
-    thread::spawn(|| {
+    tokio::task::spawn_blocking(|| {
         let res = f();
         let _ = result_tx.send(res);
     });
