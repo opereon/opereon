@@ -39,13 +39,13 @@ pub trait FileVersionManager: Send + std::fmt::Debug {
 }
 
 
-pub fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
-    let git = GitManager::open(repo_path)?;
+pub async fn open_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
+    let git = GitManager::open(repo_path).await?;
     Ok(Box::new(git))
 }
 
-pub fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
-    let git = GitManager::create(repo_path)?;
+pub async fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> Result<Box<dyn FileVersionManager + Send>, BasicDiag> {
+    let git = GitManager::create(repo_path).await?;
     Ok(Box::new(git))
 }
 

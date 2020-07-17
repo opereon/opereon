@@ -32,13 +32,13 @@ impl ModelManager {
 
     /// Commit current model
     pub async fn commit(&mut self, message: &str) -> ModelManagerResult<Oid> {
-        self.init()?;
+        self.init().await?;
         let oid = self.repo_manager_mut().commit(message).await?;
         Ok(oid)
     }
 
     pub async fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
-        self.init()?;
+        self.init().await?;
 
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
@@ -51,7 +51,7 @@ impl ModelManager {
     }
 
     pub async fn resolve(&mut self, rev_path: &RevPath) -> ModelManagerResult<ModelRef> {
-        self.init()?;
+        self.init().await?;
 
         let oid = self.repo_manager_mut().resolve(rev_path).await?;
         self.get(oid).await
@@ -67,7 +67,7 @@ impl ModelManager {
         old_rev: &RevPath,
         new_rev: &RevPath,
     ) -> ModelManagerResult<FileDiff> {
-        self.init()?;
+        self.init().await?;
 
         let repo_manager = self.repo_manager_mut();
         let old_id = repo_manager.resolve(old_rev).await?;
@@ -75,8 +75,8 @@ impl ModelManager {
         repo_manager.get_file_diff(old_id, new_id).await
     }
 
-    pub fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
-        let repo_manager = op_rev::create_repository(&repo_path)?;
+    pub async fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
+        let repo_manager = op_rev::create_repository(&repo_path).await?;
 
         let logger = self
             .logger
@@ -93,7 +93,7 @@ impl ModelManager {
         Ok(model)
     }
 
-    fn init(&mut self) -> ModelManagerResult<()> {
+    async fn init(&mut self) -> ModelManagerResult<()> {
         if self.repo_manager.is_some() {
             return Ok(());
         }
@@ -106,7 +106,7 @@ impl ModelManager {
 
         info!(self.logger, "opened repository {}", repo_path.display());
         self.repo_path = repo_path;
-        self.repo_manager = Some(op_rev::open_repository(&self.repo_path)?);
+        self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);
 
         Ok(())
     }

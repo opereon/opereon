@@ -152,7 +152,7 @@ impl OperationImpl<Outcome> for ModelInitOperation {
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
         let mut manager = engine.service::<ModelManager>().await.unwrap();
-        manager.create_model(self.path.clone())?;
+        manager.create_model(self.path.clone()).await?;
         Ok(Outcome::Empty)
     }
 }

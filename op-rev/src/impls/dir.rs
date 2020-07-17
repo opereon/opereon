@@ -8,24 +8,31 @@ pub struct DirManager {
 
 impl DirManager {
     /// Open existing folder repository and return `DirManager`
-    pub fn open<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> Result<Self, BasicDiag> {
-        let path = fs::canonicalize(repo_dir.as_ref())?;
-        if path.is_dir() {
-            Ok(DirManager {
-                path,
-            })
-        } else {
-            Err(IoErrorDetail::file_not_found(path, FileType::Dir, OpType::Read).into())
-        }
+    pub async fn open<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> Result<Self, BasicDiag> {
+        let repo_dir = repo_dir.into();
+        spawn_blocking(move || {
+            let path = fs::canonicalize(&repo_dir)?;
+            if path.is_dir() {
+                Ok(DirManager {
+                    path,
+                })
+            } else {
+                Err(IoErrorDetail::file_not_found(path, FileType::Dir, OpType::Read).into())
+            }
+        }).await.unwrap()
     }
 
     /// Create a new folder repository and return `DirManager`
-    pub fn create<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> Result<Self, BasicDiag> {
-        let path = fs::canonicalize(repo_dir.as_ref())?;
-        fs::create_dir_all(&path)?;
-        Ok(DirManager {
-            path,
-        })
+    pub async fn create<P: Into<PathBuf> + AsRef<Path>>(repo_dir: P) -> Result<Self, BasicDiag> {
+        let repo_dir = repo_dir.into();
+        spawn_blocking(move || {
+            let path = fs::canonicalize(&repo_dir)?;
+            fs::create_dir_all(&path)?;
+            Ok(DirManager {
+                path,
+            })
+        }).await.unwrap()
+
     }
 }
 #[async_trait]
@@ -34,19 +41,23 @@ impl FileVersionManager for DirManager {
         match *rev_path {
             RevPath::Current => Ok(Oid::nil()),
             RevPath::Revision(ref spec) => {
-                let oid: Oid = spec.parse().map_err(|_| IoErrorDetail::Io {
-                    kind: std::io::ErrorKind::InvalidInput,
-                    message: "Cannot parse Oid".into()
-                })?;
-                let mut path = self.path.join(".op");
-                path.push(&format!("{:12}", oid));
-                let m = fs::metadata(&path)?;
-                if m.is_dir() {
-                    Ok(oid)
-                } else {
-                    //FIXME (jc) create custom error
-                    Err(IoErrorDetail::file_not_found(path, FileType::Dir, OpType::Read).into())
-                }
+                let spec = spec.clone();
+                let path = self.path.clone();
+                spawn_blocking(move || {
+                    let oid: Oid = spec.parse().map_err(|_| IoErrorDetail::Io {
+                        kind: std::io::ErrorKind::InvalidInput,
+                        message: "Cannot parse Oid".into()
+                    })?;
+                    let mut path = path.join(".op");
+                    path.push(&format!("{:12}", oid));
+                    let m = fs::metadata(&path)?;
+                    if m.is_dir() {
+                        Ok(oid)
+                    } else {
+                        //FIXME (jc) create custom error
+                        Err(IoErrorDetail::file_not_found(path, FileType::Dir, OpType::Read).into())
+                    }
+                }).await.unwrap()
             }
         }
     }
