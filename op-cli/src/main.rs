@@ -12,13 +12,11 @@ use url::Url;
 use crate::slog::Drain;
 use display::DisplayFormat;
 
-use kg_diag::{BasicDiag};
-use op_rev::{RevPath};
+use kg_diag::BasicDiag;
 use op_log::{build_file_drain, CliLogger};
+use op_rev::RevPath;
 use options::*;
-use slog::{FnValue, o};
-
-
+use slog::{o, FnValue};
 
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
@@ -32,7 +30,6 @@ mod options;
 pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
-
 
 fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
@@ -71,7 +68,7 @@ fn local_run(
     let mut rt = EngineRef::<()>::build_runtime();
 
     let out_res = rt.block_on(async {
-        let services = init_services(current_dir, config.clone(), logger).await;
+        let services = init_services(current_dir, config.clone(), logger).await?;
         let state = CoreState::new(config);
 
         let engine = EngineRef::new(services, state);
@@ -183,13 +180,11 @@ fn main() {
             model,
             filter,
             dry_run,
-        } => {
-            ExecContext::ModelCheck {
-                model,
-                filter,
-                dry_run,
-            }
-        }
+        } => ExecContext::ModelCheck {
+            model,
+            filter,
+            dry_run,
+        },
         Command::Probe {
             model,
             url,

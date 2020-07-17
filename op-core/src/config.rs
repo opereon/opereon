@@ -1,3 +1,4 @@
+use crate::ops::exec::config::ExecConfig;
 use kg_diag::io::fs;
 use kg_diag::Severity;
 use kg_diag::{BasicDiag, DiagResultExt, IntoDiagRes};
@@ -11,6 +12,7 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
 pub type ConfigResult<T> = Result<T, BasicDiag>;
 
 #[derive(Debug, Display, Detail)]
@@ -195,7 +197,7 @@ pub struct Config {
     log: LogConfig,
     queue: QueueConfig,
     model: ModelConfig,
-    // exec: ExecConfig,
+    exec: ExecConfig,
 }
 
 impl Config {
@@ -277,9 +279,9 @@ impl Config {
         &self.model
     }
 
-    // pub fn exec(&self) -> &ExecConfig {
-    //     &self.exec
-    // }
+    pub fn exec(&self) -> &ExecConfig {
+        &self.exec
+    }
 
     pub fn log(&self) -> &LogConfig {
         &self.log
@@ -295,7 +297,7 @@ impl Default for Config {
             log: LogConfig::default(),
             queue: QueueConfig::default(),
             model: ModelConfig::default(),
-            // exec: ExecConfig::default(),
+            exec: ExecConfig::default(),
         }
     }
 }

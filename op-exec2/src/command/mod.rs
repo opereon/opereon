@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 
 pub mod local;
 pub mod ssh;
+pub mod config;
 
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;

@@ -28,16 +28,20 @@ pub mod context;
 pub mod outcome;
 pub mod state;
 
+use kg_diag::BasicDiag;
+use op_exec2::command::ssh::SshSessionCache;
 pub use op_exec2::command::ssh::{SshAuth, SshDest};
 
 pub async fn init_services(
     repo_path: PathBuf,
     config: ConfigRef,
     logger: slog::Logger,
-) -> Vec<Service> {
+) -> Result<Vec<Service>, BasicDiag> {
     let model_manager = ModelManager::new(repo_path, config.model().clone(), logger);
+    let mut ssh_session_cache = SshSessionCache::new(config.exec().command().ssh().clone());
+    ssh_session_cache.init().await?;
 
-    vec![Box::new(model_manager)]
+    Ok(vec![Box::new(model_manager), Box::new(ssh_session_cache)])
 }
 
 #[cfg(test)]

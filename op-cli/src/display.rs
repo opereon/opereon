@@ -1,9 +1,4 @@
-
-
 use kg_tree::opath::NodeSet;
-
-
-
 
 use op_core::outcome::Outcome;
 
@@ -77,9 +72,7 @@ pub fn display_outcome(outcome: &Outcome, format: DisplayFormat) {
         Outcome::NodeSet(ref node_set) => {
             display_nodeset(&*node_set.lock(), format);
         }
-        _ => {
-            unimplemented!()
-        }
+        _ => unimplemented!(),
     }
 }
 

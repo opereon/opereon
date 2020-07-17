@@ -127,20 +127,6 @@ impl<T: Clone + 'static> EngineRef<T> {
         runtime
     }
 
-    // /// This method is necessary if we want to create OperationImpl instances in context of tokio runtime
-    // pub fn run_with(&self, f: impl FnOnce(EngineRef<T>) -> ()) -> EngineResult {
-    //     let mut runtime = Self::build_runtime();
-    //     let e = self.clone();
-    //     runtime.block_on(async {
-    //         f(e);
-    //         self.main_task().await
-    //     })
-    // }
-
-    // pub fn run(&self) -> EngineResult {
-    //     self.run_with(|_| {})
-    // }
-
     pub async fn start(&self) -> EngineResult {
         self.main_task().await
     }
@@ -181,7 +167,7 @@ impl<T: Clone + 'static> EngineRef<T> {
     pub fn enqueue_with_res(
         &self,
         operation: OperationRef<T>,
-    ) -> impl Future<Output = OperationResult<T>> {
+    ) -> impl Future<Output=OperationResult<T>> {
         let receiver = self.enqueue_operation(operation.clone());
 
         async move {
@@ -255,29 +241,18 @@ pub struct EngineServiceGuard<'a, S> {
     guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
 }
 
-impl<S: 'static> EngineServiceGuard<'_, S> {
-    /// Get mutable reference to specific service.
-    pub fn get_mut(&mut self) -> &mut S {
-        self.guard.downcast_mut().expect("Unexpected service type")
-    }
-
-    /// Get reference to service.
-    pub fn get(&self) -> &S {
-        self.guard.downcast_ref().expect("Unexpected service type")
-    }
-}
-
 impl<S: 'static> Deref for EngineServiceGuard<'_, S> {
     type Target = S;
 
     fn deref(&self) -> &S {
-        self.get()
+        // this is safe since only way to create this guard is through engine.service method.
+        self.guard.downcast_ref().expect("Unexpected service type")
     }
 }
 
 impl<S: 'static> DerefMut for EngineServiceGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut S {
-        self.get_mut()
+        self.guard.downcast_mut().expect("Unexpected service type")
     }
 }
 
