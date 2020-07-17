@@ -26,6 +26,7 @@ pub use self::meta::*;
 pub use self::impls::*;
 use std::thread;
 use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 #[async_trait]
 pub trait FileVersionManager: Send + std::fmt::Debug {
@@ -49,19 +50,14 @@ pub async fn create_repository<P: AsRef<Path> + Into<PathBuf>>(repo_path: P) -> 
     Ok(Box::new(git))
 }
 
-fn spawn_blocking<T, F>(f: F) -> oneshot::Receiver<T>
+fn spawn_blocking<T, F>(f: F) -> JoinHandle<T>
     where
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
 {
-    let (result_tx, result_rx) = oneshot::channel();
-
     // TODO ws use threadpool? see https://docs.rs/tokio/0.2.21/tokio/runtime/struct.Handle.html#method.spawn_blocking
 
     tokio::task::spawn_blocking(|| {
-        let res = f();
-        let _ = result_tx.send(res);
-    });
-
-    result_rx
+        f()
+    })
 }
