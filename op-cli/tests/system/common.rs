@@ -87,14 +87,22 @@ impl Context {
             .to_string_lossy()
             .to_string();
 
-        let mut params = vec!["root@127.0.0.1", "-p", port, "-i", &key, "-o", "batchmode=yes"];
+        let mut params = vec![
+            "root@127.0.0.1",
+            "-p",
+            port,
+            "-i",
+            &key,
+            "-o",
+            "batchmode=yes",
+        ];
         params.extend_from_slice(args);
 
         self.exec_cmd("ssh", &params)
     }
 
     pub fn exec_cmd(&self, cmd: &str, args: &[&str]) -> CmdOutput {
-//        println!("executing: {} {}", cmd, args.join(" "));
+        //        println!("executing: {} {}", cmd, args.join(" "));
         let out = Command::new(cmd)
             .args(args)
             .current_dir(&self.model_dir)

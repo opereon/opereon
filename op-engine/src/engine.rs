@@ -1,12 +1,15 @@
 use crate::{OperationImpl, OperationRef};
 use kg_utils::collections::LinkedHashMap;
 use kg_utils::sync::{SyncRef, SyncRefMapReadGuard, SyncRefReadGuard};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::operation::OperationResult;
 use futures::lock::{Mutex, MutexGuard};
-use std::any::Any;
+use kg_diag::Detail;
+use serde::export::PhantomData;
+use std::any::{Any, TypeId};
 use std::future::Future;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
@@ -77,28 +80,40 @@ impl<T: Clone + 'static> Core<T> {
     }
 }
 
-type Services = Arc<Mutex<Box<dyn Any + Send + 'static>>>;
+pub type Service = Box<dyn Any + Send + 'static>;
+pub type State = Box<dyn Any + Send + Sync + 'static>;
 
 #[derive(Clone)]
 pub struct EngineRef<T: Clone + 'static> {
     operations: SyncRef<Operations<T>>,
     core: SyncRef<Core<T>>,
-    services: Services,
+    services: Arc<HashMap<TypeId, Arc<Mutex<Service>>>>,
+    state: Arc<State>,
 }
 
 impl<T: Clone + 'static> EngineRef<T> {
-
-    pub fn new() -> EngineRef<T> {
-        EngineRef::with_services(())
+    pub fn default() -> EngineRef<T> {
+        EngineRef::new(vec![], ())
     }
 
-    pub fn with_services<S: Any + Send + 'static>(services: S) -> EngineRef<T> {
+    pub fn new<S: Any + Send + Sync + 'static>(
+        services: Vec<Box<dyn Any + Send + 'static>>,
+        state: S,
+    ) -> EngineRef<T> {
+        let services = services
+            .into_iter()
+            .map(|s| {
+                // use as_ref() to get type of boxed struct instead of Box
+                let type_id = s.as_ref().type_id();
+                (type_id, Arc::new(Mutex::new(s)))
+            })
+            .collect::<HashMap<_, _>>();
+
         EngineRef {
             operations: SyncRef::new(Operations::new()),
             core: SyncRef::new(Core::new()),
-            services: Arc::new(Mutex::new(
-                Box::new(services) as Box<dyn Any + Send + 'static>
-            )),
+            services: Arc::new(services),
+            state: Arc::new(Box::new(state)),
         }
     }
 
@@ -111,20 +126,6 @@ impl<T: Clone + 'static> EngineRef<T> {
             .unwrap();
         runtime
     }
-
-    // /// This method is necessary if we want to create OperationImpl instances in context of tokio runtime
-    // pub fn run_with(&self, f: impl FnOnce(EngineRef<T>) -> ()) -> EngineResult {
-    //     let mut runtime = Self::build_runtime();
-    //     let e = self.clone();
-    //     runtime.block_on(async {
-    //         f(e);
-    //         self.main_task().await
-    //     })
-    // }
-
-    // pub fn run(&self) -> EngineResult {
-    //     self.run_with(|_| {})
-    // }
 
     pub async fn start(&self) -> EngineResult {
         self.main_task().await
@@ -166,7 +167,7 @@ impl<T: Clone + 'static> EngineRef<T> {
     pub fn enqueue_with_res(
         &self,
         operation: OperationRef<T>,
-    ) -> impl Future<Output = OperationResult<T>> {
+    ) -> impl Future<Output=OperationResult<T>> {
         let receiver = self.enqueue_operation(operation.clone());
 
         async move {
@@ -217,33 +218,41 @@ impl<T: Clone + 'static> EngineRef<T> {
         }
     }
 
-    pub async fn services(&self) -> EngineServicesGuard<'_> {
-        let guard = self.services.lock().await;
-        EngineServicesGuard { guard }
+    pub async fn service<S: 'static>(&self) -> Option<EngineServiceGuard<'_, S>> {
+        let s = self.services.get(&TypeId::of::<S>());
+        if let Some(service) = s {
+            let guard = service.lock().await;
+            Some(EngineServiceGuard {
+                phantom: PhantomData::<S>,
+                guard,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn state<S: 'static>(&self) -> Option<&S> {
+        self.state.downcast_ref::<S>()
     }
 }
 
-pub struct EngineServicesGuard<'a> {
+pub struct EngineServiceGuard<'a, S> {
+    phantom: PhantomData<S>,
     guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
 }
 
-impl EngineServicesGuard<'_> {
-    /// Get mutable reference to services.
-    /// # Panics
-    /// Panics if requested type is different from type registered in Engine constructor
-    pub fn get_mut<S: 'static>(&mut self) -> &mut S {
-        self.guard
-            .downcast_mut()
-            .expect("Unexpected engine services type")
-    }
+impl<S: 'static> Deref for EngineServiceGuard<'_, S> {
+    type Target = S;
 
-    /// Get reference to services.
-    /// # Panics
-    /// Panics if requested type is different from type registered in Engine constructor
-    pub fn get<S: 'static>(&self) -> &S {
-        self.guard
-            .downcast_ref()
-            .expect("Unexpected engine services type")
+    fn deref(&self) -> &S {
+        // this is safe since only way to create this guard is through engine.service method.
+        self.guard.downcast_ref().expect("Unexpected service type")
+    }
+}
+
+impl<S: 'static> DerefMut for EngineServiceGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut S {
+        self.guard.downcast_mut().expect("Unexpected service type")
     }
 }
 

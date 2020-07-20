@@ -7,7 +7,7 @@ use op_exec2::rsync::copy::ProgressInfo;
 use op_exec2::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
 use op_exec2::OutputLog;
 
-use op_engine::operation::OperationResult;
+use op_engine::operation::{OperationImplExt, OperationResult};
 use op_engine::progress::{Progress, Unit};
 use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
@@ -92,7 +92,7 @@ impl FileCopyOperation {
     }
 }
 
-fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
+fn build_progress(diffs: &[DiffInfo]) -> Progress {
     let mut parts = vec![];
 
     for diff in diffs {
@@ -105,8 +105,7 @@ fn build_progress(diffs: &Vec<DiffInfo>) -> Progress {
             ));
         }
     }
-    let progress = Progress::from_parts(parts);
-    progress
+    Progress::from_parts(parts)
 }
 
 #[async_trait]
@@ -118,7 +117,7 @@ impl OperationImpl<Outcome> for FileCopyOperation {
     ) -> OperationResult<()> {
         let op_impl =
             FileCompareOperation::new(&self.config, &self.params, self.checksum, &self.log);
-        let op = OperationRef::new("compare_operation", op_impl);
+        let op = OperationRef::new("compare_operation", op_impl.boxed());
 
         let out = engine.enqueue_with_res(op).await?;
         let diffs = if let Outcome::FileDiff(res) = out {
@@ -198,7 +197,7 @@ mod tests {
 
     #[test]
     fn cancel_file_copy_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -207,7 +206,7 @@ mod tests {
         let log = OutputLog::new();
 
         let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
-        let op = OperationRef::new("copy_operation", op_impl);
+        let op = OperationRef::new("copy_operation", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -235,7 +234,7 @@ mod tests {
 
     #[test]
     fn file_copy_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
         let cfg = RsyncConfig::default();
@@ -243,7 +242,7 @@ mod tests {
         let log = OutputLog::new();
 
         let op_impl = FileCopyOperation::new(&cfg, &params, false, &log);
-        let op = OperationRef::new("copy_operation", op_impl);
+        let op = OperationRef::new("copy_operation", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -263,7 +262,7 @@ mod tests {
 
     #[test]
     fn compare_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -276,7 +275,7 @@ mod tests {
                 let log = OutputLog::new();
 
                 let op_impl = FileCompareOperation::new(&cfg, &params, false, &log);
-                let op = OperationRef::new("compare_operation", op_impl);
+                let op = OperationRef::new("compare_operation", op_impl.boxed());
                 let res = engine.enqueue_with_res(op).await.unwrap();
                 println!("operation completed {:?}", res);
                 engine.stop();
@@ -289,7 +288,7 @@ mod tests {
 
     #[test]
     fn cancel_compare_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
 
         let mut rt = EngineRef::<()>::build_runtime();
 
@@ -302,7 +301,7 @@ mod tests {
                 let log = OutputLog::new();
 
                 let op_impl = FileCompareOperation::new(&cfg, &params, true, &log);
-                let op = OperationRef::new("compare_operation", op_impl);
+                let op = OperationRef::new("compare_operation", op_impl.boxed());
 
                 let o = op.clone();
                 tokio::spawn(async move {

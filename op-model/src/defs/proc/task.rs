@@ -386,10 +386,10 @@ impl ParsedModelDef for Case {
                 proc: ProcDef::parse(model, parent, node)?,
             })
         } else {
-            return Err(DefsErrorDetail::TaskCaseNonObject {
+            Err(DefsErrorDetail::TaskCaseNonObject {
                 kind: node.data().kind(),
             }
-            .into());
+            .into())
         }
     }
 }

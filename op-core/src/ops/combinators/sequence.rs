@@ -3,8 +3,7 @@ use crate::outcome::Outcome;
 use async_trait::*;
 use op_engine::operation::OperationResult;
 use op_engine::progress::{Progress, Unit};
-use op_engine::{EngineRef, OperationError, OperationImpl, OperationRef, ProgressUpdate};
-use tokio::task::JoinHandle;
+use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};
 
 pub struct SequenceOperation {
     ops: Vec<OperationRef<Outcome>>,
@@ -70,13 +69,9 @@ mod tests {
     use crate::outcome::Outcome;
     use kg_diag::IntoDiagRes;
     use kg_diag::Severity;
-    use op_engine::operation::OperationResult;
+    use op_engine::operation::{OperationImplExt, OperationResult};
     use op_engine::{EngineRef, OperationImpl, OperationRef};
     use tokio::time::Duration;
-
-    use crate::ops::combinators::parallel::ParallelOperation;
-    use async_trait::*;
-    use kg_diag::io::ResultExt;
 
     pub struct TestOp {
         should_fail: bool,
@@ -95,14 +90,14 @@ mod tests {
                 should_fail: false,
                 duration,
             };
-            OperationRef::new("test_op", op_impl)
+            OperationRef::new("test_op", op_impl.boxed())
         }
         pub fn new_op_fail(duration: u64) -> OperationRef<Outcome> {
             let op_impl = TestOp {
                 should_fail: true,
                 duration,
             };
-            OperationRef::new("test_op", op_impl)
+            OperationRef::new("test_op", op_impl.boxed())
         }
     }
 
@@ -137,13 +132,13 @@ mod tests {
 
     #[test]
     fn sequence_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let ops = vec![TestOp::new_op(1), TestOp::new_op(1), TestOp::new_op(1)];
 
         let op_impl = SequenceOperation::new(ops);
-        let op = OperationRef::new("parallel_operation", op_impl);
+        let op = OperationRef::new("parallel_operation", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();

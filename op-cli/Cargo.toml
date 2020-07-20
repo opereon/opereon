@@ -11,7 +11,8 @@ build = "build.rs"
 kg-diag = "0.4.0"
 kg-tree = "0.2.0"
 kg-utils = "0.4.0"
-op-exec = { version = "0.1.1", path = "../op-exec" }
+op-engine = { path= "../op-engine"}
+op-core = { version = "0.1.0", path = "../op-core" }
 op-rev = { version = "0.1.1", path = "../op-rev" }
 op-log = { version = "0.1.0", path = "../op-log" }
 structopt = "0.3.14"

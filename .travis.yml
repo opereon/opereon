@@ -18,11 +18,11 @@ before_install:
   - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
 
 script:
-  - export CARGO_INCREMENTAL=0
-  - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+#  - export CARGO_INCREMENTAL=0
+#  - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
   - cargo build --verbose
-  - cargo test --verbose
-  - |
-    zip -0 ccov.zip `find . \( -name "op*.gc*" \) -print`;
-    ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" -o lcov.info;
-    bash <(curl -s https://codecov.io/bash) -f lcov.info;
+#  - cargo test --verbose
+#  - |
+#    zip -0 ccov.zip `find . \( -name "op*.gc*" \) -print`;
+#    ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" -o lcov.info;
+#    bash <(curl -s https://codecov.io/bash) -f lcov.info;

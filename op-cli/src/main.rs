@@ -1,37 +1,35 @@
 extern crate slog;
 extern crate structopt;
 
-#[macro_use]
-extern crate op_log;
-
+use op_core::*;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::Future;
+
 use structopt::StructOpt;
 use url::Url;
 
 use crate::slog::Drain;
 use display::DisplayFormat;
-use futures::stream::Stream;
+
 use kg_diag::BasicDiag;
-use op_rev::{RevPath};
-use op_exec::OutcomeFuture;
-use op_exec::{ConfigRef, Context as ExecContext, EngineRef};
-use op_exec::{SshAuth, SshDest};
 use op_log::{build_file_drain, CliLogger};
+use op_rev::RevPath;
 use options::*;
-use slog::{FnValue, o, error};
-use std::sync::atomic::*;
-use std::sync::Arc;
-use tokio::runtime;
+use slog::{o, FnValue};
+
+use op_core::config::ConfigRef;
+use op_core::context::Context as ExecContext;
+use op_engine::EngineRef;
+
+use op_core::state::CoreState;
+
 mod display;
 mod options;
 
 pub static SHORT_VERSION: &str = env!("OP_SHORT_VERSION");
 pub static LONG_VERSION: &str = env!("OP_LONG_VERSION");
 pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
-
 
 fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
@@ -61,64 +59,39 @@ fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
 fn local_run(
     current_dir: PathBuf,
     config: ConfigRef,
-    operation: ExecContext,
+    ctx: ExecContext,
     disp_format: DisplayFormat,
     verbose: u8,
 ) -> Result<u32, BasicDiag> {
     let logger = init_logger(&config, verbose);
 
-    let engine = EngineRef::start(current_dir, config, logger.clone())?;
-    let outcome_fut: OutcomeFuture = engine.enqueue_operation(operation.into(), false)?;
+    let mut rt = EngineRef::<()>::build_runtime();
 
-    let progress_fut = outcome_fut.progress().for_each(|p| {
-        println!("=========================================");
-        eprintln!("Total: {}/{} {:?}", p.value(), p.max(), p.unit());
-        for p in p.steps() {
-            if let Some(ref file_name) = p.file_name() {
-                eprintln!("{}/{} {:?}: {}", p.value(), p.max(), p.unit(), file_name);
-            } else {
-                eprintln!("Step value: {}/{} {:?}", p.value(), p.max(), p.unit());
-            }
-        }
-        //            eprintln!("p = {:#?}", p);
-        Ok(())
-    });
+    let out_res = rt.block_on(async {
+        let services = init_services(current_dir, config.clone(), logger).await?;
+        let state = CoreState::new(config);
 
-    let progress_fut = progress_fut.map_err(|err| {
-        eprintln!("progress error \n{}", err);
-    });
+        let engine = EngineRef::new(services, state);
 
-    let engine_fut = engine.clone().then(|_| {
-        // Nothing to do when engine future complete
-        futures::future::ok(())
-    });
-
-    let exit_code = Arc::new(AtomicU32::new(0));
-    let code = exit_code.clone();
-    let outcome_fut = outcome_fut
-        .and_then(move |outcome| {
-            display::display_outcome(&outcome, disp_format);
-            futures::future::ok(())
-        })
-        .map_err(move |err| {
-            use kg_diag::Diag;
-            code.store(err.detail().code(), Ordering::Relaxed);
-            error!(logger, "Operation execution error"; "err" => err.to_string());
-            op_error!(0, "Operation execution error:\n{}", err);
-        })
-        .then(move |_| {
-            engine.stop();
-            futures::future::ok::<(), ()>(())
+        let e = engine.clone();
+        let res = tokio::spawn(async move {
+            let res = e.enqueue_with_res(ctx.into()).await;
+            e.stop();
+            res
         });
+        engine.register_progress_cb(|_e, o| {
+            if !o.read().progress().is_done() {
+                println!("{}", o.read().progress())
+            }
+        });
+        let (_engine_result, res) = futures::future::join(engine.start(), res).await;
+        res.unwrap()
+    });
 
-    let mut rt = runtime::Builder::new().build().unwrap();
-    rt.block_on(
-        outcome_fut
-            .join3(engine_fut, progress_fut)
-            .then(|_| futures::future::ok::<(), ()>(())),
-    )
-    .unwrap();
-    Ok(exit_code.load(Ordering::Relaxed))
+    let outcome = out_res?;
+
+    display::display_outcome(&outcome, disp_format);
+    Ok(0)
 }
 
 fn main() {
@@ -207,13 +180,11 @@ fn main() {
             model,
             filter,
             dry_run,
-        } => {
-            ExecContext::ModelCheck {
-                model,
-                filter,
-                dry_run,
-            }
-        }
+        } => ExecContext::ModelCheck {
+            model,
+            filter,
+            dry_run,
+        },
         Command::Probe {
             model,
             url,

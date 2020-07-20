@@ -97,8 +97,8 @@ impl SpawnableCommand for SshScriptOperation {
             self.script.as_ref(),
             &self.args,
             self.env.as_ref(),
-            self.cwd.as_ref().map(|c| c.as_path()),
-            self.run_as.as_ref().map(|s| s.as_str()),
+            self.cwd.as_deref(),
+            self.run_as.as_deref(),
             &self.log,
         )
     }
@@ -109,6 +109,7 @@ command_operation_impl!(SshScriptOperation);
 mod tests {
     use super::*;
     use crate::outcome::Outcome;
+    use op_engine::operation::OperationImplExt;
     use op_engine::{EngineRef, OperationRef};
     use op_exec2::command::ssh::{SshAuth, SshConfig};
     use op_exec2::command::SourceRef;
@@ -121,7 +122,7 @@ mod tests {
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
 
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let mut cfg = SshConfig::default();
@@ -146,7 +147,7 @@ mod tests {
             &dest,
             &cache,
         );
-        let op = OperationRef::new("ssh_command", op_impl);
+        let op = OperationRef::new("ssh_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -168,7 +169,7 @@ mod tests {
         };
         let dest = SshDest::new("localhost", 22, "wiktor", auth);
 
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let mut cfg = SshConfig::default();
@@ -214,7 +215,7 @@ mod tests {
             &dest,
             &cache,
         );
-        let op = OperationRef::new("ssh_command", op_impl);
+        let op = OperationRef::new("ssh_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();

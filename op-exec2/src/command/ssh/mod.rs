@@ -1,8 +1,8 @@
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::process::{Stdio};
-use std::sync::{Arc};
+use std::process::Stdio;
+use std::sync::Arc;
 
 use os_pipe::pipe;
 
@@ -12,10 +12,10 @@ use std::io::{Seek, SeekFrom, Write};
 pub use self::config::SshConfig;
 pub use self::dest::{SshAuth, SshDest};
 use crate::utils::spawn_blocking;
+use futures::lock::{Mutex, MutexGuard};
 use kg_diag::io::fs::create_dir_all;
 use kg_diag::io::ResultExt;
 use shared_child::SharedChild;
-use futures::lock::{Mutex, MutexGuard};
 
 mod config;
 mod dest;
@@ -496,10 +496,7 @@ mod tests {
             "This is environment variable content".into(),
         );
 
-        env.insert(
-            "TEST_ENV_VAR2".into(),
-            "Another variable content".into(),
-        );
+        env.insert("TEST_ENV_VAR2".into(), "Another variable content".into());
 
         rt.block_on(async move {
             sess.open().await.unwrap_disp();

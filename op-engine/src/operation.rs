@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
+
 #[derive(Debug, Display)]
 pub enum OperationErrorDetail {
     #[display(fmt = "operation cancelled by user")]
@@ -44,6 +45,19 @@ pub trait OperationImpl<T: Clone + 'static>: Send {
     ) -> OperationResult<T>;
 }
 
+pub trait OperationImplExt<T: Clone + 'static>: OperationImpl<T> + Sized + 'static {
+    fn boxed(self) -> Box<dyn OperationImpl<T>> {
+        Box::new(self)
+    }
+}
+
+impl<T, O> OperationImplExt<O> for T
+where
+    T: OperationImpl<O> + 'static,
+    O: Clone + 'static,
+{
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum OperationState {
     Init,
@@ -68,7 +82,7 @@ pub struct Operation<T> {
 }
 
 impl<T: Clone + 'static> Operation<T> {
-    fn new<S: Into<String>, O: OperationImpl<T> + 'static>(name: S, op_impl: O) -> Operation<T> {
+    fn new<S: Into<String>>(name: S, op_impl: Box<dyn OperationImpl<T>>) -> Operation<T> {
         let (cancel_tx, cancel_rx) = mpsc::channel(100);
         Operation {
             id: Uuid::new_v4(),
@@ -78,7 +92,7 @@ impl<T: Clone + 'static> Operation<T> {
             progress: Progress::default(),
             waker: None,
             op_state: OperationState::Init,
-            op_impl: Some(Box::new(op_impl)),
+            op_impl: Some(op_impl),
             outcome: None,
             done_sender: None,
             cancel_sender: cancel_tx,
@@ -144,7 +158,7 @@ impl<T: Clone + 'static> Operation<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct OperationRef<T>(SyncRef<Operation<T>>);
 
 impl<T> Deref for OperationRef<T> {
@@ -157,10 +171,7 @@ impl<T> Deref for OperationRef<T> {
 }
 
 impl<T: Clone + 'static> OperationRef<T> {
-    pub fn new<S: Into<String>, O: OperationImpl<T> + 'static>(
-        name: S,
-        op_impl: O,
-    ) -> OperationRef<T> {
+    pub fn new<S: Into<String>>(name: S, op_impl: Box<dyn OperationImpl<T>>) -> OperationRef<T> {
         OperationRef(SyncRef::new(Operation::new(name, op_impl)))
     }
 

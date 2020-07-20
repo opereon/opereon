@@ -5,14 +5,15 @@ use kg_diag::io::ResultExt;
 use crate::utils::spawn_blocking;
 use shared_child::SharedChild;
 use std::io::{BufRead, BufReader, Read};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::process::{Command, ExitStatus};
 use std::sync::Arc;
 use tokio::sync::oneshot;
-use std::path::PathBuf;
 
 pub mod local;
 pub mod ssh;
+pub mod config;
 
 pub type CommandError = BasicDiag;
 pub type CommandResult<T> = Result<T, CommandError>;
@@ -107,8 +108,8 @@ impl<'a> SourceRef<'a> {
 
     pub fn to_owned(&self) -> Source {
         match self {
-            SourceRef::Path(p) => { Source::Path(p.to_path_buf()) }
-            SourceRef::Source(src) => { Source::Source(src.to_string()) }
+            SourceRef::Path(p) => Source::Path(p.to_path_buf()),
+            SourceRef::Source(src) => Source::Source(src.to_string()),
         }
     }
 }
@@ -121,8 +122,8 @@ pub enum Source {
 impl Source {
     pub fn as_ref(&self) -> SourceRef<'_> {
         match self {
-            Source::Path(p) => { SourceRef::Path(p.as_path()) }
-            Source::Source(src) => { SourceRef::Source(src.as_str()) }
+            Source::Path(p) => SourceRef::Path(p.as_path()),
+            Source::Source(src) => SourceRef::Source(src.as_str()),
         }
     }
 }
@@ -139,35 +140,35 @@ fn prepare_script<W: std::io::Write>(
 
     let script = script.read()?;
 
-    write!(out, "#!/usr/bin/env bash\n")?;
+    writeln!(out, "#!/usr/bin/env bash")?;
 
     if let Some(cwd) = cwd {
-        write!(out, "cd \"{}\"\n", cwd.display())?;
+        writeln!(out, "cd \"{}\"", cwd.display())?;
     }
     if let Some(env) = env {
         for (k, v) in env {
-            write!(out, "export {}='{}'\n", k, v)?;
+            writeln!(out, "export {}='{}'", k, v)?;
         }
     }
 
     // Create temp script file in ramdisk
     let tmp_path = format!("/dev/shm/op_{:0x}", rng.gen::<u64>());
-    write!(out, "cat > {} <<-'%%EOF%%'\n", tmp_path)?;
-    write!(out, "{}\n", script.trim())?;
-    write!(out, "%%EOF%%\n")?;
+    writeln!(out, "cat > {} <<-'%%EOF%%'", tmp_path)?;
+    writeln!(out, "{}", script.trim())?;
+    writeln!(out, "%%EOF%%")?;
 
     // Make temp script executable
-    write!(out, "chmod +x {}\n", tmp_path)?;
+    writeln!(out, "chmod +x {}", tmp_path)?;
 
     // Execute tmp script
     if args.is_empty() {
-        write!(out, "({})\n", tmp_path)?;
+        writeln!(out, "({})", tmp_path)?;
     } else {
         write!(out, "({}", tmp_path)?;
         for arg in args {
             write!(out, " \'{}\'", arg)?;
         }
-        write!(out, ")\n")?;
+        writeln!(out, ")")?;
     }
 
     // Capture script status
@@ -205,7 +206,7 @@ impl CommandBuilder {
         self
     }
 
-    pub fn args<S: Into<String>, I: Iterator<Item=S>>(&mut self, args: I) -> &mut CommandBuilder {
+    pub fn args<S: Into<String>, I: Iterator<Item = S>>(&mut self, args: I) -> &mut CommandBuilder {
         for a in args {
             self.args.push(a.into());
         }
@@ -295,7 +296,9 @@ impl CommandBuilder {
         use std::fmt::Write;
         let mut out = String::new();
 
-        let envs = self.envs.iter()
+        let envs = self
+            .envs
+            .iter()
             .map(|(k, v)| format!("{}='{}'", k, v))
             .collect::<Vec<String>>()
             .join(" ");

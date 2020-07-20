@@ -17,10 +17,8 @@ pub use progress::ProgressUpdate;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operation::OperationResult;
+    use crate::operation::{OperationImplExt, OperationResult};
     use async_trait::*;
-    use futures::lock::MutexGuard;
-    use std::any::Any;
     use tokio::time::{Duration, Interval};
 
     struct TestOp {
@@ -41,10 +39,10 @@ mod tests {
 
     type OutputType = String;
 
-    pub struct TestServices {
+    pub struct TestService {
         counter: usize,
     }
-    impl TestServices {
+    impl TestService {
         pub fn new() -> Self {
             Self { counter: 0 }
         }
@@ -53,6 +51,11 @@ mod tests {
         }
         pub fn set_counter(&mut self, counter: usize) {
             self.counter = counter
+        }
+        pub async fn foo(&mut self) {
+            let delay = tokio::time::delay_for(Duration::from_secs(1));
+            println!("Some long running async task....");
+            delay.await;
         }
     }
 
@@ -63,11 +66,12 @@ mod tests {
             engine: &EngineRef<OutputType>,
             _operation: &OperationRef<OutputType>,
         ) -> OperationResult<ProgressUpdate> {
-            let mut services = engine.services().await;
-            let s = services.get_mut::<TestServices>();
-            s.set_counter(s.counter() + 1);
-            eprintln!("counter = {:?}", s.counter());
-            drop(services); // keep critical section as small as possible
+            let mut service = engine.service::<TestService>().await.unwrap();
+            let counter = service.counter();
+            service.set_counter(counter + 1);
+            eprintln!("counter = {:?}", service.counter());
+            // s.foo().await;
+            drop(service); // keep critical section as small as possible
 
             //println!("progress: {}", operation.read().name);
             if self.count > 0 {
@@ -116,9 +120,9 @@ mod tests {
 
     #[test]
     fn test_operation() {
-        let services = TestServices::new();
+        let service = TestService::new();
 
-        let engine: EngineRef<String> = EngineRef::with_services(services);
+        let engine: EngineRef<String> = EngineRef::new(vec![Box::new(service)], ());
 
         engine.register_progress_cb(|e, _o| {
             print_progress(e, false);
@@ -131,11 +135,11 @@ mod tests {
         rt.block_on(async move {
             let e = engine.clone();
             tokio::spawn(async move {
-                engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new()));
-                engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new()));
-                engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new()));
+                engine.enqueue_operation(OperationRef::new("ddd1", TestOp::new().boxed()));
+                engine.enqueue_operation(OperationRef::new("ddd2", TestOp::new().boxed()));
+                engine.enqueue_operation(OperationRef::new("ddd3", TestOp::new().boxed()));
                 engine
-                    .enqueue_with_res(OperationRef::new("ddd4", TestOp::new()))
+                    .enqueue_with_res(OperationRef::new("ddd4", TestOp::new().boxed()))
                     .await
                     .unwrap();
                 engine.stop()

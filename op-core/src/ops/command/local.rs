@@ -49,7 +49,7 @@ impl SpawnableCommand for LocalCommandOperation {
             &self.cmd,
             &self.args,
             self.env.as_ref(),
-            self.cwd.as_ref().map(|p| p.as_path()),
+            self.cwd.as_deref(),
             self.run_as.as_ref().map(|s| s.as_ref()),
             &self.config,
             &self.log,
@@ -97,7 +97,7 @@ impl SpawnableCommand for LocalScriptOperation {
             self.script.as_ref(),
             &self.args,
             self.env.as_ref(),
-            self.cwd.as_ref().map(|p| p.as_path()),
+            self.cwd.as_deref(),
             self.run_as.as_ref().map(|s| s.as_ref()),
             &self.config,
             &self.log,
@@ -109,10 +109,11 @@ command_operation_impl!(LocalScriptOperation);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use op_engine::operation::OperationImplExt;
 
     #[test]
     fn local_command_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = LocalConfig::default();
@@ -135,7 +136,7 @@ mod tests {
             &cfg,
             &log,
         );
-        let op = OperationRef::new("local_command", op_impl);
+        let op = OperationRef::new("local_command", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();
@@ -152,7 +153,7 @@ mod tests {
 
     #[test]
     fn local_script_operation_test() {
-        let engine: EngineRef<Outcome> = EngineRef::new();
+        let engine: EngineRef<Outcome> = EngineRef::default();
         let mut rt = EngineRef::<()>::build_runtime();
 
         let cfg = LocalConfig::default();
@@ -198,7 +199,7 @@ mod tests {
             &cfg,
             &log,
         );
-        let op = OperationRef::new("local_script", op_impl);
+        let op = OperationRef::new("local_script", op_impl.boxed());
 
         rt.block_on(async move {
             let e = engine.clone();

@@ -136,7 +136,7 @@ impl ParsedModelDef for ProcDef {
 
         match *node.data().value() {
             Value::Object(ref props) => {
-                if let Some(_) = props.get("when") {
+                if props.get("when").is_some() {
                     p.kind = ProcKind::Exec;
                 } else if let Some(n) = props.get("proc") {
                     p.kind = ProcKind::from_str(&n.data().as_string())?;

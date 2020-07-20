@@ -6,7 +6,7 @@ use crate::utils::spawn_blocking;
 use config::LocalConfig;
 use os_pipe::pipe;
 use shared_child::SharedChild;
-use std::io::{ Write};
+use std::io::Write;
 use std::sync::Arc;
 
 pub fn spawn_local_command(
