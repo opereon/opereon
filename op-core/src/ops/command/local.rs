@@ -4,11 +4,11 @@ use crate::utils::SharedChildExt;
 use async_trait::*;
 use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef};
-use op_exec2::command::local::config::LocalConfig;
-use op_exec2::command::local::{spawn_local_command, spawn_local_script};
-use op_exec2::command::Source;
-use op_exec2::command::{CommandHandle, EnvVars, SourceRef};
-use op_exec2::OutputLog;
+use op_exec::command::local::config::LocalConfig;
+use op_exec::command::local::{spawn_local_command, spawn_local_script};
+use op_exec::command::Source;
+use op_exec::command::{CommandHandle, EnvVars, SourceRef};
+use op_exec::OutputLog;
 use std::path::{Path, PathBuf};
 
 pub struct LocalCommandOperation {

@@ -6,14 +6,14 @@ workspace = ".."
 edition = "2018"
 
 [dependencies]
-async-trait = "0.1.36"
 kg-utils = "0.4.0"
 kg-diag = "0.4.0"
 kg-diag-derive = "0.4.0"
 kg-display-derive = "0.1.1"
 futures = "0.3.5"
 tokio = { version = "0.2.21", features = ["full"] }
+async-trait = "0.1.36"
 uuid = { version = "0.8.1", features = ["v1", "v3", "v4", "v5", "serde"] }
-serde = "1.0.110"
-serde_derive = "1.0.110"
+serde = "1.0.114"
+serde_derive = "1.0.114"
 rand = "0.7.3"

@@ -1,8 +1,8 @@
 [package]
-name = "op-exec2"
+name = "_op-exec"
 version = "0.1.1"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
-workspace = ".."
+#workspace = ".."
 edition = "2018"
 
 [dependencies]
@@ -17,10 +17,9 @@ kg-lang = "0.1.1"
 op-model = { version = "0.1.1", path = "../op-model" }
 op-rev = { version = "0.1.1", path = "../op-rev" }
 op-log = { version = "0.1.0", path = "../op-log" }
-tokio = { version = "0.2.21", features = ["full"] }
-pin-project = "0.4.17"
-futures = {version ="0.3.5", features = ["async-await"]}
-os_pipe = "0.9.2"
+tokio = "0.2.21"
+tokio-process = "0.2.5"
+os_pipe = "0.9.1"
 time = "0.2.16"
 chrono = { version = "0.4.11", features = ["serde"] }
 serde = "1.0.110"
@@ -41,8 +40,6 @@ users = "0.10.0"
 url = "2.1.1"
 git2 = "0.13.6"
 parking_lot = "0.10.2"
-rexpect = "0.3.0"
-shared_child = "0.3.4"
 
 [dev-dependencies]
 tempfile = "3.1.0"

@@ -6,7 +6,7 @@ use crate::ops::model::{
 use crate::outcome::Outcome;
 use op_engine::operation::OperationImplExt;
 use op_engine::OperationRef;
-use op_exec2::command::ssh::SshDest;
+use op_exec::command::ssh::SshDest;
 use op_rev::RevPath;
 use std::path::PathBuf;
 

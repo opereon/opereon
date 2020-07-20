@@ -4,9 +4,9 @@ use crate::utils::SharedChildExt;
 use async_trait::*;
 use op_engine::operation::OperationResult;
 use op_engine::{EngineRef, OperationImpl, OperationRef};
-use op_exec2::command::ssh::{SshDest, SshSessionCacheRef};
-use op_exec2::command::{CommandHandle, EnvVars, Source, SourceRef};
-use op_exec2::OutputLog;
+use op_exec::command::ssh::{SshDest, SshSessionCacheRef};
+use op_exec::command::{CommandHandle, EnvVars, Source, SourceRef};
+use op_exec::OutputLog;
 use std::path::{Path, PathBuf};
 
 pub struct SshCommandOperation {

@@ -2,11 +2,10 @@ use async_trait::async_trait;
 
 use crate::outcome::Outcome;
 
-use op_exec2::rsync::compare::State;
-use op_exec2::rsync::copy::ProgressInfo;
-use op_exec2::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
-use op_exec2::OutputLog;
-
+use op_exec::rsync::compare::State;
+use op_exec::rsync::copy::ProgressInfo;
+use op_exec::rsync::{DiffInfo, RsyncCompare, RsyncConfig, RsyncCopy, RsyncParams, RsyncResult};
+use op_exec::OutputLog;
 use op_engine::operation::{OperationImplExt, OperationResult};
 use op_engine::progress::{Progress, Unit};
 use op_engine::{EngineRef, OperationImpl, OperationRef, ProgressUpdate};

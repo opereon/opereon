@@ -1,5 +1,5 @@
-use op_exec2::command::config::CommandConfig;
-use op_exec2::rsync::RsyncConfig;
+use op_exec::command::config::CommandConfig;
+use op_exec::rsync::RsyncConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

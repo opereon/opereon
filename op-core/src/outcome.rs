@@ -4,8 +4,8 @@ use kg_tree::NodeRef;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use op_exec2::command::CommandOutput;
-use op_exec2::rsync::DiffInfo;
+use op_exec::command::CommandOutput;
+use op_exec::rsync::DiffInfo;
 use serde::{de, ser};
 use std::ops::Deref;
 

@@ -1,4 +1,4 @@
-#![feature(specialization)]
+#![feature(min_specialization)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -22,6 +22,7 @@ use std::path::PathBuf;
 mod ops;
 mod services;
 mod utils;
+mod proto;
 
 pub mod config;
 pub mod context;
@@ -29,8 +30,8 @@ pub mod outcome;
 pub mod state;
 
 use kg_diag::BasicDiag;
-use op_exec2::command::ssh::SshSessionCache;
-pub use op_exec2::command::ssh::{SshAuth, SshDest};
+use op_exec::command::ssh::SshSessionCache;
+pub use op_exec::command::ssh::{SshAuth, SshDest};
 
 pub async fn init_services(
     repo_path: PathBuf,
