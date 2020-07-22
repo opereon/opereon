@@ -983,6 +983,7 @@ name = "op-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono 0.4.13",
  "futures",
  "kg-diag",
  "kg-diag-derive",

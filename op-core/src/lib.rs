@@ -11,8 +11,12 @@ extern crate kg_diag_derive;
 
 #[macro_use]
 extern crate kg_display_derive;
+
 #[macro_use]
 extern crate slog;
+
+use chrono::prelude::*;
+use kg_diag::*;
 
 use crate::config::ConfigRef;
 use crate::services::model_manager::ModelManager;
