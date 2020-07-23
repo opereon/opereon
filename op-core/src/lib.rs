@@ -16,12 +16,22 @@ extern crate kg_display_derive;
 extern crate slog;
 
 use chrono::prelude::*;
+use slog::Logger;
+
 use kg_diag::*;
+use kg_diag::io::fs;
+use kg_tree::*;
+use kg_tree::opath::Opath;
+use kg_tree::serial::{from_tree, to_tree};
+use op_rev::*;
+use op_model::*;
+use op_engine::engine::Service;
+use op_exec::command::ssh::{SshSessionCache, SshAuth, SshDest};
 
 use crate::config::ConfigRef;
 use crate::services::model_manager::ModelManager;
-use op_engine::engine::Service;
-use std::path::PathBuf;
+
+use std::path::{Path, PathBuf};
 
 mod ops;
 mod services;
@@ -33,9 +43,6 @@ pub mod context;
 pub mod outcome;
 pub mod state;
 
-use kg_diag::BasicDiag;
-use op_exec::command::ssh::SshSessionCache;
-pub use op_exec::command::ssh::{SshAuth, SshDest};
 
 pub async fn init_services(
     repo_path: PathBuf,

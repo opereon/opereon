@@ -1,7 +1,6 @@
 extern crate slog;
 extern crate structopt;
 
-use op_core::*;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
@@ -14,15 +13,16 @@ use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
 use op_log::{build_file_drain, CliLogger};
-use op_rev::RevPath;
-use options::*;
-use slog::{o, FnValue};
-
+use op_rev::*;
+use op_core::*;
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
+use op_core::state::CoreState;
+use op_exec::command::ssh::{SshAuth, SshDest};
 use op_engine::EngineRef;
 
-use op_core::state::CoreState;
+use options::*;
+use slog::{o, FnValue};
 
 mod display;
 mod options;

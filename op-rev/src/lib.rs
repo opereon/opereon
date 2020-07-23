@@ -15,6 +15,9 @@ extern crate kg_diag_derive;
 extern crate async_trait;
 
 use std::path::{Path, PathBuf};
+use std::thread;
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 use kg_diag::*;
 use kg_tree::diff::ChangeKind;
@@ -24,9 +27,7 @@ mod impls;
 
 pub use self::meta::*;
 pub use self::impls::*;
-use std::thread;
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
+
 
 #[async_trait]
 pub trait FileVersionManager: Send + std::fmt::Debug {
