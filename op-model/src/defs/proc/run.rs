@@ -3,13 +3,13 @@ use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Run {
+pub struct RunDef {
     steps: Vec<Step>,
 }
 
-impl Run {
-    pub(crate) fn new() -> Run {
-        Run { steps: Vec::new() }
+impl RunDef {
+    pub(crate) fn new() -> RunDef {
+        RunDef { steps: Vec::new() }
     }
 
     pub fn steps(&self) -> &[Step] {
@@ -17,9 +17,9 @@ impl Run {
     }
 }
 
-impl ParsedModelDef for Run {
+impl ParsedModelDef for RunDef {
     fn parse(model: &Model, parent: &Scoped, node: &NodeRef) -> DefsResult<Self> {
-        let mut run = Run { steps: Vec::new() };
+        let mut run = RunDef { steps: Vec::new() };
 
         if let Some(rn) = node.get_child_key("run") {
             let kind = rn.data().kind();
@@ -60,7 +60,7 @@ impl ParsedModelDef for Run {
     }
 }
 
-impl Remappable for Run {
+impl Remappable for RunDef {
     fn remap(&mut self, node_map: &NodeMap) {
         self.steps.iter_mut().for_each(|s| s.remap(node_map));
     }

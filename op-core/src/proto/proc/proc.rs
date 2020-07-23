@@ -1,7 +1,6 @@
-use std::sync::{Arc, Mutex, MutexGuard};
-
 use super::*;
-use slog::Logger;
+
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcExec {
@@ -9,12 +8,10 @@ pub struct ProcExec {
     name: String,
     label: String,
     kind: ProcKind,
-    curr_model: RevPath,
+    curr_model: RevInfo,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    prev_model: Option<RevPath>,
+    prev_model: Option<RevInfo>,
     proc_path: Opath,
-    #[serde(skip_serializing_if = "Arguments::is_empty", default)]
-    args: Arguments,
     run: RunExec,
     #[serde(skip)]
     path: PathBuf,
@@ -27,29 +24,14 @@ impl ProcExec {
             name: String::new(),
             label: String::new(),
             kind: ProcKind::default(),
-            curr_model: RevPath::Current,
+            curr_model: RevInfo::default(),
             prev_model: None,
             proc_path: Opath::null(),
-            args: Arguments::new(),
             run: RunExec::new(),
             path: PathBuf::new(),
         }
     }
 
-    pub fn with_args(created: DateTime<Utc>, args: Arguments) -> ProcExec {
-        ProcExec {
-            created,
-            name: String::new(),
-            label: String::new(),
-            kind: ProcKind::default(),
-            curr_model: RevPath::Current,
-            prev_model: None,
-            proc_path: Opath::null(),
-            args,
-            run: RunExec::new(),
-            path: PathBuf::new(),
-        }
-    }
 
     fn get_proc_exec_dir_name(&self) -> String {
         let mut dir_name = format!("{}_{}", self.created.format("%Y%m%d_%H%M%S%.3f"), self.name);
@@ -85,12 +67,11 @@ impl ProcExec {
         self.label = proc.label().to_string();
         self.kind = proc.kind();
 
-        self.curr_model = RevPath::Revision(model.rev_info().id().to_string());
+        self.curr_model = model.rev_info().clone();
 
         self.proc_path = proc.node().path();
 
         let scope = proc.scope_mut()?;
-        self.args.resolve(proc.root(), proc.node(), scope)?;
 
         if proc_exec_dir.is_absolute() {
             self.create_proc_exec_dir(proc_exec_dir, logger)?;
@@ -116,7 +97,7 @@ impl ProcExec {
         self.run.add_step(step);
     }
 
-    pub fn set_prev_model(&mut self, prev_model: Option<RevPath>) {
+    pub fn set_prev_model(&mut self, prev_model: Option<RevInfo>) {
         self.prev_model = prev_model;
     }
 
@@ -166,11 +147,11 @@ impl ProcExec {
         self.kind
     }
 
-    pub fn curr_model(&self) -> &RevPath {
+    pub fn curr_model(&self) -> &RevInfo {
         &self.curr_model
     }
 
-    pub fn prev_model(&self) -> Option<&RevPath> {
+    pub fn prev_model(&self) -> Option<&RevInfo> {
         self.prev_model.as_ref()
     }
 
@@ -188,10 +169,6 @@ impl ProcExec {
 
     pub fn run(&self) -> &RunExec {
         &self.run
-    }
-
-    pub fn args(&self) -> &Arguments {
-        &self.args
     }
 }
 

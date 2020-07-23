@@ -4,8 +4,8 @@ use kg_tree::NodeRef;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use op_exec2::command::CommandOutput;
-use op_exec2::rsync::DiffInfo;
+use op_exec::command::CommandOutput;
+use op_exec::rsync::DiffInfo;
 use serde::{de, ser};
 use std::ops::Deref;
 
@@ -21,10 +21,11 @@ pub enum Outcome {
     File(PathBuf),
     Many(Vec<Outcome>),
 }
-/**
+
+//FIXME (jc) implement
 impl std::fmt::Display for Outcome {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
+        /*match *self {
             Outcome::Empty => write!(f, "<empty>"),
             Outcome::NodeSet(ref s) => write!(f, "<data> {}", s.lock()),
             Outcome::Diff(ref d) => write!(f, "<diff> {}", d),
@@ -42,10 +43,12 @@ impl std::fmt::Display for Outcome {
                 }
                 write!(f, " }}")
             }
-        }
+        }*/
+        unimplemented!()
     }
 }
-**/
+
+
 #[derive(Debug, Clone)]
 pub struct NodeSetRef(Arc<Mutex<NodeSet>>);
 

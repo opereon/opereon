@@ -1,6 +1,6 @@
 use async_trait::*;
 use op_engine::operation::OperationResult;
-use op_exec2::command::CommandHandle;
+use op_exec::command::CommandHandle;
 
 #[async_trait]
 pub trait SpawnableCommand {
