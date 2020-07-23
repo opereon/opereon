@@ -14,6 +14,9 @@ extern crate kg_display_derive;
 #[macro_use]
 extern crate slog;
 
+#[macro_use]
+extern crate tracing;
+
 use crate::config::ConfigRef;
 use crate::services::model_manager::ModelManager;
 use op_engine::engine::Service;

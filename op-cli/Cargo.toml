@@ -8,6 +8,7 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
+tracing="0.1"
 kg-diag = "0.4.0"
 kg-tree = "0.2.0"
 kg-utils = "0.4.0"

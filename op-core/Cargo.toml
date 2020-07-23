@@ -11,7 +11,8 @@ tokio = { version = "0.2.21", features = ["full"] }
 lazy_static = "1.4.0"
 serde = "1.0.110"
 async-trait = "0.1.36"
-
+tracing = "0.1"
+tracing-futures = "0.2"
 
 kg-tree = "0.2.0"
 op-engine = { version = "0.1.1", path = "../op-engine" }

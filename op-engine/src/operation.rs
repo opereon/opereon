@@ -10,6 +10,7 @@ use kg_diag::BasicDiag;
 
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use std::fmt::{Debug, Formatter};
 
 pub type OperationError = BasicDiag;
 pub type OperationResult<T> = Result<T, OperationError>;
@@ -52,11 +53,10 @@ pub trait OperationImplExt<T: Clone + 'static>: OperationImpl<T> + Sized + 'stat
 }
 
 impl<T, O> OperationImplExt<O> for T
-where
-    T: OperationImpl<O> + 'static,
-    O: Clone + 'static,
-{
-}
+    where
+        T: OperationImpl<O> + 'static,
+        O: Clone + 'static,
+{}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum OperationState {
@@ -190,5 +190,13 @@ impl<T: Clone + 'static> OperationRef<T> {
     pub async fn cancel(&self) {
         let mut sender = self.0.write().cancel_sender_mut().clone();
         let _ = sender.send(()).await;
+    }
+}
+
+impl<T: Debug + Clone + 'static> Debug for OperationRef<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("OperationRef")
+            // .field(&self.some_field)
+            .finish()
     }
 }

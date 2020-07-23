@@ -10,12 +10,85 @@ use std::sync::Mutex;
 mod logger;
 
 pub use logger::*;
+use tracing::subscriber::DefaultGuard;
+use tracing_subscriber::layer::{SubscriberExt, Context};
+use tracing_subscriber::{Layer, registry};
+use tracing::{Subscriber, Event, Id, Metadata};
+use tracing::span::Attributes;
+
+pub struct FileLayer {}
+
+impl<S> Layer<S> for FileLayer
+    where
+        S: Subscriber + for<'a> registry::LookupSpan<'a>, {
+
+    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        eprintln!("file: new span");
+    }
+
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        println!("file: on_event {:?}", event);
+    }
+
+    fn on_enter(&self, id: &Id, _ctx: Context<'_, S>) {
+        println!("file: on_enter {:?}", id);
+    }
+
+    fn on_exit(&self, _id: &Id, _ctx: Context<'_, S>) {
+        println!("file: on_exit");
+    }
+
+    fn on_close(&self, _id: Id, _ctx: Context<'_, S>) {
+        println!("file: on_close");
+    }
+}
+
+pub struct CliLayer {
+
+}
+
+impl<S> Layer<S> for CliLayer
+    where
+        S: Subscriber + for<'a> registry::LookupSpan<'a>, {
+
+    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        eprintln!("cli:new span");
+    }
+
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        println!("cli:on_event {:?}", event);
+    }
+
+    fn on_enter(&self, id: &Id, _ctx: Context<'_, S>) {
+        println!("cli:on_enter {:?}", id);
+    }
+
+    fn on_exit(&self, _id: &Id, _ctx: Context<'_, S>) {
+        println!("cli:on_exit");
+    }
+
+    fn on_close(&self, _id: Id, _ctx: Context<'_, S>) {
+        println!("cli:on_close");
+    }
+}
+
+pub fn init_tracing() {
+    let subscriber = tracing_subscriber::fmt()
+        .finish()
+        .with(CliLayer {})
+        .with(FileLayer {})
+
+        ;
+
+
+    tracing::subscriber::set_global_default(subscriber).unwrap()
+}
 
 
 pub fn build_file_drain<P: AsRef<Path>>(
     log_path: P,
     level: slog::Level,
-) -> impl Drain<Ok = (), Err = Never> {
+) -> impl Drain<Ok=(), Err=Never> {
     if let Some(log_dir) = log_path.as_ref().parent() {
         std::fs::create_dir_all(log_dir).expect("Cannot create log dir");
     }
@@ -38,7 +111,7 @@ pub fn build_file_drain<P: AsRef<Path>>(
 /// Each message is also logged to provided `slog::Logger`
 pub struct CliLogger {
     verbosity: usize,
-    logger: slog::Logger
+    logger: slog::Logger,
 }
 
 impl CliLogger {

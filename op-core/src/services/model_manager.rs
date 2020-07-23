@@ -16,6 +16,7 @@ pub struct ModelManager {
     repo_manager: Option<Box<dyn FileVersionManager + Send>>,
     logger: slog::Logger,
 }
+
 // FIXME ws non-blocking methods
 impl ModelManager {
     pub fn new(repo_path: PathBuf, config: ModelConfig, logger: slog::Logger) -> ModelManager {
@@ -78,12 +79,7 @@ impl ModelManager {
     pub async fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
         let repo_manager = op_rev::create_repository(&repo_path).await?;
 
-        let logger = self
-            .logger
-            .new(o!("repo_path" => repo_path.display().to_string()));
-        self.logger = logger;
-
-        info!(self.logger, "created repository {}", repo_path.display());
+        info!(repo_path=&repo_path.to_string_lossy().to_string().as_str(), "Repository created");
         self.repo_path = repo_path;
         self.repo_manager = Some(repo_manager);
 
@@ -99,12 +95,9 @@ impl ModelManager {
         }
 
         let repo_path = Model::resolve_manifest_dir(&self.repo_path)?;
-        let logger = self
-            .logger
-            .new(o!("repo_path" => repo_path.display().to_string()));
-        self.logger = logger;
 
-        info!(self.logger, "opened repository {}", repo_path.display());
+        info!(repo_path=repo_path.to_string_lossy().to_string().as_str(), "Repository opened");
+
         self.repo_path = repo_path;
         self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);
 

@@ -19,6 +19,7 @@ pub enum ModelOpErrorDetail {
     QueryOp,
 }
 
+#[derive(Debug)]
 pub struct ModelQueryOperation {
     model_path: RevPath,
     expr: String,
@@ -32,11 +33,13 @@ impl ModelQueryOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelQueryOperation {
+    #[instrument(skip(engine, _operation))]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
+        info!("Querying model...");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let model = manager.resolve(&self.model_path).await?;
         let expr = Opath::parse(&self.expr).map_err_as_cause(|| ModelOpErrorDetail::QueryOp)?;

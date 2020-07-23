@@ -1,6 +1,9 @@
 extern crate slog;
 extern crate structopt;
 
+#[macro_use]
+extern crate tracing;
+
 use op_core::*;
 use std::path::{Path, PathBuf};
 
@@ -63,6 +66,7 @@ fn local_run(
     disp_format: DisplayFormat,
     verbose: u8,
 ) -> Result<u32, BasicDiag> {
+    op_log::init_tracing();
     let logger = init_logger(&config, verbose);
 
     let mut rt = EngineRef::<()>::build_runtime();
