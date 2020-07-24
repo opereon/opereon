@@ -33,13 +33,13 @@ impl ModelManager {
 
     /// Commit current model
     pub async fn commit(&mut self, message: &str) -> ModelManagerResult<Oid> {
-        self.init().await?;
+        self.init_model().await?;
         let oid = self.repo_manager_mut().commit(message).await?;
         Ok(oid)
     }
 
     pub async fn get(&mut self, id: Oid) -> ModelManagerResult<ModelRef> {
-        self.init().await?;
+        self.init_model().await?;
 
         if let Some(b) = self.model_cache.get_mut(&id) {
             return Ok(b.clone());
@@ -52,7 +52,7 @@ impl ModelManager {
     }
 
     pub async fn resolve(&mut self, rev_path: &RevPath) -> ModelManagerResult<ModelRef> {
-        self.init().await?;
+        self.init_model().await?;
 
         let oid = self.repo_manager_mut().resolve(rev_path).await?;
         self.get(oid).await
@@ -68,7 +68,7 @@ impl ModelManager {
         old_rev: &RevPath,
         new_rev: &RevPath,
     ) -> ModelManagerResult<FileDiff> {
-        self.init().await?;
+        self.init_model().await?;
 
         let repo_manager = self.repo_manager_mut();
         let old_id = repo_manager.resolve(old_rev).await?;
@@ -76,27 +76,29 @@ impl ModelManager {
         repo_manager.get_file_diff(old_id, new_id).await
     }
 
+    #[instrument(skip(self))]
     pub async fn create_model(&mut self, repo_path: PathBuf) -> ModelManagerResult<ModelRef> {
         let repo_manager = op_rev::create_repository(&repo_path).await?;
 
-        info!(repo_path=&repo_path.to_string_lossy().to_string().as_str(), "Repository created");
         self.repo_path = repo_path;
         self.repo_manager = Some(repo_manager);
 
         let rev_info = RevInfo::new(Oid::nil(), self.repo_path.clone());
         let model = ModelRef::create(rev_info, self.logger.clone())?;
+        info!(verb=2, "Repository created");
         self.cache_model(model.clone());
         Ok(model)
     }
 
-    async fn init(&mut self) -> ModelManagerResult<()> {
+    #[instrument(skip(self))]
+    async fn init_model(&mut self) -> ModelManagerResult<()> {
         if self.repo_manager.is_some() {
             return Ok(());
         }
 
         let repo_path = Model::resolve_manifest_dir(&self.repo_path)?;
 
-        info!(repo_path=repo_path.to_string_lossy().to_string().as_str(), "Repository opened");
+        info!(verb=2, repo_path=repo_path.to_string_lossy().as_ref(), "Repository opened");
 
         self.repo_path = repo_path;
         self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);

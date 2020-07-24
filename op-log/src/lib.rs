@@ -13,8 +13,14 @@ pub use logger::*;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::layer::{SubscriberExt, Context};
 use tracing_subscriber::{Layer, registry};
-use tracing::{Subscriber, Event, Id, Metadata};
+use tracing::{Subscriber, Event, Id, Metadata, Span};
 use tracing::span::Attributes;
+use tracing_subscriber::field::RecordFields;
+use tracing::field::{Visit, Field};
+use std::fmt::Debug;
+use crate::term::TermLayer;
+
+mod term;
 
 pub struct FileLayer {}
 
@@ -22,60 +28,29 @@ impl<S> Layer<S> for FileLayer
     where
         S: Subscriber + for<'a> registry::LookupSpan<'a>, {
 
-    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        eprintln!("file: new span");
-    }
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
 
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        println!("file: on_event {:?}", event);
+        // println!("file: on_event {:?}, span: {:?}", event, ctx.current_span());
     }
 
     fn on_enter(&self, id: &Id, _ctx: Context<'_, S>) {
-        println!("file: on_enter {:?}", id);
+        // println!("file: on_enter {:?}", id);
     }
 
     fn on_exit(&self, _id: &Id, _ctx: Context<'_, S>) {
-        println!("file: on_exit");
+        // println!("file: on_exit");
     }
 
     fn on_close(&self, _id: Id, _ctx: Context<'_, S>) {
-        println!("file: on_close");
+        // println!("file: on_close");
     }
 }
 
-pub struct CliLayer {
-
-}
-
-impl<S> Layer<S> for CliLayer
-    where
-        S: Subscriber + for<'a> registry::LookupSpan<'a>, {
-
-    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        eprintln!("cli:new span");
-    }
-
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        println!("cli:on_event {:?}", event);
-    }
-
-    fn on_enter(&self, id: &Id, _ctx: Context<'_, S>) {
-        println!("cli:on_enter {:?}", id);
-    }
-
-    fn on_exit(&self, _id: &Id, _ctx: Context<'_, S>) {
-        println!("cli:on_exit");
-    }
-
-    fn on_close(&self, _id: Id, _ctx: Context<'_, S>) {
-        println!("cli:on_close");
-    }
-}
 
 pub fn init_tracing() {
     let subscriber = tracing_subscriber::fmt()
         .finish()
-        .with(CliLayer {})
+        .with(TermLayer::new(3))
         .with(FileLayer {})
 
         ;
