@@ -1,5 +1,5 @@
 //#![deny(warnings)]
-#![feature(box_syntax, specialization, raw)]
+#![feature(box_syntax, min_specialization, raw)]
 
 #[cfg(test)]
 #[macro_use]

@@ -42,7 +42,7 @@ pub struct ProcDef {
     model_watches: Vec<ModelWatch>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     file_watches: Vec<FileWatch>,
-    run: Run,
+    run: RunDef,
     id: String,
     label: String,
     path: PathBuf,
@@ -70,7 +70,7 @@ impl ProcDef {
         self.kind
     }
 
-    pub fn run(&self) -> &Run {
+    pub fn run(&self) -> &RunDef {
         &self.run
     }
 
@@ -125,7 +125,7 @@ impl ParsedModelDef for ProcDef {
         let mut p = ProcDef {
             scoped: Scoped::new(parent.root(), node, ScopeDef::parse(model, parent, node)?),
             kind: ProcKind::Exec,
-            run: Run::new(),
+            run: RunDef::new(),
             model_watches: Vec::new(),
             file_watches: Vec::new(),
             id: String::new(),
@@ -173,7 +173,7 @@ impl ParsedModelDef for ProcDef {
                     }
                 }
 
-                p.run = Run::parse(model, &p.scoped, node)
+                p.run = RunDef::parse(model, &p.scoped, node)
                     .map_err_as_cause(|| DefsErrorDetail::RunParse)?;
             }
             _ => {

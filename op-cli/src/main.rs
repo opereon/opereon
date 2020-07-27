@@ -15,15 +15,20 @@ use crate::slog::Drain;
 use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
+use op_log::{build_file_drain};
+use op_rev::*;
+use op_core::*;
 use op_rev::RevPath;
 use options::*;
 use slog::{o, FnValue, Discard};
 
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
+use op_core::state::CoreState;
+use op_exec::command::ssh::{SshAuth, SshDest};
 use op_engine::EngineRef;
 
-use op_core::state::CoreState;
+use options::*;
 
 mod display;
 mod options;

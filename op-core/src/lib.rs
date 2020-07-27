@@ -1,4 +1,4 @@
-#![feature(specialization)]
+#![feature(min_specialization)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -11,29 +11,41 @@ extern crate kg_diag_derive;
 
 #[macro_use]
 extern crate kg_display_derive;
+
 #[macro_use]
 extern crate slog;
+
+use chrono::prelude::*;
+use slog::Logger;
+
+use kg_diag::*;
+use kg_diag::io::fs;
+use kg_tree::*;
+use kg_tree::opath::Opath;
+use kg_tree::serial::{from_tree, to_tree};
+use op_rev::*;
+use op_model::*;
+use op_engine::engine::Service;
+use op_exec::command::ssh::{SshSessionCache, SshAuth, SshDest};
 
 #[macro_use]
 extern crate tracing;
 
 use crate::config::ConfigRef;
 use crate::services::model_manager::ModelManager;
-use op_engine::engine::Service;
-use std::path::PathBuf;
+
+use std::path::{Path, PathBuf};
 
 mod ops;
 mod services;
 mod utils;
+mod proto;
 
 pub mod config;
 pub mod context;
 pub mod outcome;
 pub mod state;
 
-use kg_diag::BasicDiag;
-use op_exec2::command::ssh::SshSessionCache;
-pub use op_exec2::command::ssh::{SshAuth, SshDest};
 
 pub async fn init_services(
     repo_path: PathBuf,
