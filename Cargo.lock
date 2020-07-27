@@ -1009,6 +1009,7 @@ dependencies = [
  "libc",
  "op-engine",
  "op-exec2",
+ "op-log",
  "op-model",
  "op-rev",
  "regex 1.3.9",
@@ -1093,6 +1094,8 @@ version = "0.1.0"
 dependencies = [
  "colored",
  "lazy_static",
+ "serde",
+ "serde_derive",
  "slog",
  "slog-bunyan",
  "slog-kvfilter",
@@ -1127,6 +1130,7 @@ dependencies = [
  "slog",
  "tempfile 3.1.0",
  "toml",
+ "tracing",
  "walkdir 2.3.1",
 ]
 
