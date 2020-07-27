@@ -15,7 +15,6 @@ use crate::slog::Drain;
 use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
-use op_log::{build_file_drain};
 use op_rev::*;
 use op_core::*;
 use op_rev::RevPath;

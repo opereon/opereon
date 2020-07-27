@@ -70,38 +70,26 @@ impl Into<slog::Level> for Level {
     }
 }
 
+impl From<tracing::Level> for Level {
+    fn from(l: tracing::Level) -> Self {
+        unimplemented!()
+    }
+}
+
 pub fn init_tracing(verbosity: u8, cfg: &LogConfig) {
+    let mut file_layer = FileLayer::new(cfg.level(), cfg.log_path());
+
+    file_layer.init();
+
     let subscriber = tracing_subscriber::fmt()
         .finish()
         .with(TermLayer::new(verbosity))
-        .with(FileLayer::new(cfg.level(), cfg.log_path()));
+        .with(file_layer);
 
 
     tracing::subscriber::set_global_default(subscriber).unwrap()
 }
 
-
-pub fn build_file_drain<P: AsRef<Path>>(
-    log_path: P,
-    level: slog::Level,
-) -> impl Drain<Ok=(), Err=Never> {
-    if let Some(log_dir) = log_path.as_ref().parent() {
-        std::fs::create_dir_all(log_dir).expect("Cannot create log dir");
-    }
-
-    let mut open_opts = OpenOptions::new();
-
-    open_opts.create(true).append(true);
-
-    let log_file = open_opts.open(log_path).expect("Cannot open log file");
-
-    let drain = slog_bunyan::default(log_file);
-
-    //    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
-    //    let drain = slog_term::FullFormat::new(decorator).build();
-    let drain = slog::LevelFilter::new(Mutex::new(drain), level);
-    drain.fuse()
-}
 
 // /// Logger for logging messages directly to user.
 // /// Each message is also logged to provided `slog::Logger`
