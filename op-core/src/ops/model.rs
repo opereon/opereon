@@ -45,7 +45,7 @@ impl OperationImpl<Outcome> for ModelQueryOperation {
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        info!(verb=2, "Querying model...");
+        info!(verb=2, "Querying model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let model = manager.resolve(&self.model_path).await?;
         let expr = Opath::parse(&self.expr).map_err_as_cause(|| ModelOpErrorDetail::QueryOp)?;

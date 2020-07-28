@@ -25,7 +25,6 @@ serde_json = "1.0.56"
 serde_yaml = "0.8.13"
 toml = "0.5.6"
 uuid = { version = "0.8.1", features = ["serde"] }
-slog = "2.5.2"
 url = "2.1.1"
 chrono = "0.4.13"
 tokio = "0.2.22"

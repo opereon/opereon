@@ -36,9 +36,3 @@ impl From<Oid> for RevPath {
         RevPath::Revision(oid.to_string())
     }
 }
-
-impl slog::Value for RevPath {
-    fn serialize(&self, _record: &slog::Record, key: slog::Key, serializer: &mut dyn slog::Serializer) -> slog::Result {
-        serializer.emit_str(key, &format!("{}", &self))
-    }
-}

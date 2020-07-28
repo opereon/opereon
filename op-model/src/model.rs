@@ -63,8 +63,6 @@ pub struct Model {
     procs: Vec<ProcDef>,
     #[serde(skip)]
     lookup: ModelLookup,
-    #[serde(skip)]
-    logger: Logger,
 }
 
 impl Model {
@@ -77,7 +75,6 @@ impl Model {
             users: Vec::new(),
             procs: Vec::new(),
             lookup: ModelLookup::new(),
-            logger: Logger::root(slog::Discard, o!()),
         }
     }
 
@@ -126,17 +123,17 @@ impl Model {
             .map_err_as_cause(|| ModelErrorDetail::ManifestParse { path: path.clone() })?;
         Ok(manifest)
     }
-
-    pub fn read(rev_info: RevInfo, logger: Logger) -> ModelResult<Model> {
+    #[instrument(
+        name = "Model::read",
+    )]
+    pub fn read(rev_info: RevInfo) -> ModelResult<Model> {
         let manifest = Model::load_manifest(rev_info.path())?;
-
-        let logger = logger.new(o!("model_id" => rev_info.id().to_string()));
+        info!("Reading model");
 
         kg_tree::set_base_path(rev_info.path());
 
         let mut m = Model {
             rev_info,
-            logger,
             ..Model::empty()
         };
 
@@ -172,11 +169,13 @@ impl Model {
 
         Ok(m)
     }
-
-    pub fn create(rev_info: RevInfo, logger: Logger) -> ModelResult<Model> {
-        init_manifest(rev_info.path(), &logger)?;
-        init_config(rev_info.path(), &logger)?;
-        Self::read(rev_info, logger)
+    #[instrument(
+        name = "Model::create",
+    )]
+    pub fn create(rev_info: RevInfo) -> ModelResult<Model> {
+        init_manifest(rev_info.path())?;
+        init_config(rev_info.path())?;
+        Self::read(rev_info)
     }
 
     /// Walk through each entry in model directory, resolve matching `Includes` and apply changes to model tree
@@ -301,7 +300,7 @@ impl Model {
                 let current = if let NodeSet::One(n) = node_set {
                     n
                 } else {
-                    warn!(self.logger, "Cannot resolve override to single node, assuming model root. Config path: '{path}'", path=path.to_string(); "verbosity"=> 1);
+                    warn!(verb=1, config_path=?path, "Cannot resolve override to single node, assuming model root.");
                     self.root().clone()
                 };
 
@@ -482,7 +481,6 @@ impl Model {
             users: self.users.clone(),
             procs: self.procs.clone(),
             lookup: ModelLookup::new(),
-            logger: self.logger.clone(),
         };
 
         m.remap(&node_map);
@@ -614,13 +612,13 @@ impl ModelRef {
     }
 
     /// Read model for provided revision info.
-    pub fn read(rev_info: RevInfo, logger: Logger) -> ModelResult<ModelRef> {
-        Ok(Self::new(Model::read(rev_info, logger)?))
+    pub fn read(rev_info: RevInfo) -> ModelResult<ModelRef> {
+        Ok(Self::new(Model::read(rev_info)?))
     }
 
     /// Create a new model for provided revision info.
-    pub fn create(rev_info: RevInfo, logger: Logger) -> ModelResult<ModelRef> {
-        Ok(Self::new(Model::create(rev_info, logger)?))
+    pub fn create(rev_info: RevInfo) -> ModelResult<ModelRef> {
+        Ok(Self::new(Model::create(rev_info)?))
     }
 
     pub fn lock(&self) -> ReentrantMutexGuard<Model> {

@@ -1,4 +1,3 @@
-extern crate slog;
 extern crate structopt;
 
 extern crate tracing;
@@ -14,11 +13,8 @@ use url::Url;
 use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
-use op_rev::*;
-use op_core::*;
 use op_rev::RevPath;
 use options::*;
-use slog::{o, FnValue, Discard};
 
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
@@ -50,7 +46,7 @@ fn local_run(
     let mut rt = EngineRef::<()>::build_runtime();
 
     let out_res = rt.block_on(async {
-        let services = init_services(current_dir, config.clone(), slog::Logger::root(Discard, o!())).await?;
+        let services = init_services(current_dir, config.clone()).await?;
         let state = CoreState::new(config);
 
         let engine = EngineRef::new(services, state);

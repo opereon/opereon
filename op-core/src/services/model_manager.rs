@@ -14,11 +14,10 @@ pub struct ModelManager {
     model_cache: LruCache<Oid, ModelRef>,
     repo_path: PathBuf,
     repo_manager: Option<Box<dyn FileVersionManager + Send>>,
-    logger: slog::Logger,
 }
 
 impl ModelManager {
-    pub fn new(repo_path: PathBuf, config: ModelConfig, logger: slog::Logger) -> ModelManager {
+    pub fn new(repo_path: PathBuf, config: ModelConfig) -> ModelManager {
         let model_cache = LruCache::new(config.cache_limit());
 
         ModelManager {
@@ -26,7 +25,6 @@ impl ModelManager {
             model_cache,
             repo_path,
             repo_manager: None,
-            logger,
         }
     }
 
@@ -45,7 +43,7 @@ impl ModelManager {
         }
 
         let rev_info = self.repo_manager_mut().checkout(id).await?;
-        let model = ModelRef::read(rev_info, self.logger.clone())?;
+        let model = ModelRef::read(rev_info)?;
         self.cache_model(model.clone());
         Ok(model)
     }
@@ -83,7 +81,7 @@ impl ModelManager {
         self.repo_manager = Some(repo_manager);
 
         let rev_info = RevInfo::new(Oid::nil(), self.repo_path.clone());
-        let model = ModelRef::create(rev_info, self.logger.clone())?;
+        let model = ModelRef::create(rev_info)?;
         info!(verb=2, "Repository created");
         self.cache_model(model.clone());
         Ok(model)
@@ -97,10 +95,9 @@ impl ModelManager {
 
         let repo_path = Model::resolve_manifest_dir(&self.repo_path)?;
 
-        info!(verb=2, repo_path=?repo_path, "Repository opened");
-
         self.repo_path = repo_path;
         self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);
+        info!(verb=2, repo_path=?self.repo_path, "Repository opened");
 
         Ok(())
     }

@@ -41,13 +41,10 @@ impl ProcExec {
         dir_name
     }
 
-    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path, logger: &Logger) -> ProtoResult<()> {
+    #[instrument(skip(self))]
+    fn create_proc_exec_dir(&mut self, proc_exec_dir: &Path) -> ProtoResult<()> {
         let p = proc_exec_dir.join(self.get_proc_exec_dir_name());
-        slog::debug!(
-            logger,
-            "Creating procedure execution dir: '{proc_exec_dir}'",
-            proc_exec_dir = proc_exec_dir.display()
-        );
+        debug!("Creating procedure execution dir");
         debug_assert!(!p.exists());
         fs::create_dir_all(&p)
             .into_diag_res()
@@ -61,7 +58,6 @@ impl ProcExec {
         model: &Model,
         proc: &ProcDef,
         proc_exec_dir: &Path,
-        logger: &Logger,
     ) -> ProtoResult<()> {
         self.name = proc.id().to_string();
         self.label = proc.label().to_string();
@@ -74,14 +70,14 @@ impl ProcExec {
         let scope = proc.scope_mut()?;
 
         if proc_exec_dir.is_absolute() {
-            self.create_proc_exec_dir(proc_exec_dir, logger)?;
+            self.create_proc_exec_dir(proc_exec_dir)?;
         } else {
-            self.create_proc_exec_dir(&model.rev_info().path().join(proc_exec_dir), logger)?;
+            self.create_proc_exec_dir(&model.rev_info().path().join(proc_exec_dir))?;
         }
         for s in proc.run().steps().iter() {
             let hosts = s.resolve_hosts(model, proc)?;
             if hosts.is_empty() {
-                slog::warn!(logger, "Procedure '{name}', label: '{label}' will not be executed, there is no target hosts!", name=&self.name, label=&self.label; "verbosity" => 0);
+                warn!(verb=0, "Procedure '{name}', label: '{label}' will not be executed, there is no target hosts!", name=&self.name, label=&self.label);
             }
             for host in hosts {
                 let step = StepExec::create(model, proc, s, &host, self)

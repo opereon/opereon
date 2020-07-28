@@ -74,9 +74,10 @@ pub fn init_tracing(verbosity: u8, cfg: &LogConfig) {
     file_layer.init();
 
     let level: tracing::Level = cfg.level().into();
-    let subscriber = tracing_subscriber::fmt()
-        .with_max_level(level)
-        .finish()
+    let subscriber = tracing_subscriber::registry()
+        // tracing_subscriber::fmt()
+        // .with_max_level(level)
+        // .finish()
         .with(TermLayer::new(verbosity))
         .with(file_layer);
 

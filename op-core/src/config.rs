@@ -7,7 +7,6 @@ use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
 use kg_tree::serial::{from_tree, to_tree};
 use kg_tree::NodeRef;
 use regex::{Captures, Regex};
-use slog::Level;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

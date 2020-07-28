@@ -12,11 +12,7 @@ extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
 
-#[macro_use]
-extern crate slog;
-
 use chrono::prelude::*;
-use slog::Logger;
 
 use kg_diag::*;
 use kg_diag::io::fs;
@@ -50,9 +46,8 @@ pub mod state;
 pub async fn init_services(
     repo_path: PathBuf,
     config: ConfigRef,
-    logger: slog::Logger,
 ) -> Result<Vec<Service>, BasicDiag> {
-    let model_manager = ModelManager::new(repo_path, config.model().clone(), logger);
+    let model_manager = ModelManager::new(repo_path, config.model().clone());
     let mut ssh_session_cache = SshSessionCache::new(config.exec().command().ssh().clone());
     ssh_session_cache.init().await?;
 

@@ -1,12 +1,23 @@
 use super::*;
+use std::fmt::Debug;
+use serde::export::Formatter;
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RevInfo {
     /// Model identifier as git Oid
     id: Oid,
     /// Path to model dir
     path: PathBuf,
+}
+
+impl Debug for RevInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RevInfo")
+            .field("id", &self.id().to_string())
+            .field("path", &self.path)
+            .finish()
+    }
 }
 
 impl RevInfo {

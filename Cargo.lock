@@ -998,7 +998,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "slog",
  "structopt",
  "tokio",
  "toml",
@@ -1032,7 +1031,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shared_child",
- "slog",
  "tokio",
  "toml",
  "tracing",
@@ -1091,7 +1089,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shared_child",
- "slog",
  "tempfile",
  "time 0.2.16",
  "tokio",
@@ -1107,12 +1104,10 @@ name = "op-log"
 version = "0.1.0"
 dependencies = [
  "colored",
- "lazy_static",
  "serde",
  "serde_derive",
  "slog",
  "slog-bunyan",
- "slog-kvfilter",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1141,9 +1136,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "slog",
  "tempfile",
  "toml",
+ "tracing",
  "walkdir 2.3.1",
 ]
 
@@ -1163,7 +1158,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "slog",
  "tokio",
 ]
 
@@ -1668,16 +1662,6 @@ dependencies = [
  "chrono 0.4.13",
  "serde",
  "serde_json",
- "slog",
-]
-
-[[package]]
-name = "slog-kvfilter"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae939ed7d169eed9699f4f5cd440f046f5dc5dfc27c19e3cd311619594c175e0"
-dependencies = [
- "regex",
  "slog",
 ]
 
