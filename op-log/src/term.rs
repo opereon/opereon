@@ -1,7 +1,7 @@
 use colored::Colorize;
 use std::fmt::Debug;
 use tracing::field::Field;
-use tracing::span::Attributes;
+
 use tracing::{Event, Id, Level, Span, Subscriber};
 use tracing_subscriber::field::Visit;
 use tracing_subscriber::layer::Context;
@@ -131,7 +131,7 @@ where
             return;
         }
         let verbosity = verbosity.unwrap();
-        let mut evt = TermEvent::new(&verbosity, event, self.verbosity as u64);
+        let evt = TermEvent::new(&verbosity, event, self.verbosity as u64);
         evt.print()
     }
 }

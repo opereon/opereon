@@ -1,5 +1,5 @@
 use crate::Level;
-use slog::{o, Discard, Drain, Logger, Never, Record, Serializer, KV};
+use slog::{o, Discard, Drain, Never, Record, Serializer, KV};
 use std::fmt::Debug;
 use std::fs::OpenOptions;
 use std::ops::Deref;
@@ -94,7 +94,7 @@ pub struct FileLayer {
 impl FileLayer {
     pub fn new(level: &Level, file_path: &Path) -> Self {
         FileLayer {
-            level: level.clone(),
+            level: *level,
             file_path: file_path.to_path_buf(),
             root_logger: SlogLogger(slog::Logger::root(Discard, o!())),
         }
@@ -150,9 +150,6 @@ where
             tracing::Level::INFO => slog::info!(l, "{}", msg; evt, "module"=>module),
             tracing::Level::WARN => slog::warn!(l, "{}", msg; evt, "module"=>module),
             tracing::Level::ERROR => slog::error!(l, "{}", msg; evt, "module"=>module),
-            _ => {
-                eprintln!("Unsupported tracing level");
-            }
         }
     }
 }

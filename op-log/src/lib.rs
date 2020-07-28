@@ -1,23 +1,23 @@
 #[macro_use]
 extern crate serde_derive;
 
-use colored::Colorize;
-use slog::{Drain, Never};
-use std::fs::OpenOptions;
-use std::path::Path;
-use std::sync::Mutex;
+
+
+
+
+
 
 use crate::config::LogConfig;
 use crate::file::FileLayer;
 use crate::term::TermLayer;
 use std::fmt::Debug;
-use tracing::field::{Field, Visit};
-use tracing::span::Attributes;
-use tracing::subscriber::DefaultGuard;
-use tracing::{Event, Id, Metadata, Span, Subscriber};
-use tracing_subscriber::field::RecordFields;
-use tracing_subscriber::layer::{Context, SubscriberExt};
-use tracing_subscriber::{registry, Layer};
+
+
+
+
+
+use tracing_subscriber::layer::{SubscriberExt};
+
 
 pub mod config;
 mod file;
