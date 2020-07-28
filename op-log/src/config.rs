@@ -1,5 +1,5 @@
-use std::path::{PathBuf, Path};
 use crate::Level;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

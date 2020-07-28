@@ -1,11 +1,11 @@
-use tracing::field::Field;
-use tracing_subscriber::field::Visit;
-use std::fmt::Debug;
-use tracing_subscriber::{Layer, registry};
-use tracing::{Subscriber, Event, Id, Span, Level};
-use tracing::span::Attributes;
-use tracing_subscriber::layer::Context;
 use colored::Colorize;
+use std::fmt::Debug;
+use tracing::field::Field;
+use tracing::span::Attributes;
+use tracing::{Event, Id, Level, Span, Subscriber};
+use tracing_subscriber::field::Visit;
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::{registry, Layer};
 
 struct TermEvent<'a, 'b> {
     verb_field: &'a Field,
@@ -58,7 +58,9 @@ impl<'a, 'b> TermEvent<'a, 'b> {
                 Level::ERROR => "ERROR".bright_red(),
             };
 
-            let fields = self.kvs.iter()
+            let fields = self
+                .kvs
+                .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -69,10 +71,12 @@ impl<'a, 'b> TermEvent<'a, 'b> {
                 format!("{{ {} }}", fields)
             };
 
-            println!("{level} {message} {fields}",
-                     level = level,
-                     message = self.message.as_ref().unwrap_or(&String::new()),
-                     fields = fields)
+            println!(
+                "{level} {message} {fields}",
+                level = level,
+                message = self.message.as_ref().unwrap_or(&String::new()),
+                fields = fields
+            )
         }
     }
 }
@@ -108,7 +112,7 @@ impl<'a, 'b> Visit for TermEvent<'a, 'b> {
 const VERBOSITY_KEY: &str = "verb";
 
 pub struct TermLayer {
-    verbosity: u8
+    verbosity: u8,
 }
 
 impl TermLayer {
@@ -118,8 +122,9 @@ impl TermLayer {
 }
 
 impl<S> Layer<S> for TermLayer
-    where
-        S: Subscriber + for<'a> registry::LookupSpan<'a>, {
+where
+    S: Subscriber + for<'a> registry::LookupSpan<'a>,
+{
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let verbosity = event.metadata().fields().field(VERBOSITY_KEY);
         if verbosity.is_none() {
