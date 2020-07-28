@@ -1,23 +1,12 @@
 #[macro_use]
 extern crate serde_derive;
 
-
-
-
-
-
-
 use crate::config::LogConfig;
 use crate::file::FileLayer;
 use crate::term::TermLayer;
 use std::fmt::Debug;
 
-
-
-
-
-use tracing_subscriber::layer::{SubscriberExt};
-
+use tracing_subscriber::layer::SubscriberExt;
 
 pub mod config;
 mod file;
