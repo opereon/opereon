@@ -73,11 +73,18 @@ impl ModelCommitOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelCommitOperation {
+    #[instrument(
+    name = "ModelCommitOperation",
+    skip(self, engine, _operation),
+    fields(
+    message = % _self.message)
+    )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
+        info!("Committing model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let _m = manager.commit(&self.message).await?;
         Ok(Outcome::Empty)
@@ -96,11 +103,18 @@ impl ModelTestOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelTestOperation {
+    #[instrument(
+    name = "ModelTestOperation",
+    skip(self, engine, _operation),
+    fields(
+        model_path = % _self.model_path)
+    )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
+        info!("Testing model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let model = manager.resolve(&self.model_path).await?;
         let res = to_tree(&*model.lock()).unwrap();
@@ -121,11 +135,19 @@ impl ModelDiffOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelDiffOperation {
+    #[instrument(
+    name = "ModelDiffOperation",
+    skip(self, engine, _operation),
+    fields(
+        source = % _self.source,
+        target = % _self.target)
+    )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
+        info!("Getting diffs");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let m1 = manager.resolve(&self.source).await?;
         let m2 = manager.resolve(&self.target).await?;
@@ -154,6 +176,12 @@ impl ModelInitOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelInitOperation {
+    #[instrument(
+    name = "ModelInitOperation",
+    skip(self, engine, _operation),
+    fields(
+        path = % _self.path)
+    )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
