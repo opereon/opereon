@@ -92,9 +92,9 @@ pub struct FileLayer {
 }
 
 impl FileLayer {
-    pub fn new(level: &Level, file_path: &Path) -> Self {
+    pub fn new(level: Level, file_path: &Path) -> Self {
         FileLayer {
-            level: *level,
+            level,
             file_path: file_path.to_path_buf(),
             root_logger: SlogLogger(slog::Logger::root(Discard, o!())),
         }

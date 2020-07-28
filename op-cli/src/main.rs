@@ -11,7 +11,6 @@ use chrono::{DateTime, FixedOffset, Utc};
 use structopt::StructOpt;
 use url::Url;
 
-use crate::slog::Drain;
 use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
@@ -27,8 +26,6 @@ use op_core::state::CoreState;
 use op_exec::command::ssh::{SshAuth, SshDest};
 use op_engine::EngineRef;
 
-use options::*;
-
 mod display;
 mod options;
 
@@ -39,26 +36,6 @@ pub static TIMESTAMP: &str = env!("OP_TIMESTAMP");
 fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
-
-// fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
-//     let file_drain = build_file_drain(
-//         config.log().log_path().to_path_buf(),
-//         (*config.log().level()).into(),
-//     );
-//
-//     let logger = slog::Logger::root(
-//         file_drain.fuse(),
-//         o!("module" =>
-//          FnValue(move |info| {
-//               info.module()
-//          })
-//         ),
-//     );
-//
-//     let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
-//     op_log::set_logger(cli_logger);
-//     logger
-// }
 
 /// start engine and execute provided operation. Returns exit code
 fn local_run(

@@ -9,8 +9,8 @@ pub struct LogConfig {
 }
 
 impl LogConfig {
-    pub fn level(&self) -> &Level {
-        &self.level
+    pub fn level(&self) -> Level {
+        self.level
     }
 
     pub fn log_path(&self) -> &Path {

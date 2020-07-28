@@ -17,7 +17,6 @@ pub struct ModelManager {
     logger: slog::Logger,
 }
 
-// FIXME ws non-blocking methods
 impl ModelManager {
     pub fn new(repo_path: PathBuf, config: ModelConfig, logger: slog::Logger) -> ModelManager {
         let model_cache = LruCache::new(config.cache_limit());
@@ -98,7 +97,7 @@ impl ModelManager {
 
         let repo_path = Model::resolve_manifest_dir(&self.repo_path)?;
 
-        info!(verb=2, repo_path=repo_path.to_string_lossy().as_ref(), "Repository opened");
+        info!(verb=2, repo_path=?repo_path, "Repository opened");
 
         self.repo_path = repo_path;
         self.repo_manager = Some(op_rev::open_repository(&self.repo_path).await?);

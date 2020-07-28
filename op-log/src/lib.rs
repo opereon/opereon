@@ -56,12 +56,26 @@ impl Into<slog::Level> for Level {
     }
 }
 
+impl Into<tracing::Level> for Level {
+    fn into(self) -> tracing::Level {
+        match self {
+            Level::Trace => tracing::Level::TRACE,
+            Level::Debug => tracing::Level::DEBUG,
+            Level::Info => tracing::Level::INFO,
+            Level::Warn => tracing::Level::WARN,
+            Level::Error => tracing::Level::ERROR,
+            Level::Critical => tracing::Level::ERROR,
+        }
+    }
+}
 pub fn init_tracing(verbosity: u8, cfg: &LogConfig) {
     let mut file_layer = FileLayer::new(cfg.level(), cfg.log_path());
 
     file_layer.init();
 
+    let level: tracing::Level = cfg.level().into();
     let subscriber = tracing_subscriber::fmt()
+        .with_max_level(level)
         .finish()
         .with(TermLayer::new(verbosity))
         .with(file_layer);

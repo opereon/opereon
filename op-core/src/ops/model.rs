@@ -33,18 +33,23 @@ impl ModelQueryOperation {
 
 #[async_trait]
 impl OperationImpl<Outcome> for ModelQueryOperation {
-    #[instrument(skip(self, engine, _operation), name="ModelQueryOperation")]
+    #[instrument(
+    name = "ModelQueryOperation",
+    skip(self, engine, _operation),
+    fields(
+        model_path = % _self.model_path,
+        expr = % _self.expr)
+    )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        info!(verb=2, model_path=%self.model_path, expr=%self.expr, "Querying model...");
+        info!(verb=2, "Querying model...");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let model = manager.resolve(&self.model_path).await?;
         let expr = Opath::parse(&self.expr).map_err_as_cause(|| ModelOpErrorDetail::QueryOp)?;
 
-        // info!(self.logger, "Querying model...");
         let res = {
             let m = model.lock();
             kg_tree::set_base_path(m.rev_info().path());
