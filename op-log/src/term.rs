@@ -6,27 +6,18 @@ use tracing::{Event, Id, Level, Span, Subscriber};
 use tracing_subscriber::field::Visit;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::{registry, Layer};
+use tracing::span::{Attributes, Record};
 
-struct TermEvent<'a, 'b> {
+struct VerbosityVisitor<'a,> {
     verb_field: &'a Field,
-    target_verb: u64,
-    event: &'a Event<'b>,
     verbosity: Option<u64>,
-    recording: bool,
-    kvs: Vec<(&'static str, String)>,
-    message: Option<String>,
 }
 
-impl<'a, 'b> TermEvent<'a, 'b> {
-    pub fn new(verb_field: &'a Field, event: &'b Event<'_>, target_verb: u64) -> Self {
-        let mut evt = TermEvent {
+impl<'a> VerbosityVisitor<'a> {
+    pub fn new(verb_field: &'a Field, event: &'_ Event<'_>) -> Self {
+        let mut evt = VerbosityVisitor {
             verb_field,
-            target_verb,
-            event,
             verbosity: None,
-            recording: true,
-            kvs: vec![],
-            message: None,
         };
         event.record(&mut evt);
         evt
@@ -34,104 +25,82 @@ impl<'a, 'b> TermEvent<'a, 'b> {
 
     fn set_verbosity(&mut self, verbosity: u64) {
         self.verbosity = Some(verbosity);
-        // skip remaining fields if event verbosity lower than expected
-        // this is necessary because Event API limitations https://github.com/tokio-rs/tracing/issues/680
-        self.recording = verbosity <= self.target_verb
     }
 
     pub fn verbosity(&self) -> &Option<u64> {
         &self.verbosity
     }
-
-    pub fn print(&self) {
-        if let Some(verbosity) = self.verbosity() {
-            if *verbosity > self.target_verb {
-                return;
-            }
-            let level = self.event.metadata().level();
-
-            let level = match *level {
-                Level::TRACE => "TRACE".white(),
-                Level::DEBUG => "DEBUG".bright_black(),
-                Level::INFO => "INFO".blue(),
-                Level::WARN => "WARN".yellow(),
-                Level::ERROR => "ERROR".bright_red(),
-            };
-
-            let fields = self
-                .kvs
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            let fields = if fields.is_empty() {
-                String::new()
-            } else {
-                format!("{{ {} }}", fields)
-            };
-
-            println!(
-                "{level} {message} {fields}",
-                level = level,
-                message = self.message.as_ref().unwrap_or(&String::new()),
-                fields = fields
-            )
-        }
-    }
 }
 
-impl<'a, 'b> Visit for TermEvent<'a, 'b> {
+impl<'a> Visit for VerbosityVisitor<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
         if self.verb_field == field {
             self.set_verbosity(value as u64)
-        } else {
-            self.record_debug(field, &value)
         }
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
         if self.verb_field == field {
             self.set_verbosity(value)
-        } else {
-            self.record_debug(field, &value)
         }
     }
 
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        if self.recording {
-            if field.name() == "message" {
-                self.message = Some(format!("{:?}", value))
-            } else {
-                self.kvs.push((field.name(), format!("{:?}", value)))
-            }
-        }
-    }
+    fn record_debug(&mut self, _field: &Field, _value: &dyn Debug) {}
 }
 
 const VERBOSITY_KEY: &str = "verb";
 
-pub struct TermLayer {
+pub struct TermLayer<S> {
     verbosity: u8,
+    inner: tracing_subscriber::fmt::Layer<S>
 }
 
-impl TermLayer {
+impl <S> TermLayer<S> {
     pub fn new(verbosity: u8) -> Self {
-        TermLayer { verbosity }
+        let inner = tracing_subscriber::fmt::Layer::new();
+        TermLayer {
+            verbosity,
+            inner
+        }
     }
 }
 
-impl<S> Layer<S> for TermLayer
+impl<S> Layer<S> for TermLayer<S>
 where
     S: Subscriber + for<'a> registry::LookupSpan<'a>,
 {
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        self.inner.new_span(attrs, id, ctx)
+    }
+
+    fn on_record(&self, span: &Id, values: &Record<'_>, ctx: Context<'_, S>) {
+        self.inner.on_record(span, values, ctx)
+    }
+
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let verbosity = event.metadata().fields().field(VERBOSITY_KEY);
         if verbosity.is_none() {
             return;
         }
         let verbosity = verbosity.unwrap();
-        let evt = TermEvent::new(&verbosity, event, self.verbosity as u64);
-        evt.print()
+        let evt = VerbosityVisitor::new(&verbosity, event);
+
+        if let Some(verb) = evt.verbosity {
+            if verb <= self.verbosity as u64 {
+                self.inner.on_event(event, ctx)
+            }
+        }
+    }
+
+    fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
+        self.inner.on_enter(id, ctx)
+    }
+
+    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
+        self.inner.on_exit(id, ctx)
+    }
+
+    fn on_close(&self, id: Id, ctx: Context<'_, S>) {
+        self.inner.on_close(id, ctx)
     }
 }

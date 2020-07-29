@@ -84,7 +84,7 @@ impl OperationImpl<Outcome> for ModelCommitOperation {
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        info!("Committing model");
+        info!(verb=2, "Committing model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let _m = manager.commit(&self.message).await?;
         Ok(Outcome::Empty)
@@ -114,7 +114,7 @@ impl OperationImpl<Outcome> for ModelTestOperation {
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        info!("Testing model");
+        info!(verb=2, "Testing model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let model = manager.resolve(&self.model_path).await?;
         let res = to_tree(&*model.lock()).unwrap();
@@ -147,7 +147,7 @@ impl OperationImpl<Outcome> for ModelDiffOperation {
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
-        info!("Getting diffs");
+        info!(verb=2, "Getting diffs");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         let m1 = manager.resolve(&self.source).await?;
         let m2 = manager.resolve(&self.target).await?;
@@ -180,13 +180,14 @@ impl OperationImpl<Outcome> for ModelInitOperation {
     name = "ModelInitOperation",
     skip(self, engine, _operation),
     fields(
-        path = % _self.path)
+        path = ? _self.path)
     )]
     async fn done(
         &mut self,
         engine: &EngineRef<Outcome>,
         _operation: &OperationRef<Outcome>,
     ) -> OperationResult<Outcome> {
+        info!(verb=2, "Initializing model");
         let mut manager = engine.service::<ModelManager>().await.unwrap();
         manager.create_model(self.path.clone()).await?;
         Ok(Outcome::Empty)
