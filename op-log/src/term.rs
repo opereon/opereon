@@ -2,13 +2,13 @@ use colored::Colorize;
 use std::fmt::Debug;
 use tracing::field::Field;
 
+use tracing::span::{Attributes, Record};
 use tracing::{Event, Id, Level, Span, Subscriber};
 use tracing_subscriber::field::Visit;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::{registry, Layer};
-use tracing::span::{Attributes, Record};
 
-struct VerbosityVisitor<'a,> {
+struct VerbosityVisitor<'a> {
     verb_field: &'a Field,
     verbosity: Option<u64>,
 }
@@ -52,16 +52,13 @@ const VERBOSITY_KEY: &str = "verb";
 
 pub struct TermLayer<S> {
     verbosity: u8,
-    inner: tracing_subscriber::fmt::Layer<S>
+    inner: tracing_subscriber::fmt::Layer<S>,
 }
 
-impl <S> TermLayer<S> {
+impl<S> TermLayer<S> {
     pub fn new(verbosity: u8) -> Self {
         let inner = tracing_subscriber::fmt::Layer::new();
-        TermLayer {
-            verbosity,
-            inner
-        }
+        TermLayer { verbosity, inner }
     }
 }
 
