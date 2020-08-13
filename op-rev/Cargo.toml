@@ -13,9 +13,9 @@ kg-display-derive = "0.1.1"
 kg-diag-derive = "0.4.0"
 slog = "2.5.2"
 git2 = "0.13.8"
-serde = "1.0.114"
-serde_derive = "1.0.114"
-async-trait = "0.1.36"
+serde = "1.0.115"
+serde_derive = "1.0.115"
+async-trait = "0.1.37"
 tokio = "0.2.22"
 
 [dev-dependencies]
