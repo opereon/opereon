@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "kg-symbol"
-version = "0.1.10"
+version = "0.2.0"
 dependencies = [
  "heapsize",
  "lazy_static",

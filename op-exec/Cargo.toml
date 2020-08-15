@@ -12,7 +12,7 @@ kg-display-derive = "0.1.1"
 kg-utils = "0.4.0"
 kg-tree = "0.2.0"
 kg-template = "0.1.2"
-kg-symbol= "0.1.10"
+kg-symbol= "0.2.0"
 kg-lang = "0.1.1"
 op-model = { path = "../op-model" }
 op-rev = { path = "../op-rev" }
