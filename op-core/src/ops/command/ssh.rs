@@ -111,8 +111,8 @@ mod tests {
     use crate::outcome::Outcome;
     use op_engine::operation::OperationImplExt;
     use op_engine::{EngineRef, OperationRef};
-    use op_exec2::command::ssh::{SshAuth, SshConfig};
-    use op_exec2::command::SourceRef;
+    use op_exec::command::ssh::{SshAuth, SshConfig};
+    use op_exec::command::SourceRef;
     use std::path::PathBuf;
 
     #[test]
