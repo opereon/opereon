@@ -9,7 +9,7 @@ build = "build.rs"
 
 [dependencies]
 kg-diag = "0.4.0"
-kg-tree = "0.2.0"
+kg-tree = "0.2.1"
 kg-utils = "0.4.0"
 op-engine = { path= "../op-engine"}
 op-core = { path = "../op-core" }

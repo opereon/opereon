@@ -5,7 +5,7 @@ authors = ["Wiktor Sikora <wiktor.sikora@kodegenix.pl>"]
 edition = "2018"
 
 [dependencies]
-kg-tree = "0.2.0"
+kg-tree = "0.2.1"
 kg-diag = "0.4.0"
 kg-diag-derive = "0.4.0"
 kg-display-derive = "0.1.1"
