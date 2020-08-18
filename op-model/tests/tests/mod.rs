@@ -30,6 +30,5 @@ pub fn initial_commit(path: &Path) -> Oid {
 
 mod config;
 mod defs;
-mod git;
 mod load_file;
 mod model;

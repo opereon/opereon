@@ -1,5 +1,6 @@
 use super::*;
 use op_model::{AsScoped, ParsedModelDef, UserDef};
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn new_empty() {

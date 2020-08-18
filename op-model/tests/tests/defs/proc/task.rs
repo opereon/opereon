@@ -4,15 +4,12 @@ use kg_tree::opath::Opath;
 use kg_tree::FileFormat;
 use op_model::{Case, OutputMode, Switch, TaskDef, TaskEnv, TaskKind, TaskOutput};
 use std::str::FromStr;
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn proc_kind_from_str() {
     assert_eq!(TaskKind::Exec, TaskKind::from_str("exec").unwrap_disp());
     assert_eq!(TaskKind::Switch, TaskKind::from_str("switch").unwrap_disp());
-    assert_eq!(
-        TaskKind::Template,
-        TaskKind::from_str("template").unwrap_disp()
-    );
     assert_eq!(
         TaskKind::Command,
         TaskKind::from_str("command").unwrap_disp()

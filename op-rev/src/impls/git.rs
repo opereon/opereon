@@ -171,7 +171,7 @@ impl GitManager {
         self.repo.clone()
     }
 
-    fn update_index(&self) -> GitResult<git2::Oid> {
+    pub fn update_index(&self) -> GitResult<git2::Oid> {
         let r = self.repo();
         let repo = r.lock().unwrap();
         update_index(&*repo)

@@ -4,6 +4,7 @@ use kg_tree::FileInfo;
 use op_model::{ProcDef, ProcKind};
 use std::path::PathBuf;
 use std::str::FromStr;
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn proc_kind_from_str() {

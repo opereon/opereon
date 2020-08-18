@@ -1,6 +1,7 @@
 use super::*;
 use kg_tree::Kind;
-use op_model::{HostDef, ParsedModelDef};
+use op_model::{HostDef, ParsedModelDef, DefsErrorDetail};
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn new_host_empty() {

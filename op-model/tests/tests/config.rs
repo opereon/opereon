@@ -1,7 +1,9 @@
 use super::*;
 use op_model::{Config, ConfigResolver};
-use op_model::{GitErrorDetail, ModelErrorDetail, ModelErrorDetail::*};
+use op_model::{ModelErrorDetail, ModelErrorDetail::*};
 use std::path::PathBuf;
+use op_test_helpers::{get_tmp_dir, init_repo, ToStringExt, UnwrapDisplay};
+use kg_diag::{IoResult, IoErrorDetail};
 
 #[test]
 fn resolver_scan_revision() {
@@ -11,7 +13,7 @@ fn resolver_scan_revision() {
     init_repo(&dir);
     let commit = initial_commit(&dir);
 
-    let cr: ConfigResolver = ConfigResolver::scan_revision(&dir, &commit).unwrap_disp();
+    let cr: ConfigResolver = ConfigResolver::scan(&dir).unwrap_disp();
 
     let cfgs: Vec<(&PathBuf, &Config)> = cr.iter().collect();
     assert_eq!(4, cfgs.len());
@@ -21,13 +23,13 @@ fn resolver_scan_revision() {
     assert_eq!("proc/hosts_file", cfgs[3].0.to_string_ext());
 }
 
-#[test]
-fn resolver_scan_bad_git_path() {
-    let (_tmp, dir) = get_tmp_dir();
-    let res = ConfigResolver::scan_revision(&dir, &Oid::nil());
-
-    let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::OpenRepository{..});
-}
+// #[test]
+// fn resolver_scan_bad_git_path() {
+//     let (_tmp, dir) = get_tmp_dir();
+//     let res = ConfigResolver::scan_revision(&dir, &Oid::nil());
+//
+//     let (_err, _detail) = assert_detail!(res, GitErrorDetail, GitErrorDetail::OpenRepository{..});
+// }
 
 #[test]
 fn resolver_scan_non_utf8() {
@@ -36,23 +38,24 @@ fn resolver_scan_non_utf8() {
     init_repo(&dir);
     let commit = initial_commit(&dir);
 
-    let res = ConfigResolver::scan_revision(&dir, &commit);
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, ConfigUtf8{..});
+    let res = ConfigResolver::scan(&dir);
+    let (_err, _detail) = assert_detail!(res, IoErrorDetail, IoErrorDetail::IoPath{..});
 }
 
-#[test]
-fn resolver_malformed_config() {
-    let (_tmp, dir) = get_tmp_dir();
-
-    // language=toml
-    let content = r#"
-exclude="unexpected string"
-"#;
-
-    write_file!(dir.join(".operc"), content);
-    init_repo(&dir);
-    let commit = initial_commit(&dir);
-
-    let res = ConfigResolver::scan_revision(&dir, &commit);
-    let (_err, _detail) = assert_detail!(res, ModelErrorDetail, MalformedConfigFile{..});
-}
+// TODO ws
+// #[test]
+// fn resolver_malformed_config() {
+//     let (_tmp, dir) = get_tmp_dir();
+//
+//     // language=toml
+//     let content = r#"
+// exclude="unexpected string"
+// "#;
+//
+//     write_file!(dir.join(".operc"), content);
+//     init_repo(&dir);
+//     let commit = initial_commit(&dir);
+//
+//     let res = ConfigResolver::scan(&dir);
+//     let (_err, _detail) = assert_detail!(res, IoErrorDetail, IoErrorDetail::Io{..});
+// }

@@ -333,6 +333,7 @@ impl ConfigResolver {
             Err(ref err) if err.kind() == ::std::io::ErrorKind::NotFound => Ok(()),
             Err(err) => Err(err),
             Ok(_) => {
+                // FIXME ws handle errors
                 let config: Config = toml::from_str(&content).unwrap();
                 self.add_file(dir, config);
                 Ok(())
@@ -382,25 +383,25 @@ mod tests {
     path = "**/*"
     file_type = "dir"
     item = "${map()}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_name, $item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join(\".\", \"\\\"\")).set($item.@file_name, $item)}"
 
     [[include]]
     path = "**/_.{yaml,yml,toml,json}"
     file_type = "file"
     item = "${loadFile(@.@file_path, @.@file_ext)}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).extend($item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join(\".\", \"\\\"\")).extend($item)}"
 
     [[include]]
     path = "**/*.{yaml,yml,toml,json}"
     file_type = "file"
     item = "${loadFile(@.@file_path, @.@file_ext)}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_stem, $item)}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join(\".\", \"\\\"\")).set($item.@file_stem, $item)}"
 
     [[include]]
     path = "**/*"
     file_type = "file"
-    item = "${loadFile(@.@file_path, 'text')}"
-    mapping = "${$.find(array($item.@file_path_components[..-2]).join('.', '\\\"')).set($item.@file_stem, $item)}"
+    item = "${loadFile(@.@file_path, \"text\")}"
+    mapping = "${$.find(array($item.@file_path_components[..-2]).join(\".\", \"\\\"\")).set($item.@file_stem, $item)}"
 
     [overrides]
     "#);
@@ -410,7 +411,7 @@ mod tests {
         let config = Config::standard();
 
         let toml = toml::to_string(&config).unwrap();
-        eprint!("toml = {}", toml);
+        eprint!("toml = {:?}", toml);
         assert_eq!(&toml, CONFIG_STANDARD_TOML);
     }
 

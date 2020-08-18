@@ -15,9 +15,12 @@ git2 = "0.13.8"
 serde = "1.0.115"
 serde_derive = "1.0.115"
 async-trait = "0.1.38"
-tokio = "0.2.22"
+tokio = {version="0.2.22", features=["full"]}
 
 [dev-dependencies]
 indoc = "1.0.2"
 serde_json = "1.0.57"
 serde_yaml = "0.8.13"
+pretty_assertions = "0.6.1"
+op-test-helpers = { version = "0.1.0", path = "../op-test-helpers" }
+tokio-test = "0.2.1"

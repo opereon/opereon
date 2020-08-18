@@ -1,6 +1,7 @@
 use super::*;
 use kg_tree::opath::{Opath, ScopeMut};
 use op_model::{AsScoped, ParsedModelDef, ScopeDef, ValueDef};
+use op_test_helpers::{UnwrapDisplay, NodeRefExt};
 
 #[test]
 fn value_parse_static() {
