@@ -1,5 +1,6 @@
 use super::*;
-use op_model::{Run, Step};
+use op_model::{RunDef, Step};
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn step_parse_array_tasks() {
@@ -166,7 +167,7 @@ run:
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let def = Run::parse(&model, model.as_scoped(), &node).unwrap_disp();
+    let def = RunDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
 
     assert_eq!(2, def.steps().len())
 }
@@ -184,7 +185,7 @@ run:
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let def = Run::parse(&model, model.as_scoped(), &node).unwrap_disp();
+    let def = RunDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
 
     assert_eq!(2, def.steps().len())
 }
@@ -196,7 +197,7 @@ fn run_parse_null() {
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let def = Run::parse(&model, model.as_scoped(), &node).unwrap_disp();
+    let def = RunDef::parse(&model, model.as_scoped(), &node).unwrap_disp();
 
     assert_eq!(0, def.steps().len())
 }
@@ -216,7 +217,7 @@ run:
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let res = Run::parse(&model, model.as_scoped(), &node);
+    let res = RunDef::parse(&model, model.as_scoped(), &node);
 
     let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParse{step, ..}, assert_eq!("1 (step_1)", step));
     assert_cause!(err);
@@ -235,7 +236,7 @@ run:
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let res = Run::parse(&model, model.as_scoped(), &node);
+    let res = RunDef::parse(&model, model.as_scoped(), &node);
 
     let (err, _detail) = assert_detail!(res, DefsErrorDetail, DefsErrorDetail::StepParse{step, ..}, assert_eq!("1", step));
     assert_cause!(err);
@@ -250,7 +251,7 @@ run: "some string"
     let node: NodeRef = node!(node, yaml);
     let model: Model = Model::empty();
 
-    let res = Run::parse(&model, model.as_scoped(), &node);
+    let res = RunDef::parse(&model, model.as_scoped(), &node);
 
     let (_err, _detail) = assert_detail!(
         res,

@@ -1,10 +1,5 @@
 ---
 scope:
-tasks:
-  "generate /etc/hosts":
-    kind: template
-    scope:
-      src_path: etc/hosts
 
 updates:
   proc: update
@@ -16,12 +11,9 @@ updates:
     "conf/hosts/**": "~"
   run:
     - tasks:
-        - task: template
-          scope:
-            src_path: etc/hosts
         - task: file-copy
           scope:
-            src_path: ${$$work_dir + '/etc/hosts'}
+            src_path: etc/hosts
             dst_path: /root/hosts # this should be /etc/hosts but due to docker limitation just copy file to /root/hosts: https://github.com/moby/moby/issues/22281#issuecomment-214336587
             chown: root:root
             chmod: u+rw,g+r,o+r

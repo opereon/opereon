@@ -2,6 +2,7 @@ use super::*;
 use globset::GlobBuilder;
 use kg_tree::opath::Opath;
 use op_model::{FileWatch, ModelWatch};
+use op_test_helpers::UnwrapDisplay;
 
 #[test]
 fn model_watch_parse() {

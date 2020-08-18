@@ -160,7 +160,6 @@ impl ParsedModelDef for TaskDef {
 pub enum TaskKind {
     Exec,
     Switch,
-    Template,
     Command,
     Script,
     FileCopy,
@@ -174,7 +173,6 @@ impl FromStr for TaskKind {
         match s {
             "exec" => Ok(TaskKind::Exec),
             "switch" => Ok(TaskKind::Switch),
-            "template" => Ok(TaskKind::Template),
             "command" => Ok(TaskKind::Command),
             "script" => Ok(TaskKind::Script),
             "file-copy" => Ok(TaskKind::FileCopy),
