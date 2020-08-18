@@ -4,7 +4,7 @@ scope:
 run:
   - hosts: ${$$host}
     tasks:
-      - task: template
+      - task: file-copy
         scope:
           src_path: "host.tpl"
           dst_path: ${$$host.hostname + "/_.yaml"}
