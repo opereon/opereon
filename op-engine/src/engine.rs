@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::operation::OperationResult;
 use futures::lock::{Mutex, MutexGuard};
 use kg_diag::Detail;
-use serde::export::PhantomData;
+use serde::export::{PhantomData, Formatter};
 use std::any::{Any, TypeId};
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
@@ -16,6 +16,7 @@ use std::task::{Context, Poll, Waker};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use uuid::Uuid;
+use std::fmt::Debug;
 
 struct Operations<T: Clone + 'static> {
     operation_queue1: VecDeque<OperationRef<T>>,
@@ -308,4 +309,13 @@ async fn get_operation_fut<T: Clone + 'static>(
 
     let out = inner().await;
     e.finish_operation(&o, out);
+}
+
+impl<T: Debug + Clone + 'static> Debug for EngineRef<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("EngineRef")
+            // .field(&self.some_field)
+
+            .finish()
+    }
 }

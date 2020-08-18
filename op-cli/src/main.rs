@@ -1,6 +1,8 @@
-extern crate slog;
 extern crate structopt;
 
+extern crate tracing;
+
+use op_core::*;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
@@ -8,21 +10,17 @@ use chrono::{DateTime, FixedOffset, Utc};
 use structopt::StructOpt;
 use url::Url;
 
-use crate::slog::Drain;
 use display::DisplayFormat;
 
 use kg_diag::BasicDiag;
-use op_log::{build_file_drain, CliLogger};
-use op_rev::*;
-use op_core::*;
+use op_rev::RevPath;
+use options::*;
+
 use op_core::config::ConfigRef;
 use op_core::context::Context as ExecContext;
 use op_core::state::CoreState;
 use op_exec::command::ssh::{SshAuth, SshDest};
 use op_engine::EngineRef;
-
-use options::*;
-use slog::{o, FnValue};
 
 mod display;
 mod options;
@@ -35,40 +33,20 @@ fn make_path_absolute(path: &Path) -> PathBuf {
     path.canonicalize().unwrap()
 }
 
-fn init_logger(config: &ConfigRef, verbosity: u8) -> slog::Logger {
-    let file_drain = build_file_drain(
-        config.log().log_path().to_path_buf(),
-        (*config.log().level()).into(),
-    );
-
-    let logger = slog::Logger::root(
-        file_drain.fuse(),
-        o!("module" =>
-         FnValue(move |info| {
-              info.module()
-         })
-        ),
-    );
-
-    let cli_logger = CliLogger::new(verbosity as usize, logger.new(o!()));
-    op_log::set_logger(cli_logger);
-    logger
-}
-
 /// start engine and execute provided operation. Returns exit code
 fn local_run(
     current_dir: PathBuf,
     config: ConfigRef,
     ctx: ExecContext,
     disp_format: DisplayFormat,
-    verbose: u8,
+    verbosity: u8,
 ) -> Result<u32, BasicDiag> {
-    let logger = init_logger(&config, verbose);
+    op_log::init_tracing(verbosity, config.log());
 
     let mut rt = EngineRef::<()>::build_runtime();
 
     let out_res = rt.block_on(async {
-        let services = init_services(current_dir, config.clone(), logger).await?;
+        let services = init_services(current_dir, config.clone()).await?;
         let state = CoreState::new(config);
 
         let engine = EngineRef::new(services, state);

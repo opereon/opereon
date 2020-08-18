@@ -1,67 +1,85 @@
-extern crate colored;
-extern crate slog;
+#[macro_use]
+extern crate serde_derive;
 
-use crate::colored::Colorize;
-use slog::{Drain, Never};
-use std::fs::OpenOptions;
-use std::path::Path;
-use std::sync::Mutex;
+use crate::config::LogConfig;
+use crate::file::FileLayer;
+use crate::term::TermLayer;
+use std::fmt::Debug;
 
-mod logger;
+use tracing_subscriber::layer::SubscriberExt;
 
-pub use logger::*;
+pub mod config;
+mod file;
+mod term;
 
-
-pub fn build_file_drain<P: AsRef<Path>>(
-    log_path: P,
-    level: slog::Level,
-) -> impl Drain<Ok = (), Err = Never> {
-    if let Some(log_dir) = log_path.as_ref().parent() {
-        std::fs::create_dir_all(log_dir).expect("Cannot create log dir");
-    }
-
-    let mut open_opts = OpenOptions::new();
-
-    open_opts.create(true).append(true);
-
-    let log_file = open_opts.open(log_path).expect("Cannot open log file");
-
-    let drain = slog_bunyan::default(log_file);
-
-    //    let decorator = slog_term::PlainSyncDecorator::new(log_file.try_clone().unwrap());
-    //    let drain = slog_term::FullFormat::new(decorator).build();
-    let drain = slog::LevelFilter::new(Mutex::new(drain), level);
-    drain.fuse()
+#[derive(Copy, Clone, Debug, Hash, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    Trace = 0,
+    Debug = 1,
+    Info = 2,
+    Warn = 3,
+    Error = 4,
+    Critical = 5,
 }
 
-/// Logger for logging messages directly to user.
-/// Each message is also logged to provided `slog::Logger`
-pub struct CliLogger {
-    verbosity: usize,
-    logger: slog::Logger
-}
-
-impl CliLogger {
-    pub fn new(verbosity: usize, logger: slog::Logger) -> CliLogger {
-        CliLogger {
-            verbosity,
-            logger,
+impl std::fmt::Display for Level {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Level::Trace => f.write_str("Trace"),
+            Level::Debug => f.write_str("Debug"),
+            Level::Info => f.write_str("Info"),
+            Level::Warn => f.write_str("Warn"),
+            Level::Error => f.write_str("Error"),
+            Level::Critical => f.write_str("Critical"),
         }
     }
 }
 
-impl Logger for CliLogger {
-    fn log(&mut self, record: &Record) {
-        if record.verbosity() > self.verbosity {
-            return;
-        }
-        let prefix = match record.level() {
-            Level::Error => "Error:".bright_red(),
-            Level::Warn => "Warn:".yellow(),
-            Level::Info => "Info:".blue(),
-        };
-        slog::info!(self.logger, "CLI OUT: {} {}", record.level(), record.msg());
-
-        println!("{} {}", prefix, record.msg())
+impl PartialEq for Level {
+    #[inline]
+    fn eq(&self, other: &Level) -> bool {
+        *self as usize == *other as usize
     }
+}
+
+impl Into<slog::Level> for Level {
+    fn into(self) -> slog::Level {
+        match self {
+            Level::Trace => slog::Level::Trace,
+            Level::Debug => slog::Level::Debug,
+            Level::Info => slog::Level::Info,
+            Level::Warn => slog::Level::Warning,
+            Level::Error => slog::Level::Error,
+            Level::Critical => slog::Level::Critical,
+        }
+    }
+}
+
+impl Into<tracing::Level> for Level {
+    fn into(self) -> tracing::Level {
+        match self {
+            Level::Trace => tracing::Level::TRACE,
+            Level::Debug => tracing::Level::DEBUG,
+            Level::Info => tracing::Level::INFO,
+            Level::Warn => tracing::Level::WARN,
+            Level::Error => tracing::Level::ERROR,
+            Level::Critical => tracing::Level::ERROR,
+        }
+    }
+}
+pub fn init_tracing(verbosity: u8, cfg: &LogConfig) {
+    let mut file_layer = FileLayer::new(cfg.level(), cfg.log_path());
+
+    file_layer.init();
+
+    let level: tracing::Level = cfg.level().into();
+    let subscriber = tracing_subscriber::registry()
+        // tracing_subscriber::fmt()
+        // .with_max_level(level)
+        // .finish()
+        .with(TermLayer::new(verbosity))
+        .with(file_layer);
+
+    tracing::subscriber::set_global_default(subscriber).unwrap()
 }

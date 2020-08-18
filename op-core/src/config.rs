@@ -7,11 +7,11 @@ use kg_tree::opath::{RootedResolveStrategy, TreeResolver};
 use kg_tree::serial::{from_tree, to_tree};
 use kg_tree::NodeRef;
 use regex::{Captures, Regex};
-use slog::Level;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use op_log::config::LogConfig;
 
 pub type ConfigResult<T> = Result<T, BasicDiag>;
 
@@ -134,56 +134,6 @@ impl Default for ModelConfig {
             data_dir: PathBuf::from("/var/run/opereon/data"),
             cache_limit: 10,
             diff: NodeDiffOptions::new(true, Some(5), Some(0.1)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-    Critical,
-    Error,
-    Warning,
-    Info,
-    Debug,
-    Trace,
-}
-
-impl Into<Level> for LogLevel {
-    fn into(self) -> Level {
-        match self {
-            LogLevel::Trace => Level::Trace,
-            LogLevel::Debug => Level::Debug,
-            LogLevel::Info => Level::Info,
-            LogLevel::Warning => Level::Warning,
-            LogLevel::Error => Level::Error,
-            LogLevel::Critical => Level::Critical,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct LogConfig {
-    level: LogLevel,
-    log_path: PathBuf,
-}
-
-impl LogConfig {
-    pub fn level(&self) -> &LogLevel {
-        &self.level
-    }
-
-    pub fn log_path(&self) -> &Path {
-        &self.log_path
-    }
-}
-
-impl Default for LogConfig {
-    fn default() -> Self {
-        LogConfig {
-            level: LogLevel::Info,
-            log_path: PathBuf::from("/var/log/opereon/opereon.log"),
         }
     }
 }

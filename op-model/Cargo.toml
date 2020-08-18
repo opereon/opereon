@@ -14,7 +14,7 @@ kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
 kg-diag-derive = "0.4.0"
 op-rev = { path = "../op-rev" }
-slog = "2.5.2"
+tracing="0.1.17"
 libc = "0.2.74"
 walkdir = "2.3.1"
 globset = "0.4.5"

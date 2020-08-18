@@ -11,7 +11,7 @@ extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
 #[macro_use]
-extern crate slog;
+extern crate tracing;
 
 use std::path::{Path, PathBuf};
 
@@ -23,7 +23,6 @@ use kg_tree::opath::*;
 use kg_tree::*;
 use kg_utils::collections::LinkedHashMap;
 use op_rev::*;
-use slog::{o, warn, Logger};
 
 pub static DEFAULT_CONFIG_FILENAME: &str = ".operc";
 pub static DEFAULT_MANIFEST_FILENAME: &str = "op.toml";
@@ -58,23 +57,23 @@ mod model;
 mod update;
 
 
-fn init_manifest(model_dir: &Path, logger: &Logger) -> ModelResult<()> {
+fn init_manifest(model_dir: &Path) -> ModelResult<()> {
     let manifest_path = model_dir.join(DEFAULT_MANIFEST_FILENAME);
     if manifest_path.exists() {
-        info!(logger, "Manifest file '{manifest}' already exists, skipping...", manifest=manifest_path.display(); "verbosity"=>1);
-        return Ok(())
+        info!(verb=1, ?manifest_path, "Manifest file already exists, skipping...");
+        return Ok(());
     }
 
     fs::write(manifest_path, INITIAL_MANIFEST)?;
     Ok(())
 }
 
-fn init_config(model_dir: &Path, logger: &Logger) -> ModelResult<()> {
+fn init_config(model_dir: &Path) -> ModelResult<()> {
     let config_path = model_dir.join(DEFAULT_CONFIG_FILENAME);
 
     if config_path.exists() {
-        info!(logger, "Config file '{config}' already exists, skipping...", config=config_path.display(); "verbosity"=>1);
-        return Ok(())
+        info!(verb=1, ?config_path, "Config file already exists, skipping...");
+        return Ok(());
     }
 
     fs::write(config_path, INITIAL_CONFIG)?;
