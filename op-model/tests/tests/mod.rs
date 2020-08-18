@@ -30,8 +30,7 @@ pub fn initial_commit(path: &Path) -> Oid {
 
 //FIXME (jc) some tests are currently broken since op-rev crate was introduced.
 
-// mod config;
+mod config;
 mod defs;
-// mod git;
-// mod load_file;
+mod load_file;
 mod model;

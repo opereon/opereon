@@ -2,6 +2,7 @@ use super::*;
 use kg_tree::opath::{FuncCallErrorDetail, FuncCallErrorDetail::*, FuncId, Opath, ScopeMut};
 use op_model::LoadFileFunc;
 use std::str::FromStr;
+use op_test_helpers::{get_tmp_dir, init_repo, UnwrapDisplay, NodeRefExt};
 
 #[test]
 fn non_existing_file() {
@@ -10,7 +11,7 @@ fn non_existing_file() {
     init_repo(&dir);
     let commit = initial_commit(&dir);
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), commit);
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -29,7 +30,7 @@ fn non_existing_file() {
 fn non_existing_repo() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -48,7 +49,7 @@ fn non_existing_repo() {
 fn bad_args_num() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -72,7 +73,6 @@ fn bad_commit_oid() {
     let func = LoadFileFunc::new(
         dir.clone(),
         "".into(),
-        Oid::from_str("9306be9441bec94c673a494f05ffa389c1243d58").unwrap(),
     );
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
@@ -92,7 +92,7 @@ fn bad_commit_oid() {
 fn arg_resolve_err() {
     let (_tmp, dir) = get_tmp_dir();
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), Oid::nil());
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -120,7 +120,7 @@ fn single_param() {
     write_file!(dir.join("example_file.json"), content);
     let commit = initial_commit(&dir);
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), commit);
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -147,7 +147,7 @@ fn two_params() {
     write_file!(dir.join("example_file"), content);
     let commit = initial_commit(&dir);
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), commit);
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();
@@ -174,7 +174,7 @@ fn node_parse_err() {
     write_file!(dir.join("example_file.toml"), content);
     let commit = initial_commit(&dir);
 
-    let func = LoadFileFunc::new(dir.clone(), "".into(), commit);
+    let func = LoadFileFunc::new(dir.clone(), "".into());
     let scope = ScopeMut::new();
     scope.set_func("loadFile".into(), Box::new(func));
     let node = node!();

@@ -333,6 +333,7 @@ impl ConfigResolver {
             Err(ref err) if err.kind() == ::std::io::ErrorKind::NotFound => Ok(()),
             Err(err) => Err(err),
             Ok(_) => {
+                // FIXME ws handle errors
                 let config: Config = toml::from_str(&content).unwrap();
                 self.add_file(dir, config);
                 Ok(())
