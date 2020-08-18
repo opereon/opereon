@@ -28,8 +28,6 @@ pub fn initial_commit(path: &Path) -> Oid {
     op_test_helpers::initial_commit(path).into()
 }
 
-//FIXME (jc) some tests are currently broken since op-rev crate was introduced.
-
 mod config;
 mod defs;
 mod load_file;
