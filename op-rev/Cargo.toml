@@ -7,17 +7,17 @@ edition = "2018"
 
 [dependencies]
 kg-diag = "0.4.0"
-kg-tree = "0.2.0"
+kg-tree = "0.2.1"
 kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
 kg-diag-derive = "0.4.0"
 git2 = "0.13.8"
-serde = "1.0.114"
-serde_derive = "1.0.114"
-async-trait = "0.1.36"
+serde = "1.0.115"
+serde_derive = "1.0.115"
+async-trait = "0.1.38"
 tokio = {version="0.2.22", features=["full"]}
 
 [dev-dependencies]
-indoc = "0.3.6"
-serde_json = "1.0.56"
+indoc = "1.0.2"
+serde_json = "1.0.57"
 serde_yaml = "0.8.13"

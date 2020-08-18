@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 tempfile = "3.1.0"
-kg-tree = "0.2.0"
+kg-tree = "0.2.1"
 copy_dir = "0.1.2"
 git2 = "0.13.8"
