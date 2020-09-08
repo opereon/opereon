@@ -1,8 +1,33 @@
 # Update /etc/hosts file
-proc hosts_file(hosts = $$hosts) {
-    run on host in hosts {
-        file_copy from: "./etc/hosts.ot" to: "/etc/hosts" process: true
-        command "cat /root/hosts > /etc/hosts"
+fn hosts_file($hosts = $$hosts) {
+    for $h in $hosts {
+        $h.exec(|$e| {
+            try {
+                $f = $e.file_copy($from = "./etc/hosts.ot", $to = "/etc/hosts", $process = true, $scope = {
+                    host: $h,
+                    hosts: $hosts,
+                })
+
+                $res = $e.command("cat /root/hosts > /etc/hosts")
+
+                if $f.content == $res.content {
+                    print "ok"
+                } else {
+                    throw Error();
+                }
+
+                $e.script("""
+
+                """)
+            } catch ($err) {
+                raise Event($err)
+            }
+        })
     }
 }
+
+class Executor;
+class Host;
+class Event;
+class Error;
 
