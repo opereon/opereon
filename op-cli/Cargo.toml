@@ -8,7 +8,7 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-tracing="0.1"
+tracing= "0.1.19"
 kg-diag = "0.4.0"
 kg-tree = "0.2.1"
 kg-utils = "0.4.0"
@@ -17,7 +17,7 @@ op-core = { path = "../op-core" }
 op-exec = { path = "../op-exec" }
 op-rev = { path = "../op-rev" }
 op-log = { path = "../op-log" }
-structopt = "0.3.16"
+structopt = "0.3.17"
 futures = "0.3.5"
 serde = "1.0.115"
 serde_derive = "1.0.115"

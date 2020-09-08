@@ -12,7 +12,7 @@ kg-diag-derive = "0.4.0"
 kg-display-derive = "0.1.1"
 futures = "0.3.5"
 tokio = { version = "0.2.22", features = ["full"] }
-async-trait = "0.1.38"
+async-trait = "0.1.40"
 uuid = { version = "0.8.1", features = ["v1", "v3", "v4", "v5", "serde"] }
 serde = "1.0.115"
 serde_derive = "1.0.115"
