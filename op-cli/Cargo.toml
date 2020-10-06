@@ -8,7 +8,7 @@ default-run = "op"
 build = "build.rs"
 
 [dependencies]
-tracing= "0.1.19"
+tracing= "0.1.21"
 kg-diag = "0.4.0"
 kg-tree = "0.2.1"
 kg-utils = "0.4.0"
@@ -17,16 +17,16 @@ op-core = { path = "../op-core" }
 op-exec = { path = "../op-exec" }
 op-rev = { path = "../op-rev" }
 op-log = { path = "../op-log" }
-structopt = "0.3.17"
-futures = "0.3.5"
-serde = "1.0.115"
-serde_derive = "1.0.115"
-serde_json = "1.0.57"
+structopt = "0.3.18"
+futures = "0.3.6"
+serde = "1.0.116"
+serde_derive = "1.0.116"
+serde_json = "1.0.58"
 serde_yaml = "0.8.13"
 toml = "0.5.6"
 uuid = { version = "0.8.1", features = ["serde"] }
 url = "2.1.1"
-chrono = "0.4.15"
+chrono = "0.4.19"
 tokio = "0.2.22"
 
 [features]
