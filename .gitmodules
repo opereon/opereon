@@ -30,3 +30,7 @@
 	path = kg-lang
 	url = git@github.com:kodegenix/kg-lang.git
 	branch = master
+[submodule "kg-script"]
+	path = kg-script
+	url = git@github.com:kodegenix/kg-script.git
+	branch = master
