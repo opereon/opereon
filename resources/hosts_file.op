@@ -1,33 +1,60 @@
-# Update /etc/hosts file
-fn hosts_file($hosts = $$hosts) {
-    for $h in $hosts {
-        $h.exec(|$e| {
-            try {
-                $f = $e.file_copy($from = "./etc/hosts.ot", $to = "/etc/hosts", $process = true, $scope = {
-                    host: $h,
-                    hosts: $hosts,
-                })
+aspect hosts {
+    event MyEvent: ErrorEvent {
+        timestamp: Datetime,
+    }
 
-                $res = $e.command("cat /root/hosts > /etc/hosts")
+    # Update /etc/hosts file
+    fn hosts_file($hosts = $$hosts) {
+        for $h in $hosts {
+            $h.exec(|$e| {
+                try {
+                    $f = $e.file_copy($from = "./etc/hosts.ot", $to = "/etc/hosts", $process = true, $scope = {
+                        host: $h,
+                        hosts: $hosts,
+                    })
 
-                if $f.content == $res.content {
-                    print "ok"
-                } else {
-                    throw Error();
+                    $res = $e.command("cat /root/hosts > /etc/hosts")
+
+                    if $f.content == $res.out {
+                        print "ok"
+                    } else {
+                        throw Error();
+                    }
+
+                    $e.script("""
+
+                    """)
+                } catch ($err) {
+                    raise MyEvent($err)
                 }
+            })
+        }
+    }
 
-                $e.script("""
 
-                """)
-            } catch ($err) {
-                raise Event($err)
-            }
-        })
+    check hosts_file($hosts: Host[]) {
+
+    }
+
+    @[cache_interval: '1m']
+    query architecture($host: Host) {
+
+    }
+
+    @[interval: '1m']
+    poll MyEvent($hosts: Host[]) {
+
+    }
+
+    on MyEvent($event: Event) {
+
     }
 }
+
 
 class Executor;
 class Host;
 class Event;
 class Error;
+
 
