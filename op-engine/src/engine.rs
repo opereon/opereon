@@ -119,9 +119,8 @@ impl<T: Clone + 'static> EngineRef<T> {
     }
 
     pub fn build_runtime() -> Runtime {
-        let runtime = tokio::runtime::Builder::new()
+        let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .threaded_scheduler()
             .thread_name("engine")
             .build()
             .unwrap();

@@ -2,7 +2,7 @@ use futures::task::{Context, Poll};
 
 use std::pin::Pin;
 use std::thread;
-use tokio::future::poll_fn;
+use futures::future::poll_fn;
 use tokio::io::AsyncBufRead;
 use tokio::sync::oneshot;
 

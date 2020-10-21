@@ -8,7 +8,7 @@ kg-diag-derive = { path = "kg-diag/kg-diag-derive" }
 kg-display = { path = "kg-display/kg-display" }
 kg-display-derive = { path = "kg-display/kg-display-derive" }
 kg-js = { path = "kg-js" }
-kg-lang = { path = "kg-lang" }
+kg-syntax = { path = "kg-syntax/kg-syntax" }
 kg-symbol = { path = "kg-symbol" }
 kg-template = { path = "kg-template" }
 kg-tree = { path = "kg-tree" }

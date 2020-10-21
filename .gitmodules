@@ -26,9 +26,9 @@
 	path = kg-js
 	url = git@github.com:kodegenix/kg-js.git
 	branch = master
-[submodule "kg-lang"]
-	path = kg-lang
-	url = git@github.com:kodegenix/kg-lang.git
+[submodule "kg-syntax"]
+	path = kg-syntax
+	url = git@github.com:kodegenix/kg-syntax.git
 	branch = master
 [submodule "kg-script"]
 	path = kg-script
