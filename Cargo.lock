@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "kg-display-derive"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "kg-display",
  "kg-utils",
@@ -597,6 +597,8 @@ name = "kg-syntax"
 version = "0.2.0"
 dependencies = [
  "kg-diag",
+ "kg-diag-derive",
+ "kg-display-derive",
  "kg-js",
  "kg-tree",
  "kg-utils",

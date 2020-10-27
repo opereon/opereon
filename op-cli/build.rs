@@ -22,10 +22,8 @@ fn main() {
     )
     .unwrap();
 
-    println!(
-        "cargo:rustc-env=OP_SHORT_VERSION=v{}",
-        env!("CARGO_PKG_VERSION")
-    );
+    println!("cargo:rustc-env=OP_SHORT_VERSION=v{}", env!("CARGO_PKG_VERSION"));
     println!("cargo:rustc-env=OP_LONG_VERSION={}", &version);
     println!("cargo:rustc-env=OP_TIMESTAMP={}", &timestamp);
+    println!("cargo:rustc-env=KG_DIAG_OUTPUT={}", "/home/outsider/workspace/opereon/diags.out");
 }
