@@ -17,16 +17,16 @@ op-exec = { path = "../op-exec" }
 op-log = { path = "../op-log" }
 op-model = { path = "../op-model"}
 op-rev = { path = "../op-rev" }
-futures = { version = "0.3.6", features = ["async-await"] }
-tokio = { version = "0.3.0", features = ["full"] }
+futures = { version = "0.3.8", features = ["async-await"] }
+tokio = { version = "0.3.3", features = ["full"] }
 lazy_static = "1.4.0"
 serde = "1.0.117"
 async-trait = "0.1.41"
 shared_child = "0.3.4"
 serde_derive = "1.0.117"
 serde_json = "1.0.59"
-serde_yaml = "0.8.13"
+serde_yaml = "0.8.14"
 toml = "0.5.7"
-libc = "0.2.79"
-regex = "1.4.1"
+libc = "0.2.80"
+regex = "1.4.2"
 chrono = "0.4.19"

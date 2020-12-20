@@ -18,16 +18,16 @@ op-exec = { path = "../op-exec" }
 op-rev = { path = "../op-rev" }
 op-log = { path = "../op-log" }
 structopt = "0.3.20"
-futures = "0.3.6"
+futures = "0.3.8"
 serde = "1.0.117"
 serde_derive = "1.0.117"
 serde_json = "1.0.59"
-serde_yaml = "0.8.13"
+serde_yaml = "0.8.14"
 toml = "0.5.7"
 uuid = { version = "0.8.1", features = ["serde"] }
-url = "2.1.1"
+url = "2.2.0"
 chrono = "0.4.19"
-tokio = "0.3.0"
+tokio = "0.3.3"
 
 [features]
 system-tests =[]
