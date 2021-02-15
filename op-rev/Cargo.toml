@@ -11,16 +11,16 @@ kg-tree = "0.2.1"
 kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
 kg-diag-derive = "0.4.0"
-git2 = "0.13.12"
-serde = "1.0.117"
-serde_derive = "1.0.117"
-async-trait = "0.1.41"
-tokio = { version = "0.3.3", features = ["full"] }
+git2 = "0.13.17"
+serde = "1.0.123"
+serde_derive = "1.0.123"
+async-trait = "0.1.42"
+tokio = { version = "1.2.0", features = ["full"] }
 
 [dev-dependencies]
 indoc = "1.0.3"
-serde_json = "1.0.59"
-serde_yaml = "0.8.14"
+serde_json = "1.0.62"
+serde_yaml = "0.8.17"
 pretty_assertions = "0.6.1"
 op-test-helpers = { version = "0.1.0", path = "../op-test-helpers" }
-tokio-test = "0.3.0"
+tokio-test = "0.4.0"
