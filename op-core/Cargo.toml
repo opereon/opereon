@@ -11,7 +11,7 @@ kg-diag-derive = "0.4.0"
 kg-display-derive = "0.1.1"
 kg-utils = "0.4.0"
 tracing= "0.1.23"
-tracing-futures = "0.2.4"
+tracing-futures = "0.2.5"
 op-engine = { path = "../op-engine" }
 op-exec = { path = "../op-exec" }
 op-log = { path = "../op-log" }
