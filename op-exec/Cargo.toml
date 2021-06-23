@@ -17,33 +17,33 @@ kg-syntax = "0.3.0"
 op-model = { path = "../op-model" }
 op-rev = { path = "../op-rev" }
 op-log = { path = "../op-log" }
-tokio = { version = "1.2.0", features = ["full"] }
-pin-project = "1.0.5"
-futures = { version = "0.3.13", features = ["async-await"] }
+tokio = { version = "1.7.1", features = ["full"] }
+pin-project = "1.0.7"
+futures = { version = "0.3.15", features = ["async-await"] }
 os_pipe = "0.9.2"
-time = "0.2.25"
+time = "0.2.27"
 chrono = { version = "0.4.19", features = ["serde"] }
-serde = "1.0.123"
-serde_derive = "1.0.123"
-serde_json = "1.0.63"
+serde = "1.0.126"
+serde_derive = "1.0.126"
+serde_json = "1.0.64"
 serde_yaml = "0.8.17"
 toml = "0.5.8"
-rmp-serde = "0.15.4"
-libc = "0.2.86"
-regex = "1.4.3"
+rmp-serde = "0.15.5"
+libc = "0.2.97"
+regex = "1.5.4"
 uuid = { version = "0.8.2", features = ["v1", "v3", "v4", "v5", "serde"] }
 bytes = "1.0.1"
 lazy_static = "1.4.0"
-rand = "0.8.3"
-walkdir = "2.3.1"
+rand = "0.8.4"
+walkdir = "2.3.2"
 users = "0.11.0"
-url = "2.2.1"
-git2 = "0.13.17"
+url = "2.2.2"
+git2 = "0.13.20"
 parking_lot = "0.11.1"
 rexpect = "0.4.0"
-shared_child = "0.3.4"
+shared_child = "0.3.5"
 
 [dev-dependencies]
 tempfile = "3.2.0"
-pretty_assertions = "0.6.1"
+pretty_assertions = "0.7.2"
 op-test-helpers = { version = "0.1.0", path = "../op-test-helpers" }

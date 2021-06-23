@@ -1,6 +1,5 @@
 use super::*;
 use std::fmt::Debug;
-use serde::export::Formatter;
 
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -12,7 +11,7 @@ pub struct RevInfo {
 }
 
 impl Debug for RevInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevInfo")
             .field("id", &self.id().to_string())
             .field("path", &self.path)
